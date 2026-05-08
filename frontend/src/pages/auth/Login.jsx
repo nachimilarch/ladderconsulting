@@ -16,7 +16,7 @@ export default function Login() {
         try {
             const user = await login(form.email, form.password);
             const routes = {
-                candidate: '/dashboard/candidate',
+                candidate: '/candidate',
                 company: '/dashboard/company',
                 hr_staff: '/hr',
                 admin: '/dashboard/admin',

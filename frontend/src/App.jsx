@@ -18,7 +18,7 @@ import Reports from './pages/hr/Reports';
 const RoleRedirect = () => {
   const { user } = useAuth();
   const routes = {
-    candidate: '/dashboard/candidate',
+    candidate: '/candidate',
     company: '/dashboard/company',
     hr_staff: '/hr',
     admin: '/dashboard/admin',
@@ -45,7 +45,7 @@ export default function App() {
         } />
 
         {/* Placeholder dashboards */}
-        <Route path="/dashboard/candidate" element={
+        <Route path="/candidate" element={
           <ProtectedRoute allowedRoles={['candidate']}>
             <div className="p-10 text-xl font-semibold">Candidate Dashboard — Coming Soon (Module 3)</div>
           </ProtectedRoute>
