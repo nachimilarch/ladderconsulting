@@ -17,7 +17,7 @@ const trySendEmail = async (options) => {
 
 // ─── REGISTER ────────────────────────────────────────────────────────────────
 exports.register = async (req, res) => {
-    const { name, email, password, role, company_name, phone, address } = req.body;
+    const { name, email, password, role } = req.body;
 
     const allowedRoles = ['candidate', 'company', 'hr_staff'];
     if (!allowedRoles.includes(role)) {
@@ -54,16 +54,11 @@ exports.register = async (req, res) => {
         const userId = result.insertId;
 
         if (role === 'company') {
-            if (!company_name) {
-                return res.status(400).json({ message: 'Company name is required.' });
-            }
             await db.query(
-                `INSERT INTO company_approvals (user_id, company_name, company_email, phone, address)
-         VALUES (?, ?, ?, ?, ?)`,
-                [userId, company_name, email, phone || null, address || null]
+                `INSERT INTO company_approvals (user_id, status) VALUES (?, 'pending')`,
+                [userId]
             );
         }
-
         // Send email without blocking or crashing the response
         if (!DEV_MODE) {
             const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${verifyToken}`;
