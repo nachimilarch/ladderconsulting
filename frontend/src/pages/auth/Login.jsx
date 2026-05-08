@@ -18,7 +18,7 @@ export default function Login() {
             const routes = {
                 candidate: '/dashboard/candidate',
                 company: '/dashboard/company',
-                hr_staff: '/dashboard/hr',
+                hr_staff: '/hr',
                 admin: '/dashboard/admin',
                 trainer: '/dashboard/admin',
             };

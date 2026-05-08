@@ -1,12 +1,24 @@
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuthStore } from '../store/authStore';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
-export default function ProtectedRoute({ allowedRoles }) {
-    const { user, token } = useAuthStore();
+export default function ProtectedRoute({ children, allowedRoles }) {
+    const { user, loading } = useAuth();
 
-    if (!token || !user) return <Navigate to="/login" replace />;
-    if (allowedRoles && !allowedRoles.includes(user.role)) {
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-screen text-gray-400">
+                Loading...
+            </div>
+        );
+    }
+
+    if (!user) {
         return <Navigate to="/login" replace />;
     }
-    return <Outlet />;
+
+    if (allowedRoles && !allowedRoles.includes(user.role)) {
+        return <Navigate to="/unauthorized" replace />;
+    }
+
+    return children;
 }
