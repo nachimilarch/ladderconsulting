@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db');
+const db = require('../config/db');
 const { authenticate, authorize } = require('../middleware/auth');
 
 // GET /api/jobs/matched — jobs ranked by match score for logged-in candidate
