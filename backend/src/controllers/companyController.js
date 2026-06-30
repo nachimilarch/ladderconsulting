@@ -548,12 +548,11 @@ exports.listRequests = async (req, res) => {
 exports.getTalentPool = async (req, res) => {
     try {
         const company = await getOrCreateCompany(req.user.id);
-        if (!(await hasSelectedPackage(company.id, company.placement_fee_percent))) {
-            return res.status(403).json({
-                message: 'Select a resume unlock package to access the Talent Pool.',
-                code: 'PACKAGE_REQUIRED',
-            });
-        }
+        // No package gate — every company can browse masked candidates.
+        // PII (name/email/phone) stays hidden via maskCandidateForCompany until
+        // the specific candidate is unlocked. has_package lets the frontend know
+        // whether to show the credit-spend flow or the request-a-package flow.
+        const companyHasPkg = await hasSelectedPackage(company.id, company.placement_fee_percent);
 
         const { search = '', experience_min, experience_max, skill, page = 1 } = req.query;
         const limit = 24;
@@ -669,6 +668,7 @@ exports.getTalentPool = async (req, res) => {
             total: countRows[0].total,
             page: parseInt(page),
             limit,
+            has_package: companyHasPkg,
         });
     } catch (err) {
         console.error('[getTalentPool]', err.message);

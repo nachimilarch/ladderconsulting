@@ -139,56 +139,24 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
     );
 }
 
-// ── Unlock paywall (only shown when no Platinum/pack credit covers it) ───────
-function UnlockModal({ candidate, onClose, onPurchase, purchasing }) {
+// ── Package request modal (shown when company has no credits/platinum) ────────
+function PackageRequestModal({ onClose }) {
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                <h2 className="font-semibold text-gray-900 mb-1">Unlock Full Resume</h2>
-                <p className="text-sm text-gray-500 mb-5">
-                    Get the complete, original resume file for <strong>{candidate.candidate_name}</strong> — and the
-                    ability to schedule an interview and send an offer directly. No placement fee at hire — you've
-                    already paid for this candidate.
-                </p>
-
-                <div className="flex flex-col gap-3">
-                    <button
-                        onClick={() => onPurchase('single')}
-                        disabled={!!purchasing}
-                        className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 hover:border-indigo-300 hover:bg-indigo-50/50 transition text-left disabled:opacity-60"
-                    >
-                        <div>
-                            <p className="text-sm font-semibold text-gray-900">Unlock this resume</p>
-                            <p className="text-xs text-gray-400">Single candidate</p>
-                        </div>
-                        <span className="text-sm font-bold text-indigo-700">{purchasing === 'single' ? '…' : '₹999'}</span>
-                    </button>
-
-                    <button
-                        onClick={() => onPurchase('pack_4')}
-                        disabled={!!purchasing}
-                        className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3 hover:border-indigo-300 hover:bg-indigo-50/50 transition text-left disabled:opacity-60"
-                    >
-                        <div>
-                            <p className="text-sm font-semibold text-gray-900">4-Resume Pack</p>
-                            <p className="text-xs text-gray-400">Use now and on 3 more candidates, anytime</p>
-                        </div>
-                        <span className="text-sm font-bold text-indigo-700">{purchasing === 'pack_4' ? '…' : '₹3,999'}</span>
-                    </button>
-
-                    <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700 border border-indigo-100">
-                        Hiring at volume? Ask your account executive about <strong>Platinum</strong> — unlimited free unlocks (AI-parsed resume), placement fee at your contracted rate when you hire.
-                    </div>
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="font-semibold text-gray-900">Request a Resume Unlock Package</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
                 </div>
-
-                <button
-                    type="button"
-                    onClick={onClose}
-                    disabled={!!purchasing}
-                    className="w-full mt-4 border border-gray-300 text-gray-600 py-2 rounded-xl text-sm hover:bg-gray-50 transition disabled:opacity-60"
-                >
-                    Cancel
-                </button>
+                <p className="text-sm text-gray-500 mb-5">
+                    To see full candidate details and download resumes, select a package below.
+                    Your LadderStep executive will activate it for you — no payment gateway needed right now.
+                </p>
+                <PackagePicker
+                    title="Choose a Package"
+                    subtitle="Unlock credits let you access full profiles and resumes for any candidate in the pool."
+                    onSelected={onClose}
+                />
             </div>
         </div>
     );
@@ -291,13 +259,10 @@ export default function TalentPool() {
     const [unlockMap, setUnlockMap] = useState({}); // candidateId -> { unlocked, via }
     const [platinum, setPlatinum] = useState(false);
     const [packCredits, setPackCredits] = useState(0);
-    const [unlockModal, setUnlockModal] = useState(null); // candidate object (paywall)
-    const [purchasing, setPurchasing] = useState(null); // tier string while buying
+    const [pkgRequestModal, setPkgRequestModal] = useState(false); // request-a-package modal
     const [profileModal, setProfileModal] = useState(null); // candidate object (full profile view)
     const [downloading, setDownloading] = useState(null); // candidateId while downloading
-
-    // Package gate — null = still checking, false = blocked, true = browsing allowed
-    const [hasPackage, setHasPackage] = useState(null);
+    const [hasPackage, setHasPackage] = useState(false); // banner only — browsing is always allowed
 
     // Move-to-pipeline (paid-unlock candidates only)
     const [pipelineModal, setPipelineModal] = useState(null); // candidate object
@@ -330,14 +295,10 @@ export default function TalentPool() {
             const rows = data?.data || [];
             setCandidates(rows);
             setTotal(data?.total || 0);
-            setHasPackage(true);
+            setHasPackage(!!data?.has_package);
             fetchUnlockStatus(rows);
         } catch (err) {
-            if (err.response?.data?.code === 'PACKAGE_REQUIRED') {
-                setHasPackage(false);
-            } else {
-                toast.error('Failed to load talent pool.');
-            }
+            toast.error('Failed to load talent pool.');
         } finally {
             setLoading(false);
         }
@@ -408,7 +369,7 @@ export default function TalentPool() {
     };
 
     const handleUnlockClick = async (cand) => {
-        // Platinum or a spare pack credit means an instant, free grant — skip the paywall.
+        // Platinum or a spare pack credit → instant free grant, no modal needed.
         if (platinum || packCredits > 0) {
             try {
                 const { data } = await talentPoolAPI.unlock(cand.candidate_id);
@@ -421,28 +382,8 @@ export default function TalentPool() {
             }
             return;
         }
-        setUnlockModal(cand);
-    };
-
-    const handlePurchase = async (tier) => {
-        if (!unlockModal) return;
-        setPurchasing(tier);
-        try {
-            const { data } = await talentPoolAPI.unlock(unlockModal.candidate_id, tier);
-            if (data?.unlocked) {
-                // Already covered (race with another tab, etc.) — no payment needed.
-                applyUnlock(unlockModal.candidate_id, data.via);
-                toast.success('Unlocked.');
-                setUnlockModal(null);
-                return;
-            }
-            if (data?.needs_payment) {
-                window.location.href = `https://payments.cashfree.com/forms/${data.payment_session_id}`;
-            }
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to start purchase.');
-            setPurchasing(null);
-        }
+        // No package yet — show request modal (request flow, no payment gateway needed).
+        setPkgRequestModal(true);
     };
 
     const handleViewProfile = (cand) => setProfileModal(cand);
@@ -490,31 +431,25 @@ export default function TalentPool() {
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">Talent Pool</h1>
-                {hasPackage && (
-                    <>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                            Browse {total > 0 ? `${total} available` : 'available'} candidates sourced by LadderStep Human Consulting.
-                            Contact details are shared via your executive after you express interest.
-                        </p>
-                        {platinum ? (
-                            <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
-                                ⭐ Platinum — unlimited free resume unlocks
-                            </span>
-                        ) : packCredits > 0 ? (
-                            <span className="inline-block mt-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full">
-                                🔓 {packCredits} unlock credit{packCredits !== 1 ? 's' : ''} remaining
-                            </span>
-                        ) : null}
-                    </>
-                )}
+                    <p className="text-sm text-gray-500 mt-0.5">
+                    Browse {total > 0 ? `${total} available` : 'available'} candidates sourced by LadderStep Human Consulting.
+                    Unlock a candidate to view full contact details and download their resume.
+                </p>
+                {platinum ? (
+                    <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
+                        ⭐ Platinum — unlimited free resume unlocks
+                    </span>
+                ) : packCredits > 0 ? (
+                    <span className="inline-block mt-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full">
+                        🔓 {packCredits} unlock credit{packCredits !== 1 ? 's' : ''} remaining
+                    </span>
+                ) : !hasPackage ? (
+                    <span className="inline-block mt-2 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full cursor-pointer hover:bg-amber-100 transition" onClick={() => setPkgRequestModal(true)}>
+                        🔒 Request a package to unlock candidates →
+                    </span>
+                ) : null}
             </div>
 
-            {hasPackage === false ? (
-                <PackagePicker
-                    subtitle="Select a resume unlock package to browse the Talent Pool and see AI match % on your applicants."
-                    onSelected={(has) => { if (has) fetchCandidates(1); }}
-                />
-            ) : (
             <>
             {/* Filters */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-end">
@@ -607,7 +542,6 @@ export default function TalentPool() {
                 </>
             )}
             </>
-            )}
 
             {/* Interest modal */}
             {modal && (
@@ -674,14 +608,9 @@ export default function TalentPool() {
                 </div>
             )}
 
-            {/* Unlock paywall */}
-            {unlockModal && (
-                <UnlockModal
-                    candidate={unlockModal}
-                    purchasing={purchasing}
-                    onPurchase={handlePurchase}
-                    onClose={() => { if (!purchasing) setUnlockModal(null); }}
-                />
+            {/* Package request modal */}
+            {pkgRequestModal && (
+                <PackageRequestModal onClose={() => setPkgRequestModal(false)} />
             )}
 
             {/* Full unlocked profile */}
