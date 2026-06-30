@@ -9,7 +9,7 @@ export default defineConfig({
     allowedHosts: ['milarch-server.tail7eb794.ts.net'],
     proxy: {
       '/api': {
-        target: 'http://localhost:5002',
+        target: 'http://localhost:5001',
         changeOrigin: true,
       },
     },

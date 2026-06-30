@@ -1,18 +1,4 @@
-const nodemailer = require('nodemailer');
-
-// Dedicated GoDaddy SMTP transporter for cold outreach campaigns.
-// Kept separate from the main transactional email transporter (utils/email.js)
-// so outreach credentials can be rotated independently.
-const getTransporter = () =>
-    nodemailer.createTransport({
-        host:   process.env.GODADDY_SMTP_HOST   || process.env.SMTP_HOST,
-        port:   parseInt(process.env.GODADDY_SMTP_PORT   || process.env.SMTP_PORT)  || 465,
-        secure: (process.env.GODADDY_SMTP_SECURE || process.env.SMTP_SECURE) === 'true',
-        auth: {
-            user: process.env.GODADDY_SMTP_USER || process.env.SMTP_USER,
-            pass: process.env.GODADDY_SMTP_PASS || process.env.SMTP_PASS,
-        },
-    });
+const { sendGraphMail } = require('./graphMail');
 
 const getDefaultFrom = () =>
     process.env.GODADDY_SMTP_USER || process.env.SMTP_USER || '';
@@ -63,4 +49,16 @@ const parseReplyToTag = (address) => {
     return { campaignId: parseInt(match[1]), executiveId: parseInt(match[2]) };
 };
 
-module.exports = { getTransporter, getDefaultFrom, getDomain, replaceMergeTags, buildReplyToAddress, parseReplyToTag };
+/**
+ * Nodemailer-compatible shim used by outreachCampaignController and
+ * outreachReplyController. Returns an object with a sendMail() method
+ * that routes through the Graph API instead of SMTP.
+ */
+const getTransporter = () => ({
+    sendMail: (opts) => sendGraphMail({ ...opts, saveToSent: false }),
+});
+
+module.exports = {
+    getTransporter, getDefaultFrom, getDomain,
+    replaceMergeTags, buildReplyToAddress, parseReplyToTag,
+};

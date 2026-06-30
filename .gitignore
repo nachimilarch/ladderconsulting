@@ -17,6 +17,12 @@ build/
 *.log
 npm-debug.log*
 
+# Production env files and private keys
+*.pem
+*.key
+backend/.env.*
+deploy/.env.*
+
 # Local file uploads (keep .gitkeep markers)
 backend/uploads/resumes/*
 backend/uploads/certificates/*

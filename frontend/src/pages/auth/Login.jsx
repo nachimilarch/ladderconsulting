@@ -31,8 +31,22 @@ export default function Login() {
             const loggedIn = await loginWithMicrosoft(result.idToken);
             navigate(ROLE_HOME[loggedIn.role] || '/dashboard');
         } catch (err) {
-            if (err.errorCode !== 'user_cancelled') {
-                setError(err.response?.data?.message || 'Microsoft sign-in failed.');
+            if (err.errorCode === 'user_cancelled') {
+                // nothing — user closed the popup intentionally
+            } else if (err.errorCode === 'interaction_in_progress') {
+                // A previous popup was interrupted and left a lock in sessionStorage.
+                // Clear all MSAL keys so the next click works cleanly.
+                Object.keys(sessionStorage)
+                    .filter(k => k.includes('msal'))
+                    .forEach(k => sessionStorage.removeItem(k));
+                setError('Sign-in was interrupted. Please click "Sign in with Microsoft" again.');
+            } else {
+                const msg = err.response?.data?.message
+                    || err.message
+                    || err.errorCode
+                    || 'Microsoft sign-in failed.';
+                console.error('[MS login]', err);
+                setError(msg);
             }
         } finally {
             setSubmitting(false);
@@ -91,7 +105,7 @@ export default function Login() {
                 </div>
 
                 <p className="text-xs text-center text-gray-400 mt-6">
-                    Trainer? <Link to="/login/trainer" className="link">Sign in here</Link>
+                    <Link to="/login/trainer" className="link">Manual Login</Link>
                 </p>
 
                 <p className="text-sm text-center text-gray-500 mt-3">

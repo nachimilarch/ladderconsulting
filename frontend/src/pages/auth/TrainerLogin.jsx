@@ -44,7 +44,7 @@ export default function TrainerLogin() {
                     <img src="/logo-full.png" alt="LadderStep Human Consulting" className="h-24 object-contain" />
                 </div>
 
-                <h1 className="auth-title">Trainer Sign In</h1>
+                <h1 className="auth-title">Sign In</h1>
                 <p className="auth-subtitle">Sign in with your email and password</p>
 
                 {error && <div className="alert-error mb-5">{error}</div>}

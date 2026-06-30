@@ -13,6 +13,9 @@ const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
 // regardless of whether the account predates this change.
 const MICROSOFT_ONLY_ROLES = ['hr_staff', 'admin'];
 const GOOGLE_ONLY_ROLES = ['candidate', 'company'];
+// When SSO_ENFORCED=true, password login is blocked for SSO-only roles.
+// Leave unset (default false) until Microsoft + Google SSO are fully configured.
+const SSO_ENFORCED = process.env.SSO_ENFORCED === 'true';
 
 // Safe email helper — never crashes the request
 const trySendEmail = async (options) => {
@@ -111,14 +114,13 @@ exports.login = async (req, res) => {
 
         const user = rows[0];
 
-        // Password login is retired for SSO-only roles — checked before the
-        // password compare so this also covers accounts that predate the
-        // change and still remember a real password.
-        if (MICROSOFT_ONLY_ROLES.includes(user.role)) {
-            return res.status(403).json({ message: 'Please sign in with Microsoft.' });
-        }
-        if (GOOGLE_ONLY_ROLES.includes(user.role)) {
-            return res.status(403).json({ message: 'Please sign in with Google.' });
+        if (SSO_ENFORCED) {
+            if (MICROSOFT_ONLY_ROLES.includes(user.role)) {
+                return res.status(403).json({ message: 'Please sign in with Microsoft.' });
+            }
+            if (GOOGLE_ONLY_ROLES.includes(user.role)) {
+                return res.status(403).json({ message: 'Please sign in with Google.' });
+            }
         }
 
         const isMatch = await bcrypt.compare(password, user.password);

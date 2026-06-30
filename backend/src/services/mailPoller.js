@@ -1,19 +1,23 @@
 /**
- * Mail Poller Service — polls the GoDaddy IMAP inbox every N minutes,
- * identifies replies to outreach campaigns, and stores them as
+ * Mail Poller Service — polls the Microsoft 365 inbox via Graph API every
+ * N minutes, identifies replies to outreach campaigns, and stores them as
  * outreach_email_replies records.
+ *
+ * Replaces the old IMAP-based poller. Requires:
+ *   MICROSOFT_TENANT_ID, MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET
+ *   Mail.Read + Mail.Send application permissions granted in Azure AD.
  *
  * Started once from server.js: startMailPoller()
  * Never throws unhandled exceptions — all errors are caught and logged.
  */
 
-const Imap        = require('imap-simple');
-const { simpleParser } = require('mailparser');
-const db          = require('../config/db');
-const { parseReplyToTag } = require('../utils/outreachEmail');
+const axios = require('axios');
+const db    = require('../config/db');
+const { getGraphToken }        = require('../utils/graphMail');
+const { parseReplyToTag }      = require('../utils/outreachEmail');
 const { createLeadFromContact } = require('./leadConverter');
 
-const POLL_INTERVAL_MS = 2 * 60 * 1000; // default 2 minutes
+const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
 let pollingActive = false;
 let pollTimer     = null;
@@ -32,7 +36,7 @@ const notify = async (userId, type, title, body, metadata = null) => {
     }
 };
 
-// ── Find admin user to assign unmatched emails ────────────────────────────────
+// ── Find admin user for unmatched emails ──────────────────────────────────────
 const getAdminUserId = async () => {
     const [[row]] = await db.query(
         "SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id WHERE r.name = 'admin' AND u.status = 'active' AND u.deleted_at IS NULL LIMIT 1"
@@ -41,6 +45,7 @@ const getAdminUserId = async () => {
 };
 
 // ── Process one parsed email ──────────────────────────────────────────────────
+// (Identical logic to the former IMAP poller — only the data source changed.)
 const processMail = async (parsed) => {
     const fromAddr  = parsed.from?.value?.[0]?.address || '';
     const fromName  = parsed.from?.value?.[0]?.name    || '';
@@ -56,19 +61,18 @@ const processMail = async (parsed) => {
         const [[dup]] = await db.query(
             'SELECT id FROM outreach_email_replies WHERE message_id = ? LIMIT 1', [messageId]
         );
-        if (dup) return; // already processed
+        if (dup) return;
     }
 
-    // --- Try to identify campaign ---
-    let campaignId   = null;
-    let executiveId  = null;
-    let contactId    = null;
-    let logId        = null;
+    let campaignId  = null;
+    let executiveId = null;
+    let contactId   = null;
+    let logId       = null;
 
     // Strategy 1: Parse tagged Reply-To / To address
     const allAddresses = [
-        ...(parsed.to?.value || []),
-        ...(parsed.cc?.value || []),
+        ...(parsed.to?.value  || []),
+        ...(parsed.cc?.value  || []),
     ].map(a => a.address);
 
     for (const addr of allAddresses) {
@@ -80,7 +84,7 @@ const processMail = async (parsed) => {
         }
     }
 
-    // Strategy 2: Match via In-Reply-To header against campaign_logs.email_message_id
+    // Strategy 2: Match via In-Reply-To against campaign_logs.email_message_id
     if (!campaignId && inReplyTo) {
         const [[logRow]] = await db.query(
             `SELECT ocl.id, ocl.campaign_id, ocl.contact_id, oc.created_by
@@ -97,7 +101,7 @@ const processMail = async (parsed) => {
         }
     }
 
-    // Strategy 3: Match via from_email against contacts in the campaign
+    // Strategy 3: Match via sender email against campaign contacts
     if (!campaignId && fromAddr) {
         const [[logRow]] = await db.query(
             `SELECT ocl.id, ocl.campaign_id, ocl.contact_id, oc.created_by
@@ -131,15 +135,8 @@ const processMail = async (parsed) => {
         }
     }
 
-    // Resolve assigned_to user_id
-    let assignedTo = null;
-    if (executiveId) {
-        assignedTo = executiveId;
-    } else {
-        assignedTo = await getAdminUserId();
-    }
+    const assignedTo = executiveId || (await getAdminUserId());
 
-    // Insert reply record
     const [insertResult] = await db.query(
         `INSERT INTO outreach_email_replies
            (campaign_id, campaign_log_id, contact_id, assigned_to, channel,
@@ -147,10 +144,7 @@ const processMail = async (parsed) => {
             received_at, in_reply_to, message_id, reply_status)
          VALUES (?, ?, ?, ?, 'email', ?, ?, ?, ?, ?, ?, ?, ?, 'unread')`,
         [
-            campaignId  || null,
-            logId       || null,
-            contactId   || null,
-            assignedTo,
+            campaignId || null, logId || null, contactId || null, assignedTo,
             fromAddr, fromName, subject, bodyText, bodyHtml,
             receivedAt, inReplyTo, messageId,
         ]
@@ -158,55 +152,43 @@ const processMail = async (parsed) => {
     const replyId = insertResult.insertId;
 
     if (campaignId) {
-        // Update campaign log
         if (logId) {
             await db.query(
                 "UPDATE outreach_campaign_logs SET status = 'replied', replied_at = NOW() WHERE id = ?",
                 [logId]
             );
         }
-        // Increment campaign reply count
         await db.query(
             'UPDATE outreach_campaigns SET reply_count = reply_count + 1 WHERE id = ?',
             [campaignId]
         );
 
-        // Auto-create lead from reply
         if (contactId && assignedTo) {
             try {
                 await createLeadFromContact({
-                    contactId,
-                    source: 'cold_email',
-                    campaignId,
-                    executiveUserId: assignedTo,
-                    replyId,
+                    contactId, source: 'cold_email', campaignId,
+                    executiveUserId: assignedTo, replyId,
                 });
             } catch (e) {
                 console.error('[mailPoller:createLead]', e.message);
             }
         }
 
-        // Notify assigned executive
         if (assignedTo) {
             const [[campaign]] = await db.query(
                 'SELECT campaign_name FROM outreach_campaigns WHERE id = ? LIMIT 1', [campaignId]
             );
             await notify(
-                assignedTo,
-                'outreach_reply',
-                'New Reply Received',
+                assignedTo, 'outreach_reply', 'New Reply Received',
                 `New reply from ${fromName || fromAddr} to campaign "${campaign?.campaign_name || 'unknown'}".`,
                 { reply_id: replyId, campaign_id: campaignId }
             );
         }
     } else {
-        // Unmatched — notify admin
         const adminId = await getAdminUserId();
         if (adminId) {
             await notify(
-                adminId,
-                'outreach_unmatched',
-                'Unmatched Email Received',
+                adminId, 'outreach_unmatched', 'Unmatched Email Received',
                 `Email from ${fromAddr} could not be matched to any campaign. Manual review needed.`,
                 { reply_id: replyId }
             );
@@ -214,14 +196,64 @@ const processMail = async (parsed) => {
     }
 };
 
-// ── One poll cycle ────────────────────────────────────────────────────────────
+// Token is managed by graphMail.js (shared with email sending)
+
+// Strip HTML tags to produce plain text
+const htmlToText = (html) => {
+    if (!html) return '';
+    return html
+        .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
+        .replace(/<[^>]+>/g, ' ')
+        .replace(/&nbsp;/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+
+const getHeader = (headers, name) =>
+    headers?.find(h => h.name.toLowerCase() === name.toLowerCase())?.value || null;
+
+// Transform a Graph API message into the shape processMail() expects
+const graphToMailParsed = (msg) => {
+    const headers  = msg.internetMessageHeaders || [];
+    const bodyHtml = msg.body?.contentType === 'html' ? msg.body.content : null;
+    const bodyText = msg.body?.contentType === 'text'
+        ? msg.body.content
+        : htmlToText(bodyHtml);
+
+    return {
+        from: {
+            value: [{
+                address: msg.from?.emailAddress?.address || '',
+                name:    msg.from?.emailAddress?.name    || '',
+            }],
+        },
+        to:  { value: (msg.toRecipients  || []).map(r => ({ address: r.emailAddress.address })) },
+        cc:  { value: (msg.ccRecipients  || []).map(r => ({ address: r.emailAddress.address })) },
+        subject:   msg.subject || '',
+        text:      bodyText,
+        html:      bodyHtml || bodyText,
+        messageId: getHeader(headers, 'message-id'),
+        inReplyTo: getHeader(headers, 'in-reply-to'),
+        date:      msg.receivedDateTime ? new Date(msg.receivedDateTime) : new Date(),
+    };
+};
+
+// ── One poll cycle via Graph API ──────────────────────────────────────────────
 const runPollCycle = async () => {
-    if (!process.env.GODADDY_IMAP_HOST && !process.env.SMTP_HOST) {
-        console.log('[mailPoller] IMAP host not configured, skipping poll.');
+    const tenantId     = process.env.MICROSOFT_TENANT_ID;
+    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+
+    if (!tenantId || !clientSecret) {
+        console.log('[mailPoller] MICROSOFT_TENANT_ID / MICROSOFT_CLIENT_SECRET not set — skipping poll.');
         return;
     }
 
-    // Check if poller is enabled in platform_settings
+    const userEmail = process.env.GODADDY_IMAP_USER || process.env.SMTP_USER;
+    if (!userEmail) {
+        console.log('[mailPoller] No mailbox email configured — skipping poll.');
+        return;
+    }
+
     try {
         const [[setting]] = await db.query(
             "SELECT value FROM platform_settings WHERE setting_key = 'mail_poller_enabled'"
@@ -230,42 +262,34 @@ const runPollCycle = async () => {
             console.log('[mailPoller] Polling disabled via platform_settings.');
             return;
         }
-    } catch { /* ignore — proceed if table not ready */ }
+    } catch { /* table not ready yet — proceed */ }
 
-    const imapConfig = {
-        imap: {
-            host:     process.env.GODADDY_IMAP_HOST || 'imap.secureserver.net',
-            port:     parseInt(process.env.GODADDY_IMAP_PORT || '993'),
-            tls:      (process.env.GODADDY_IMAP_SECURE || 'true') === 'true',
-            user:     process.env.GODADDY_IMAP_USER || process.env.SMTP_USER || '',
-            password: process.env.GODADDY_IMAP_PASS || process.env.SMTP_PASS || '',
-            tlsOptions: { rejectUnauthorized: false },
-            authTimeout: 15000,
-        },
-    };
-
-    let connection;
     try {
-        connection = await Imap.connect(imapConfig);
-        await connection.openBox('INBOX');
+        const token = await getGraphToken();
+        const { data } = await axios.get(
+            `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userEmail)}/mailFolders/inbox/messages`,
+            {
+                params: {
+                    '$filter': 'isRead eq false',
+                    '$select': 'id,subject,from,toRecipients,ccRecipients,receivedDateTime,body,internetMessageHeaders',
+                    '$top':    50,
+                },
+                headers: { Authorization: `Bearer ${token}` },
+            }
+        );
 
-        // Search for UNSEEN messages
-        const searchCriteria = ['UNSEEN'];
-        const fetchOptions   = { bodies: ['HEADER', 'TEXT', ''], markSeen: false };
-
-        const messages = await connection.search(searchCriteria, fetchOptions);
-        console.log(`[mailPoller] Found ${messages.length} unseen messages.`);
+        const messages = data.value || [];
+        console.log(`[mailPoller] Found ${messages.length} unread message(s) via Graph API.`);
 
         for (const msg of messages) {
             try {
-                const allParts = msg.parts || [];
-                // Use the full raw body (part '')
-                const rawPart  = allParts.find(p => p.which === '') || allParts[0];
-                if (!rawPart) continue;
-                const parsed = await simpleParser(rawPart.body);
-                await processMail(parsed);
-                // Mark as read
-                await connection.addFlags(msg.attributes.uid, ['\\Seen']);
+                await processMail(graphToMailParsed(msg));
+                // Mark as read so we don't re-process it
+                await axios.patch(
+                    `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(userEmail)}/messages/${msg.id}`,
+                    { isRead: true },
+                    { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+                );
             } catch (err) {
                 console.error('[mailPoller] Error processing message:', err.message);
             }
@@ -273,11 +297,10 @@ const runPollCycle = async () => {
 
         lastPolledAt = new Date();
     } catch (err) {
-        console.error('[mailPoller] IMAP error:', err.message);
-    } finally {
-        if (connection) {
-            try { connection.end(); } catch { /* ignore */ }
-        }
+        const errData = err.response?.data?.error;
+        const detail  = errData?.message || err.message;
+        const code    = errData?.code    || err.response?.status || '';
+        console.error(`[mailPoller] Graph API error [${code}]:`, detail);
     }
 };
 
@@ -287,7 +310,6 @@ const startMailPoller = () => {
     pollingActive = true;
     console.log('[mailPoller] Mail poller started — interval: 2 min');
 
-    // Initial run after 10s delay (let DB stabilise on startup)
     setTimeout(async () => {
         await runPollCycle().catch(e => console.error('[mailPoller] Initial cycle error:', e.message));
     }, 10000);
