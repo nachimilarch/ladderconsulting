@@ -8,6 +8,7 @@ import ProtectedRoute from './routes/ProtectedRoute';
 import Register from './pages/auth/Register';
 import Login from './pages/auth/Login';
 import TrainerLogin from './pages/auth/TrainerLogin';
+import LadderLogin from './pages/auth/LadderLogin';
 import VerifyEmail from './pages/auth/VerifyEmail';
 import ForgotPassword from './pages/auth/ForgotPassword';
 import ResetPassword from './pages/auth/ResetPassword';
@@ -133,6 +134,7 @@ export default function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/login/trainer" element={<TrainerLogin />} />
+        <Route path="/ladder" element={<LadderLogin />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />

@@ -63,7 +63,6 @@ export default function Login() {
 
                 {error && <div className="alert-error mb-5">{error}</div>}
 
-                {/* Candidates & Companies */}
                 <div className="flex flex-col gap-3">
                     <div className="flex justify-center">
                         <GoogleLogin
@@ -72,28 +71,6 @@ export default function Login() {
                             width="100%"
                         />
                     </div>
-                </div>
-
-                {/* Employee Login */}
-                <div className="mt-5 pt-5 border-t border-gray-100">
-                    <p className="text-xs text-center text-gray-400 mb-3 font-medium tracking-wide uppercase">Employee Login</p>
-                    <button
-                        type="button"
-                        onClick={msalInstance ? handleMicrosoftLogin : () => setError('Microsoft login requires HTTPS. Please visit https://theladderconsulting.com')}
-                        disabled={submitting}
-                        className="flex items-center justify-center gap-2 w-full border border-gray-200 rounded-lg py-2 text-xs font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-60 transition"
-                    >
-                        <svg width="14" height="14" viewBox="0 0 21 21" aria-hidden="true">
-                            <path fill="#f25022" d="M1 1h9v9H1z" />
-                            <path fill="#00a4ef" d="M1 11h9v9H1z" />
-                            <path fill="#7fba00" d="M11 1h9v9h-9z" />
-                            <path fill="#ffb900" d="M11 11h9v9h-9z" />
-                        </svg>
-                        Sign in with Microsoft
-                    </button>
-                    <p className="text-xs text-center text-gray-400 mt-3">
-                        <Link to="/login/trainer" className="link">Manual Login</Link>
-                    </p>
                 </div>
 
                 <p className="text-sm text-center text-gray-500 mt-5">
