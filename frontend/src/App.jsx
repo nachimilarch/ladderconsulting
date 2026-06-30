@@ -55,6 +55,7 @@ import InterviewRequestDetail from './pages/hr/InterviewRequestDetail';
 import Interviews from './pages/hr/Interviews';
 import HRInvoices from './pages/hr/HRInvoices';
 import ResumeSourcing from './pages/hr/ResumeSourcing';
+import PackageRequests from './pages/hr/PackageRequests';
 
 // Company payments
 import CompanyPayments from './pages/company/CompanyPayments';
@@ -163,6 +164,7 @@ export default function App() {
           <Route path="interview-requests" element={<Navigate to="/hr/interviews" replace />} />
           <Route path="interview-requests/:id" element={<InterviewRequestDetail />} />
           <Route path="scheduled-interviews" element={<Navigate to="/hr/interviews" replace />} />
+          <Route path="package-requests" element={<PackageRequests />} />
           <Route path="invoices" element={<HRInvoices />} />
           <Route path="invoices/:id" element={<HRInvoices />} />
           <Route path="sourcing" element={<ResumeSourcing />} />

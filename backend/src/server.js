@@ -125,6 +125,7 @@ app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/recruitment', require('./routes/recruitment'));
+app.use('/api/hr/package-requests', require('./routes/hrPackages'));
 app.use('/api/admin', require('./routes/admin'));
 
 // Outreach module — webhooks must be mounted before auth middleware

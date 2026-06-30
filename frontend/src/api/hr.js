@@ -47,3 +47,9 @@ export const reportAPI = {
     leads: (params) => api.get('/reports/leads', { params }),
     productivity: (params) => api.get('/reports/productivity', { params }),
 };
+
+export const packageRequestAPI = {
+    list:     ()           => api.get('/hr/package-requests'),
+    activate: (id)         => api.post(`/hr/package-requests/${id}/activate`),
+    dismiss:  (id, reason) => api.post(`/hr/package-requests/${id}/dismiss`, { reason }),
+};

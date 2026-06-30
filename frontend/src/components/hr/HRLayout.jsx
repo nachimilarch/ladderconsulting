@@ -9,6 +9,7 @@ const navItems = [
     { label: 'Resume Sourcing', to: '/hr/sourcing',       icon: '📄' },
     { label: 'Interviews',      to: '/hr/interviews',     icon: '🗓' },
     { label: 'Offer Requests',  to: '/hr/offer-requests', icon: '📋' },
+    { label: 'Package Requests', to: '/hr/package-requests', icon: '📦' },
     { label: 'Invoices',        to: '/hr/invoices',       icon: '🧾' },
     { label: 'Tasks',           to: '/hr/tasks',          icon: '✅' },
     { label: 'Outreach',        to: '/outreach',          icon: '📡' },
