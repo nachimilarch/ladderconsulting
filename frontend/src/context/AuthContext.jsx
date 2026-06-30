@@ -8,6 +8,16 @@ export const AuthProvider = ({ children }) => {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
+        // Complete a Microsoft redirect login if main.jsx stored a pending token
+        const msalToken = sessionStorage.getItem('__msal_redirect_token');
+        if (msalToken) {
+            sessionStorage.removeItem('__msal_redirect_token');
+            api.post('/auth/microsoft', { idToken: msalToken })
+                .then(({ data }) => setUser(data.user))
+                .catch(() => setUser(null))
+                .finally(() => setLoading(false));
+            return;
+        }
         // Restore session on page reload
         api.get('/auth/me')
             .then(({ data }) => setUser(data.user))

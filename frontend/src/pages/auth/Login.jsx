@@ -27,29 +27,13 @@ export default function Login() {
         setError('');
         setSubmitting(true);
         try {
-            const result = await msalInstance.loginPopup(msalLoginRequest);
-            const loggedIn = await loginWithMicrosoft(result.idToken);
-            navigate(ROLE_HOME[loggedIn.role] || '/dashboard');
+            // Redirect flow — page navigates away to Microsoft; auth result is handled
+            // by handleRedirectPromise() in main.jsx → AuthContext on the way back.
+            await msalInstance.loginRedirect(msalLoginRequest);
         } catch (err) {
-            if (err.errorCode === 'user_cancelled') {
-                // nothing — user closed the popup intentionally
-            } else if (err.errorCode === 'interaction_in_progress') {
-                // A previous popup was interrupted and left a lock in sessionStorage.
-                // Clear all MSAL keys so the next click works cleanly.
-                Object.keys(sessionStorage)
-                    .filter(k => k.includes('msal'))
-                    .forEach(k => sessionStorage.removeItem(k));
-                setError('Sign-in was interrupted. Please click "Sign in with Microsoft" again.');
-            } else {
-                const msg = err.response?.data?.message
-                    || err.message
-                    || err.errorCode
-                    || 'Microsoft sign-in failed.';
-                console.error('[MS login]', err);
-                setError(msg);
-            }
-        } finally {
             setSubmitting(false);
+            console.error('[MS login]', err);
+            setError(err.message || err.errorCode || 'Microsoft sign-in failed. Please try again.');
         }
     };
 

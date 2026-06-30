@@ -20,9 +20,11 @@ const renderApp = () => {
 
 if (msalInstance) {
   msalInstance.initialize().then(async () => {
-    if (window.opener && window.opener !== window) {
-      await msalInstance.handleRedirectPromise().catch(() => {});
-      return;
+    // If returning from a Microsoft redirect, capture the idToken before rendering
+    // so AuthContext can complete the login on mount.
+    const result = await msalInstance.handleRedirectPromise().catch(() => null);
+    if (result?.idToken) {
+      sessionStorage.setItem('__msal_redirect_token', result.idToken);
     }
     renderApp();
   });
