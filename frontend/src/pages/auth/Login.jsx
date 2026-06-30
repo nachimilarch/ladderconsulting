@@ -88,6 +88,7 @@ export default function Login() {
                         />
                     </div>
 
+                    {msalInstance && (
                     <button
                         type="button"
                         onClick={handleMicrosoftLogin}
@@ -102,6 +103,7 @@ export default function Login() {
                         </svg>
                         Sign in with Microsoft
                     </button>
+                    )}
                 </div>
 
                 <p className="text-xs text-center text-gray-400 mt-6">

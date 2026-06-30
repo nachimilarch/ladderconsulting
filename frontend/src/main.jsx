@@ -8,14 +8,7 @@ import './index.css';
 // msal-browser requires initialize() before any other call.
 // If we're in a popup window that Microsoft redirected back to us, let MSAL
 // handle the auth code and post the result to the opener — don't render React.
-msalInstance.initialize().then(async () => {
-  if (window.opener && window.opener !== window) {
-    // Running inside the MSAL login popup — process the redirect response
-    // (sends token to opener window) then close. No React rendering needed.
-    await msalInstance.handleRedirectPromise().catch(() => {});
-    return;
-  }
-
+const renderApp = () => {
   ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
       <BrowserRouter>
@@ -23,4 +16,17 @@ msalInstance.initialize().then(async () => {
       </BrowserRouter>
     </React.StrictMode>
   );
-});
+};
+
+if (msalInstance) {
+  msalInstance.initialize().then(async () => {
+    if (window.opener && window.opener !== window) {
+      await msalInstance.handleRedirectPromise().catch(() => {});
+      return;
+    }
+    renderApp();
+  });
+} else {
+  // HTTP context — MSAL unavailable, render without it (Microsoft SSO button hidden)
+  renderApp();
+}
