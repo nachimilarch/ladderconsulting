@@ -26,13 +26,15 @@ const trySendEmail = async (options) => {
     }
 };
 
-const issueSessionCookie = (res, user) => {
+const issueSessionCookie = (res, user, req) => {
     const payload = { id: user.id, email: user.email, role: user.role };
     const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
-    const isProd = process.env.NODE_ENV === 'production';
+    // Secure flag follows the actual request protocol, not NODE_ENV — works correctly
+    // on HTTP (IP/staging) and automatically upgrades once Nginx serves HTTPS.
+    const isHttps = req ? (req.secure || req.headers['x-forwarded-proto'] === 'https') : false;
     res.cookie('token', token, {
         httpOnly: true,
-        secure: isProd,
+        secure: isHttps,
         sameSite: 'lax',
         maxAge: 7 * 24 * 60 * 60 * 1000,
     });
@@ -136,7 +138,7 @@ exports.login = async (req, res) => {
             return res.status(403).json({ message: 'Account suspended. Contact support.' });
         }
 
-        issueSessionCookie(res, user);
+        issueSessionCookie(res, user, req);
 
         res.json({
             message: 'Login successful.',
@@ -183,7 +185,7 @@ exports.microsoftLogin = async (req, res) => {
 
         await linkOAuthIdentity(user.id, 'microsoft', claims.providerUserId, claims.email);
         await db.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
-        issueSessionCookie(res, user);
+        issueSessionCookie(res, user, req);
 
         res.json({
             message: 'Login successful.',
@@ -259,7 +261,7 @@ exports.googleLogin = async (req, res) => {
         }
 
         await db.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
-        issueSessionCookie(res, user);
+        issueSessionCookie(res, user, req);
 
         res.json({
             message: 'Login successful.',
