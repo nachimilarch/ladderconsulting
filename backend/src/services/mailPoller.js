@@ -244,7 +244,6 @@ const runPollCycle = async () => {
     const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
 
     if (!tenantId || !clientSecret) {
-        console.log('[mailPoller] MICROSOFT_TENANT_ID / MICROSOFT_CLIENT_SECRET not set — skipping poll.');
         return;
     }
 
@@ -307,6 +306,14 @@ const runPollCycle = async () => {
 // ── Public API ────────────────────────────────────────────────────────────────
 const startMailPoller = () => {
     if (pollingActive) return;
+
+    const tenantId     = process.env.MICROSOFT_TENANT_ID;
+    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+    if (!tenantId || !clientSecret) {
+        console.log('[mailPoller] MICROSOFT_TENANT_ID / MICROSOFT_CLIENT_SECRET not set — mail polling disabled.');
+        return;
+    }
+
     pollingActive = true;
     console.log('[mailPoller] Mail poller started — interval: 2 min');
 
