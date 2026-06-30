@@ -155,7 +155,7 @@ function PackageRequestModal({ onClose }) {
                 <PackagePicker
                     title="Choose a Package"
                     subtitle="Unlock credits let you access full profiles and resumes for any candidate in the pool."
-                    onSelected={onClose}
+                    onSelected={(hasPackage) => { if (hasPackage) onClose(); }}
                 />
             </div>
         </div>
