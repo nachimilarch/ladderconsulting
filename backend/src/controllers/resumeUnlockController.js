@@ -305,6 +305,50 @@ exports.requestPlatinum = async (req, res) => {
     }
 };
 
+// ── POST /api/companies/package-request ──────────────────────────────────────
+// Company requests a Single or 4-Pack package (pay-later / offline payment).
+// Fires a notification to their executive (or admin). No invoice is created here;
+// the admin manually activates the package via POST /api/admin/companies/:id/activate-package.
+exports.requestPackage = async (req, res) => {
+    const { tier, note } = req.body;
+    const TIER_LABELS = { single: 'Single Resume Unlock (₹999)', pack_4: '4-Resume Pack (₹3,999)' };
+    if (!TIER_LABELS[tier]) return res.status(400).json({ message: 'tier must be single or pack_4.' });
+
+    try {
+        const [[company]] = await db.query(
+            `SELECT c.id, c.company_name, c.assigned_executive_id FROM companies c
+             WHERE c.user_id = ? AND c.deleted_at IS NULL`,
+            [req.user.id]
+        );
+        if (!company) return res.status(404).json({ message: 'Company not found.' });
+
+        let notifyUserId = company.assigned_executive_id;
+        if (!notifyUserId) {
+            const [[adminRow]] = await db.query(
+                `SELECT u.id FROM users u JOIN roles ro ON ro.id = u.role_id
+                 WHERE ro.name = 'admin' AND u.status = 'active' AND u.deleted_at IS NULL LIMIT 1`
+            );
+            notifyUserId = adminRow?.id;
+        }
+
+        if (notifyUserId) {
+            await db.query(
+                `INSERT INTO notifications (user_id, type, title, body, metadata)
+                 VALUES (?, 'package_request', ?, ?, ?)`,
+                [notifyUserId,
+                 `Package Request — ${company.company_name}`,
+                 `${company.company_name} has requested the ${TIER_LABELS[tier]} package (offline payment).` + (note ? ` Note: ${note}` : '') + ` Please activate from Admin → Company Approvals.`,
+                 JSON.stringify({ company_id: company.id, tier })]
+            );
+        }
+
+        res.json({ success: true, message: `Your request for the ${TIER_LABELS[tier]} has been sent. Our team will activate it shortly.` });
+    } catch (err) {
+        console.error('[resumeUnlock.requestPackage]', err);
+        res.status(500).json({ message: 'Failed to send request.' });
+    }
+};
+
 // ── GET /api/companies/talent/:candidateId/profile ────────────────────────────
 // Full profile detail (complete skills w/ proficiency, education, links) — gated.
 exports.getFullProfile = async (req, res) => {

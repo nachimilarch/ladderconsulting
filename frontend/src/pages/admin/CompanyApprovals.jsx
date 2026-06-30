@@ -106,6 +106,18 @@ export default function CompanyApprovals() {
         }
     };
 
+    const handleActivatePackage = async (tier) => {
+        if (!detail) return;
+        const label = tier === 'single' ? 'Single (₹999)' : '4-Pack (₹3,999)';
+        if (!window.confirm(`Activate ${label} for ${detail.company_name}? This creates a paid invoice without Cashfree.`)) return;
+        try {
+            const { data } = await adminCompanyAPI.activatePackage(detail.id, tier);
+            toast.success(data?.message || 'Package activated.');
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to activate package.');
+        }
+    };
+
     const handleAssignExec = async () => {
         if (!selectedExec || !detail) return;
         setAssigningExec(true);
@@ -289,6 +301,26 @@ export default function CompanyApprovals() {
                                     className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 disabled:opacity-40"
                                 >
                                     {assigningExec ? '…' : 'Assign'}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Package Activation (Single / 4-Pack — offline payment) */}
+                        <div className="border-t mt-4 pt-4">
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Activate Package (Offline Payment)</p>
+                            <p className="text-xs text-gray-400 mb-2">Creates a paid invoice + credits without Cashfree. Use when payment was collected offline.</p>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleActivatePackage('single')}
+                                    className="px-2 py-1 bg-white border border-indigo-200 text-indigo-700 text-xs rounded hover:bg-indigo-50 transition"
+                                >
+                                    Activate Single (₹999)
+                                </button>
+                                <button
+                                    onClick={() => handleActivatePackage('pack_4')}
+                                    className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition"
+                                >
+                                    Activate 4-Pack (₹3,999)
                                 </button>
                             </div>
                         </div>

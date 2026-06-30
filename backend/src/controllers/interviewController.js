@@ -86,6 +86,25 @@ exports.listCompanySlots = async (req, res) => {
     try {
         const companyId = await getCompanyId(req.user.id);
 
+        // Check once at the company level: Package A/B (non-Platinum with any paid order)
+        // → no placement fee for any candidate, show real names
+        const [[companyRow]] = await db.query(
+            'SELECT placement_fee_percent FROM companies WHERE id = ? AND deleted_at IS NULL',
+            [companyId]
+        );
+        const isPackageAB = companyRow?.placement_fee_percent == null;
+        let hasPaidPackage = false;
+        if (isPackageAB) {
+            const [[pkgRow]] = await db.query(
+                `SELECT ruo.id FROM resume_unlock_orders ruo
+                 JOIN invoices inv ON inv.id = ruo.invoice_id AND inv.status = 'paid'
+                 WHERE ruo.company_id = ? LIMIT 1`,
+                [companyId]
+            );
+            hasPaidPackage = !!pkgRow;
+        }
+        const prepaidUnlock = isPackageAB && hasPaidPackage;
+
         const [slots] = await db.query(
             `SELECT is2.id, is2.slot_datetime, is2.duration_mins, is2.mode,
                     is2.meeting_link, is2.location_detail, is2.status, is2.candidate_confirmed,
@@ -109,7 +128,11 @@ exports.listCompanySlots = async (req, res) => {
 
         const masked = slots.map(s => {
             const { candidate_email, ...rest } = s;
-            return { ...rest, candidate_name: maskName(s.candidate_name) };
+            return {
+                ...rest,
+                candidate_name: prepaidUnlock ? s.candidate_name : maskName(s.candidate_name),
+                prepaid_unlock: prepaidUnlock,
+            };
         });
         res.json({ slots: masked });
     } catch (err) {

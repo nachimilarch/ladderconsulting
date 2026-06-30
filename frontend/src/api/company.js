@@ -63,4 +63,5 @@ export const talentPoolAPI = {
     packageStatus:   ()                 => api.get('/companies/package-status'),
     buyPack:         (tier = 'pack_4')   => api.post('/companies/talent/buy-pack', { tier }),
     requestPlatinum: (note)             => api.post('/companies/platinum-request', note ? { note } : {}),
+    requestPackage:  (tier, note)       => api.post('/companies/package-request', { tier, ...(note ? { note } : {}) }),
 };

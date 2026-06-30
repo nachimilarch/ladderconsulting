@@ -289,10 +289,13 @@ export default function InterviewScheduler() {
     // ctcVal is the ANNUAL CTC the company enters. feePercent (Platinum contracted
     // rate) applies directly to it — 8.33% = 1/12 = exactly one month's salary.
     // Default (no contracted rate) fee is 1x monthly CTC, i.e. annual / 12.
+    // Placement fees (Platinum %) carry 18% GST on top; Single/4-Pack are GST-inclusive.
     const ctcVal = parseFloat(offerReqForm.offered_ctc);
     const estimatedFee = !isNaN(ctcVal) && ctcVal > 0
-        ? (feePercent != null ? ctcVal * (parseFloat(feePercent) / 100) : ctcVal / 12)
+        ? Math.round(feePercent != null ? ctcVal * (parseFloat(feePercent) / 100) : ctcVal / 12)
         : null;
+    const estimatedGst   = estimatedFee != null ? Math.round(estimatedFee * 0.18) : null;
+    const estimatedTotal = estimatedFee != null ? estimatedFee + estimatedGst : null;
 
     return (
         <div className="max-w-6xl mx-auto">
@@ -504,11 +507,19 @@ export default function InterviewScheduler() {
                                     className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                             </div>
                             {estimatedFee && !offerReqSlot.prepaid_unlock && (
-                                <div className="bg-gray-50 rounded-lg p-3 text-sm">
-                                    <span className="text-gray-500">
-                                        Placement Fee {feePercent != null ? `(${parseFloat(feePercent)}% of annual CTC)` : '(1× monthly CTC)'}:{' '}
-                                    </span>
-                                    <span className="font-semibold text-gray-900">₹{estimatedFee.toLocaleString('en-IN')}</span>
+                                <div className="bg-gray-50 rounded-lg p-3 text-sm space-y-1">
+                                    <div className="flex justify-between text-gray-500">
+                                        <span>Placement Fee {feePercent != null ? `(${parseFloat(feePercent)}% of CTC)` : '(1× monthly CTC)'}</span>
+                                        <span>₹{estimatedFee.toLocaleString('en-IN')}</span>
+                                    </div>
+                                    <div className="flex justify-between text-gray-500">
+                                        <span>GST (18%)</span>
+                                        <span>₹{estimatedGst.toLocaleString('en-IN')}</span>
+                                    </div>
+                                    <div className="flex justify-between font-semibold text-gray-900 border-t border-gray-200 pt-1">
+                                        <span>Total Payable</span>
+                                        <span>₹{estimatedTotal.toLocaleString('en-IN')}</span>
+                                    </div>
                                 </div>
                             )}
                             <div>

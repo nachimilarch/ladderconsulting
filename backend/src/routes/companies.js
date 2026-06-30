@@ -40,6 +40,7 @@ router.get('/talent/:candidateId/resume',     unlockCtrl.downloadUnlockedResume)
 // Package selection from the company's own profile page
 router.get('/package-status',                 unlockCtrl.getPackageStatus);
 router.post('/platinum-request',              unlockCtrl.requestPlatinum);
+router.post('/package-request',               unlockCtrl.requestPackage);
 
 // Move an already-unlocked (single/pack) Talent Pool candidate into the company's
 // own hiring pipeline — creates the application that feeds the existing

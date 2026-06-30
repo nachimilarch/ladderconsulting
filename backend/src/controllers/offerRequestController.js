@@ -100,14 +100,21 @@ exports.submitOfferRequest = async (req, res) => {
             placementFee = (ctc / 12) * multiplier;
         }
 
-        // Prepaid (Single ₹999 / 4-Pack ₹3,999) candidates already paid Ladder at
-        // unlock time — no placement fee on top. Platinum/no-unlock-record
-        // candidates are unaffected (existing fee-at-hire model continues).
-        const [[unlockGrant]] = await db.query(
-            `SELECT granted_via FROM resume_unlocks WHERE company_id = ? AND candidate_id = ? AND granted_via IN ('single', 'pack')`,
-            [company.id, app.candidate_id]
-        );
-        const isPrepaid = !!unlockGrant;
+        // If the company is on Package A (Single ₹999) or Package B (4-Pack ₹3,999),
+        // placement fees are fully waived for ALL candidates — the package price IS
+        // Ladder's fee. Platinum (%) companies pay a % placement fee + 18% GST per hire.
+        // Companies with no package at all (direct applicants only, pre-package era)
+        // continue paying the default fee.
+        let isPrepaid = false;
+        if (company.placement_fee_percent == null) {
+            const [[pkgRow]] = await db.query(
+                `SELECT ruo.id FROM resume_unlock_orders ruo
+                 JOIN invoices i ON i.id = ruo.invoice_id AND i.status = 'paid'
+                 WHERE ruo.company_id = ? LIMIT 1`,
+                [company.id]
+            );
+            isPrepaid = !!pkgRow;
+        }
 
         if (!company.assigned_executive_id) {
             return res.status(400).json({ message: 'No LadderStep Human Consulting executive is assigned to your account yet. Please contact support.' });
@@ -186,12 +193,16 @@ exports.submitOfferRequest = async (req, res) => {
             });
         }
 
+        const gstOnFee   = Math.round(placementFee * 0.18 * 100) / 100;
+        const totalOnFee = Math.round((placementFee + gstOnFee) * 100) / 100;
         res.status(201).json({
             message: isPrepaid
                 ? 'Request submitted. Your executive will review and the offer letter will be enabled on approval.'
                 : 'Request submitted. The offer letter will be enabled once our team confirms the payment.',
             request_id: requestId,
             placement_fee: placementFee,
+            gst_amount:    isPrepaid ? 0 : gstOnFee,
+            total_amount:  isPrepaid ? 0 : totalOnFee,
         });
     } catch (err) {
         console.error('[offerRequest.submit]', err);
@@ -461,14 +472,21 @@ exports.approveRequest = async (req, res) => {
             // never sees.
             if (!isWaived) {
                 invoiceNumber = await nextInvoiceNumber(conn);
-                const description = `Placement fee for ${cr.candidate_name} (${cr.job_title})`;
+                // Placement fee invoices (Platinum % model) carry 18% GST on top.
+                // placement_fee_invoices.placement_fee_amount stores the BASE fee for
+                // Ladder's internal bookkeeping; the company-payable invoice amount
+                // is the total including GST.
+                const baseFee    = Math.round(parseFloat(cr.placement_fee_amount) * 100) / 100;
+                const gstAmount  = Math.round(baseFee * 0.18 * 100) / 100;
+                const totalAmount = Math.round((baseFee + gstAmount) * 100) / 100;
+                const description = `Placement fee for ${cr.candidate_name} (${cr.job_title}) + 18% GST`;
                 const [invResult] = await conn.query(
                     `INSERT INTO invoices
                         (invoice_number, company_id, candidate_id, job_posting_id, application_id,
                          raised_by, invoice_type, amount, status, description, due_date)
                      VALUES (?, ?, ?, ?, ?, ?, 'placement_fee', ?, 'pending', ?, ?)`,
                     [invoiceNumber, cr.company_id, cr.candidate_id, cr.job_id, cr.application_id,
-                     req.user.id, cr.placement_fee_amount, description, dueDate]
+                     req.user.id, totalAmount, description, dueDate]
                 );
                 payableInvoiceId = invResult.insertId;
             }
@@ -481,7 +499,12 @@ exports.approveRequest = async (req, res) => {
             conn.release();
         }
 
-        const fmtFee = `₹${parseFloat(cr.placement_fee_amount || 0).toLocaleString('en-IN')}`;
+        const baseFee    = parseFloat(cr.placement_fee_amount || 0);
+        const gstAmount  = Math.round(baseFee * 0.18 * 100) / 100;
+        const totalAmount = Math.round((baseFee + gstAmount) * 100) / 100;
+        const fmtBase    = `₹${baseFee.toLocaleString('en-IN')}`;
+        const fmtGst     = `₹${gstAmount.toLocaleString('en-IN')}`;
+        const fmtTotal   = `₹${totalAmount.toLocaleString('en-IN')}`;
 
         // Notify company — they need to act (pay), unless prepaid (no fee mention at all)
         notify(
@@ -490,7 +513,7 @@ exports.approveRequest = async (req, res) => {
             `Offer Letter Approved — ${cr.candidate_name}`,
             isWaived
                 ? `Offer letter for ${cr.candidate_name} is unlocked. You can generate it now from Company Portal → Interviews.`
-                : `Offer letter for ${cr.candidate_name} is unlocked. Invoice ${invoiceNumber} for ${fmtFee} has been raised — pay full or partial via Company Portal → Payments.`,
+                : `Offer letter for ${cr.candidate_name} is unlocked. Invoice ${invoiceNumber} for ${fmtTotal} (incl. 18% GST) raised — pay via Company Portal → Payments.`,
             { application_id: cr.application_id, company_id: cr.company_id, invoice_id: payableInvoiceId, invoice_number: invoiceNumber }
         );
 
@@ -506,9 +529,9 @@ exports.approveRequest = async (req, res) => {
                 'placement_fee_invoiced',
                 isWaived ? `Placement Fee Waived (Prepaid) — ${cr.company_name}` : `Placement Fee Invoice Raised — ${cr.company_name}`,
                 isWaived
-                    ? `${fmtFee} placement fee waived for ${cr.candidate_name} at ${cr.company_name} — candidate was unlocked via a prepaid package. Approved by ${execUser?.name || 'Executive'}.`
-                    : `Invoice ${invoiceNumber} of ${fmtFee} raised against ${cr.company_name} for ${cr.candidate_name}. Approved by ${execUser?.name || 'Executive'}.`,
-                { request_id: cr.id, company_id: cr.company_id, invoice_id: payableInvoiceId, amount: cr.placement_fee_amount }
+                    ? `${fmtBase} placement fee waived for ${cr.candidate_name} at ${cr.company_name} — candidate was unlocked via a prepaid package. Approved by ${execUser?.name || 'Executive'}.`
+                    : `Invoice ${invoiceNumber} raised against ${cr.company_name} for ${cr.candidate_name}. Fee: ${fmtBase} + GST: ${fmtGst} = Total: ${fmtTotal}. Approved by ${execUser?.name || 'Executive'}.`,
+                { request_id: cr.id, company_id: cr.company_id, invoice_id: payableInvoiceId, amount: totalAmount, base_fee: baseFee, gst_amount: gstAmount }
             );
         }
 
@@ -520,12 +543,17 @@ exports.approveRequest = async (req, res) => {
                     <p>Hi,</p>
                     <p>Your offer-letter release for <strong>${cr.candidate_name}</strong> (${cr.job_title}) has been approved by your LadderStep Human Consulting executive.</p>
                     ${isWaived ? '' : `
-                    <table style="border-collapse:collapse;margin:16px 0;font-family:sans-serif;">
+                    <table style="border-collapse:collapse;margin:16px 0;font-family:sans-serif;font-size:14px;">
                       <tr><td style="padding:6px 16px 6px 0;color:#374151;font-weight:600;">Invoice</td><td>${invoiceNumber}</td></tr>
-                      <tr><td style="padding:6px 16px 6px 0;color:#374151;font-weight:600;">Placement Fee</td><td>${fmtFee}</td></tr>
+                      <tr><td style="padding:6px 16px 6px 0;color:#374151;font-weight:600;">Placement Fee</td><td>${fmtBase}</td></tr>
+                      <tr><td style="padding:6px 16px 6px 0;color:#374151;font-weight:600;">GST (18%)</td><td>${fmtGst}</td></tr>
+                      <tr style="border-top:2px solid #e5e7eb;">
+                        <td style="padding:8px 16px 6px 0;color:#111827;font-weight:700;">Total Payable</td>
+                        <td style="font-weight:700;color:#111827;">${fmtTotal}</td>
+                      </tr>
                       <tr><td style="padding:6px 16px 6px 0;color:#374151;font-weight:600;">Due By</td><td>${new Date(dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}</td></tr>
                     </table>
-                    <p>Please complete the placement fee payment via <strong>Company Portal → Payments</strong> — partial or full payments via Cashfree are accepted.</p>
+                    <p>Please complete the payment via <strong>Company Portal → Payments</strong> — partial or full payments via Cashfree are accepted.</p>
                     `}
                     <p>You can generate the offer letter right away from <strong>Company Portal → Interviews</strong>.</p>
                     <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
@@ -534,7 +562,7 @@ exports.approveRequest = async (req, res) => {
         }
 
         await logAction(req.user.id, 'approve_offer_request', 'company_request', cr.id,
-            { company_id: cr.company_id, candidate_id: cr.candidate_id, fee: cr.placement_fee_amount, invoice_id: payableInvoiceId, fee_waived: isWaived }, ip(req));
+            { company_id: cr.company_id, candidate_id: cr.candidate_id, base_fee: baseFee, gst_amount: gstAmount, total_amount: totalAmount, invoice_id: payableInvoiceId, fee_waived: isWaived }, ip(req));
 
         res.json({
             message: isWaived

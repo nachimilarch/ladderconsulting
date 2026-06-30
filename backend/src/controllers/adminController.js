@@ -1403,3 +1403,75 @@ exports.updateInvoiceStatus = async (req, res) => {
         res.status(500).json({ message: 'Failed to update invoice.' });
     }
 };
+
+// ── POST /api/admin/companies/:id/activate-package ───────────────────────────
+// Manually activate a Single or 4-Pack resume-unlock package for a company
+// (used when payment is collected offline or deferred). Creates a paid invoice
+// + a resume_unlock_orders row and notifies the company.
+const PACKAGE_CONFIG = {
+    single: { credits: 1, amount: 999,  label: 'Single Resume Unlock' },
+    pack_4: { credits: 4, amount: 3999, label: '4-Resume Pack'         },
+};
+
+exports.activatePackage = async (req, res) => {
+    const { tier } = req.body;
+    const companyId = parseInt(req.params.id);
+    if (!PACKAGE_CONFIG[tier]) return res.status(400).json({ message: 'tier must be single or pack_4.' });
+
+    const { credits, amount, label } = PACKAGE_CONFIG[tier];
+
+    try {
+        const [[company]] = await db.query(
+            `SELECT c.id, c.company_name, c.user_id FROM companies c WHERE c.id = ? AND c.deleted_at IS NULL`,
+            [companyId]
+        );
+        if (!company) return res.status(404).json({ message: 'Company not found.' });
+
+        const conn = await db.getConnection();
+        let invoiceId, invoiceNumber;
+        try {
+            await conn.beginTransaction();
+
+            const { nextInvoiceNumber } = require('../utils/placementFee');
+            invoiceNumber = await nextInvoiceNumber(conn);
+            const [invResult] = await conn.query(
+                `INSERT INTO invoices
+                    (invoice_number, company_id, raised_by, invoice_type, amount, amount_paid,
+                     status, description, paid_at)
+                 VALUES (?, ?, ?, 'resume_unlock', ?, ?, 'paid', ?, NOW())`,
+                [invoiceNumber, companyId, req.user.id, amount, amount,
+                 `${label} — activated by LadderStep (offline payment)`]
+            );
+            invoiceId = invResult.insertId;
+
+            await conn.query(
+                `INSERT INTO resume_unlock_orders
+                    (company_id, order_type, credits_total, credits_used, invoice_id)
+                 VALUES (?, ?, ?, 0, ?)`,
+                [companyId, tier, credits, invoiceId]
+            );
+
+            await conn.commit();
+        } catch (e) {
+            await conn.rollback(); throw e;
+        } finally { conn.release(); }
+
+        // Notify company
+        await db.query(
+            `INSERT INTO notifications (user_id, type, title, body, metadata)
+             VALUES (?, 'package_activated', ?, ?, ?)`,
+            [company.user_id,
+             `Package Activated — ${label}`,
+             `Your ${label} package has been activated by LadderStep Human Consulting. You now have ${credits} resume unlock credit${credits > 1 ? 's' : ''} to use in the Talent Pool.`,
+             JSON.stringify({ company_id: companyId, tier, credits, invoice_id: invoiceId })]
+        );
+
+        await logAction(req.user.id, 'activate_package', 'company', companyId,
+            { tier, credits, amount, invoice_id: invoiceId, invoice_number: invoiceNumber }, ip(req));
+
+        res.json({ message: `${label} activated for ${company.company_name}.`, invoice_number: invoiceNumber, credits });
+    } catch (err) {
+        console.error('activatePackage:', err);
+        res.status(500).json({ message: 'Failed to activate package.' });
+    }
+};

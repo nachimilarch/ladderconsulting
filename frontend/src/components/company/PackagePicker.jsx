@@ -14,6 +14,7 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
     const [note, setNote] = useState('');
     const [requesting, setRequesting] = useState(false);
     const [requested, setRequested] = useState(false);
+    const [requestedTier, setRequestedTier] = useState(null); // 'single' | 'pack_4' | 'platinum'
 
     const load = () => {
         setLoading(true);
@@ -31,15 +32,15 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
 
     useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleBuy = async (tier) => {
+    const handleRequestPackage = async (tier) => {
         setBuying(tier);
         try {
-            const { data } = await talentPoolAPI.buyPack(tier);
-            if (data?.needs_payment) {
-                window.location.href = `https://payments.cashfree.com/forms/${data.payment_session_id}`;
-            }
+            const { data } = await talentPoolAPI.requestPackage(tier, note.trim() || undefined);
+            toast.success(data?.message || 'Request sent. Our team will activate it shortly.');
+            setRequestedTier(tier);
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to start purchase.');
+            toast.error(err.response?.data?.message || 'Failed to send request.');
+        } finally {
             setBuying(null);
         }
     };
@@ -50,6 +51,7 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
             const { data } = await talentPoolAPI.requestPlatinum(note.trim() || undefined);
             toast.success(data?.message || 'Request sent.');
             setRequested(true);
+            setRequestedTier('platinum');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to send request.');
         } finally {
@@ -81,30 +83,38 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
                     <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
                             <div>
-                                <p className="text-sm font-semibold text-gray-900">Single Resume Unlock</p>
-                                <p className="text-xs text-gray-400">1 credit — pick a candidate anytime, no expiry</p>
+                                <p className="text-sm font-semibold text-gray-900">Single Resume Unlock <span className="text-gray-400 font-normal">— ₹999 (incl. GST)</span></p>
+                                <p className="text-xs text-gray-400">1 credit — pick a candidate anytime, no expiry. No placement fee on hire.</p>
                             </div>
-                            <button
-                                onClick={() => handleBuy('single')}
-                                disabled={!!buying}
-                                className="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
-                            >
-                                {buying === 'single' ? '…' : '₹999'}
-                            </button>
+                            {requestedTier === 'single' ? (
+                                <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Requested</span>
+                            ) : (
+                                <button
+                                    onClick={() => handleRequestPackage('single')}
+                                    disabled={!!buying}
+                                    className="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
+                                >
+                                    {buying === 'single' ? '…' : 'Request'}
+                                </button>
+                            )}
                         </div>
 
                         <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
                             <div>
-                                <p className="text-sm font-semibold text-gray-900">4-Resume Pack</p>
-                                <p className="text-xs text-gray-400">Use on any candidates, anytime — no expiry</p>
+                                <p className="text-sm font-semibold text-gray-900">4-Resume Pack <span className="text-gray-400 font-normal">— ₹3,999 (incl. GST)</span></p>
+                                <p className="text-xs text-gray-400">4 credits — use anytime, no expiry. No placement fee on any hire.</p>
                             </div>
-                            <button
-                                onClick={() => handleBuy('pack_4')}
-                                disabled={!!buying}
-                                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium whitespace-nowrap"
-                            >
-                                {buying === 'pack_4' ? '…' : packCredits > 0 ? 'Buy more — ₹3,999' : '₹3,999 — Buy'}
-                            </button>
+                            {requestedTier === 'pack_4' ? (
+                                <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Requested</span>
+                            ) : (
+                                <button
+                                    onClick={() => handleRequestPackage('pack_4')}
+                                    disabled={!!buying}
+                                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium whitespace-nowrap"
+                                >
+                                    {buying === 'pack_4' ? '…' : packCredits > 0 ? 'Request more' : 'Request'}
+                                </button>
+                            )}
                         </div>
 
                         <div className="border border-gray-200 rounded-xl px-4 py-3">

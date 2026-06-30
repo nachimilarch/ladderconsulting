@@ -20,6 +20,9 @@ router.delete('/companies/:id',                   ...admin, ctrl.deleteCompany);
 router.patch('/companies/:id/assign-executive',   ...admin, ctrl.assignExecutive);
 router.get('/executive-assignments',              ...admin, ctrl.listExecutiveAssignments);
 
+// Manual package activation (offline payment collected by exec/admin)
+router.post('/companies/:id/activate-package',    ...admin, ctrl.activatePackage);
+
 // Per-company placement fee rate (Platinum tier) + onboarding agreement upload
 router.patch('/companies/:id/placement-fee-rate', ...admin, (req, res, next) => {
     uploadDocument.single('agreement')(req, res, (err) => {

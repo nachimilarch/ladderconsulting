@@ -139,10 +139,7 @@ exports.listInterviews = async (req, res) => {
                     is2.meeting_link, is2.location_detail, is2.status, is2.candidate_confirmed,
                     jp.title AS job_title,
                     u.name AS candidate_name,
-                    a.id AS application_id, a.candidate_id,
-                    (SELECT 1 FROM resume_unlocks ru
-                     WHERE ru.company_id = jp.company_id AND ru.candidate_id = a.candidate_id
-                       AND ru.granted_via IN ('single', 'pack') LIMIT 1) AS prepaid_unlock
+                    a.id AS application_id, a.candidate_id
              FROM interview_slots is2
              JOIN applications a ON a.id = is2.application_id
              JOIN job_postings jp ON jp.id = a.job_id
@@ -153,13 +150,25 @@ exports.listInterviews = async (req, res) => {
             [company.id]
         );
 
-        // Single/4-Pack unlocked candidates already show their real name everywhere
-        // else (Shortlist, Talent Pool) — stay consistent here instead of masking
-        // someone the company already paid to unlock.
+        // Package A/B companies (non-Platinum with any paid resume_unlock_orders) have
+        // no placement fee on any candidate. Check once at the company level, not per row.
+        const isPackageAB = company.placement_fee_percent == null;
+        let hasPaidPackage = false;
+        if (isPackageAB) {
+            const [[pkgRow]] = await db.query(
+                `SELECT ruo.id FROM resume_unlock_orders ruo
+                 JOIN invoices inv ON inv.id = ruo.invoice_id AND inv.status = 'paid'
+                 WHERE ruo.company_id = ? LIMIT 1`,
+                [company.id]
+            );
+            hasPaidPackage = !!pkgRow;
+        }
+        const prepaidUnlock = isPackageAB && hasPaidPackage;
+
         const masked = interviews.map(i => ({
             ...i,
-            candidate_name: i.prepaid_unlock ? i.candidate_name : maskName(i.candidate_name),
-            prepaid_unlock: !!i.prepaid_unlock,
+            candidate_name: prepaidUnlock ? i.candidate_name : maskName(i.candidate_name),
+            prepaid_unlock: prepaidUnlock,
         }));
         res.json({ interviews: masked });
     } catch (err) {
