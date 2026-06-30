@@ -15,12 +15,12 @@ const pool = mysql.createPool({
 
 pool.getConnection()
   .then(conn => {
-    console.log('[DB] MySQL connected successfully');
+    console.log('✅ DB connected successfully');
     conn.release();
   })
   .catch(err => {
-    console.error('[DB] Connection failed:', err.message);
-    process.exit(1);
+    console.error('❌ DB connection failed:', err.message);
+    // Do not exit — let the server start; DB errors will surface per-request
   });
 
 module.exports = pool;

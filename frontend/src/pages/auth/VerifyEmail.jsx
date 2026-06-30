@@ -20,8 +20,12 @@ export default function VerifyEmail() {
     }, []);
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-            <div className="bg-white shadow-md rounded-xl p-8 w-full max-w-sm text-center">
+        <div className="auth-page">
+            <div className="auth-card-sm text-center">
+                <div className="flex justify-center mb-6">
+                    <img src="/logo-full.png" alt="LadderStep Human Consulting" className="h-20 object-contain" />
+                </div>
+
                 {status === 'verifying' && <p className="text-gray-500">Verifying your email...</p>}
                 {status === 'success' && (
                     <>

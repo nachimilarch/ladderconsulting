@@ -1,36 +1,41 @@
-const axios = require('axios');
+/**
+ * Resume parsing — offline.
+ *
+ * Historically this called OpenAI (GPT-4o-mini). It now delegates to the
+ * dependency-free heuristic engine in resumeParser.js, so no API key is
+ * required. The exported function names and return shapes are unchanged, so
+ * every caller (candidates.js, recruitmentController.js) keeps working.
+ *
+ * Kept async so existing `await parseFullProfile(...)` call sites are unaffected.
+ */
+const { parseFullProfile: localFullProfile, parseResumeText: localResumeText } = require('./resumeParser');
 
 /**
- * Calls LLM API to extract structured profile data from raw resume text.
+ * Extract skills + experience + summary from raw resume text.
  * Returns: { skills: [], experience_years: number, summary: string }
  */
-const parseResumeText = async (rawText) => {
-    const prompt = `
-You are a resume parser. Given the resume text below, extract:
-1. skills: array of skill strings
-2. experience_years: total years of experience as a number
-3. summary: a 2-sentence professional summary
+const parseResumeText = async (rawText) => localResumeText(rawText);
 
-Respond ONLY with valid JSON matching this shape:
-{ "skills": [], "experience_years": 0, "summary": "" }
-
-Resume:
-"""
-${rawText.substring(0, 6000)}
-"""
-  `.trim();
-
-    const response = await axios.post(
-        'https://api.openai.com/v1/chat/completions',
-        {
-            model: 'gpt-4o-mini',
-            messages: [{ role: 'user', content: prompt }],
-            response_format: { type: 'json_object' },
-        },
-        { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } }
-    );
-
-    return JSON.parse(response.data.choices[0].message.content);
+/**
+ * Extract the full candidate profile from raw resume text.
+ * Returns: { full_name, email, phone, headline, location, experience_years,
+ *            linkedin_url, portfolio_url, summary, education[], skills[] }
+ */
+const parseFullProfile = async (rawText) => {
+    const p = localFullProfile(rawText);
+    return {
+        full_name:        p.full_name        || '',
+        email:            (p.email || '').trim().toLowerCase(),
+        phone:            p.phone            || '',
+        headline:         p.headline         || '',
+        location:         p.location         || '',
+        experience_years: parseFloat(p.experience_years) || 0,
+        linkedin_url:     p.linkedin_url     || '',
+        portfolio_url:    p.portfolio_url    || '',
+        summary:          p.summary          || '',
+        education:        Array.isArray(p.education) ? p.education : [],
+        skills:           Array.isArray(p.skills)    ? p.skills    : [],
+    };
 };
 
-module.exports = { parseResumeText };
+module.exports = { parseResumeText, parseFullProfile };

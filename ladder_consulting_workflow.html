@@ -1,0 +1,450 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>LadderStep Human Consulting — Platform Workflow Reference</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: #fff; color: #1a1a2e; font-size: 11px; }
+
+  @media print {
+    body { font-size: 9px; }
+    .page { page-break-after: always; padding: 12mm 14mm; }
+    .page:last-child { page-break-after: avoid; }
+    .no-print { display: none; }
+  }
+
+  .page { padding: 28px 32px 24px; max-width: 1100px; margin: 0 auto; }
+
+  /* ── Cover ─────────────────────────────────────────────────── */
+  .cover { background: linear-gradient(135deg, #6a47d4 0%, #3d1fa3 100%); color: #fff; min-height: 260px; display: flex; flex-direction: column; justify-content: center; border-radius: 0; padding: 40px 32px; }
+  .cover h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+  .cover h2 { font-size: 15px; font-weight: 400; opacity: .75; margin-top: 6px; }
+  .cover .meta { margin-top: 20px; display: flex; gap: 24px; }
+  .cover .tag { background: rgba(255,255,255,.15); border-radius: 6px; padding: 4px 12px; font-size: 11px; }
+
+  h2.sec { font-size: 16px; font-weight: 700; color: #6a47d4; border-bottom: 2px solid #6a47d4; padding-bottom: 4px; margin: 24px 0 14px; }
+  h3.sub { font-size: 12px; font-weight: 700; color: #3d1fa3; margin: 14px 0 8px; text-transform: uppercase; letter-spacing: .5px; }
+
+  .roles { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-bottom: 8px; }
+  .role-card { border-radius: 10px; padding: 12px 10px; text-align: center; }
+  .role-card .icon { font-size: 22px; }
+  .role-card .name { font-weight: 700; font-size: 11px; margin-top: 4px; }
+  .role-card .desc { font-size: 9px; margin-top: 3px; opacity: .8; line-height: 1.3; }
+  .rc-admin    { background: #f0ebff; border: 1.5px solid #6a47d4; }
+  .rc-hr       { background: #e8f4fd; border: 1.5px solid #3b82f6; }
+  .rc-company  { background: #fef3e2; border: 1.5px solid #f59e0b; }
+  .rc-candidate{ background: #e6f7ee; border: 1.5px solid #22c55e; }
+  .rc-trainer  { background: #fce7f3; border: 1.5px solid #ec4899; }
+
+  .flow { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
+  .fbox { background: #f5f3ff; border: 1px solid #c4b5fd; border-radius: 8px; padding: 7px 11px; font-size: 10px; font-weight: 600; color: #3d1fa3; white-space: nowrap; }
+  .fbox.green  { background: #ecfdf5; border-color: #86efac; color: #166534; }
+  .fbox.orange { background: #fff7ed; border-color: #fdba74; color: #9a3412; }
+  .fbox.red    { background: #fef2f2; border-color: #fca5a5; color: #991b1b; }
+  .fbox.blue   { background: #eff6ff; border-color: #93c5fd; color: #1e40af; }
+  .fbox.gray   { background: #f9fafb; border-color: #d1d5db; color: #374151; }
+  .arr { color: #6a47d4; font-size: 14px; font-weight: 700; }
+  .arr-d { color: #9ca3af; font-size: 12px; }
+  .flow-note { font-size: 9px; color: #6b7280; margin-top: 2px; font-style: italic; }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px; }
+
+  .module { border-radius: 10px; padding: 12px 14px; border: 1px solid; margin-bottom: 8px; }
+  .module h4 { font-size: 11px; font-weight: 700; margin-bottom: 6px; }
+  .module ul { list-style: none; }
+  .module ul li { font-size: 10px; padding: 2px 0; display: flex; align-items: flex-start; gap: 5px; line-height: 1.35; }
+  .module ul li::before { content: "→"; color: #6a47d4; font-weight: 700; flex-shrink: 0; }
+  .mod-purple { background: #f5f3ff; border-color: #c4b5fd; }
+  .mod-blue   { background: #eff6ff; border-color: #93c5fd; }
+  .mod-green  { background: #ecfdf5; border-color: #86efac; }
+  .mod-orange { background: #fff7ed; border-color: #fdba74; }
+  .mod-red    { background: #fef2f2; border-color: #fca5a5; }
+  .mod-teal   { background: #f0fdfa; border-color: #5eead4; }
+  .mod-gray   { background: #f9fafb; border-color: #d1d5db; }
+
+  .big-flow { display: flex; flex-direction: column; gap: 6px; }
+  .bfrow { display: flex; align-items: center; gap: 6px; }
+  .bflabel { font-size: 9px; color: #9ca3af; width: 70px; text-align: right; flex-shrink: 0; font-style: italic; }
+  .bfstep { background: #6a47d4; color: #fff; border-radius: 8px; padding: 8px 12px; font-size: 10px; font-weight: 700; flex: 1; text-align: center; min-width: 90px; }
+  .bfstep.comp  { background: #f59e0b; }
+  .bfstep.cand  { background: #22c55e; }
+  .bfstep.hr    { background: #3b82f6; }
+  .bfstep.pay   { background: #ef4444; }
+  .bfstep.auto  { background: #8b5cf6; }
+  .bfstep.gate  { background: #7c3aed; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 10px; margin: 6px 0; }
+  th { background: #6a47d4; color: #fff; padding: 6px 8px; text-align: left; font-weight: 600; }
+  td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; vertical-align: top; line-height: 1.35; }
+  tr:nth-child(even) td { background: #fafafa; }
+  .badge { border-radius: 20px; padding: 2px 8px; font-size: 9px; font-weight: 700; display: inline-block; }
+  .b-purple { background: #f0ebff; color: #6a47d4; }
+  .b-blue   { background: #dbeafe; color: #1e40af; }
+  .b-green  { background: #dcfce7; color: #166534; }
+  .b-orange { background: #fed7aa; color: #9a3412; }
+  .b-pink   { background: #fce7f3; color: #9d174d; }
+
+  hr.div { border: none; border-top: 1px solid #e5e7eb; margin: 16px 0; }
+
+  .footer { text-align: center; font-size: 9px; color: #9ca3af; margin-top: 24px; padding-top: 10px; border-top: 1px solid #e5e7eb; }
+
+  .status-row { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; margin: 4px 0; }
+  .st { border-radius: 4px; padding: 3px 8px; font-size: 9px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<!-- ══ COVER ══════════════════════════════════════════════════════════════ -->
+<div class="page cover">
+  <h1>LadderStep Human Consulting Platform</h1>
+  <h2>Complete Workflow &amp; Feature Reference</h2>
+  <div class="meta">
+    <span class="tag">Full-Stack SaaS</span>
+    <span class="tag">Node.js + React 19 + MySQL</span>
+    <span class="tag">v2026-06-16</span>
+    <span class="tag">5 User Roles · 8 Modules</span>
+  </div>
+</div>
+
+<!-- ══ PAGE 1: ROLES & AUTH ═══════════════════════════════════════════════ -->
+<div class="page">
+  <h2 class="sec">1. Platform Overview — Roles &amp; Portals</h2>
+  <div class="roles">
+    <div class="role-card rc-admin"><div class="icon">👑</div><div class="name">Admin</div><div class="desc">Full platform control, approvals, settings, analytics</div></div>
+    <div class="role-card rc-hr"><div class="icon">🧑‍💼</div><div class="name">HR Staff / Executive</div><div class="desc">Leads, tasks, sourcing, invoices, approvals</div></div>
+    <div class="role-card rc-company"><div class="icon">🏢</div><div class="name">Company</div><div class="desc">Jobs, shortlists, interviews, offers, payments</div></div>
+    <div class="role-card rc-candidate"><div class="icon">👤</div><div class="name">Candidate</div><div class="desc">Profile, resume, job search, applications, interviews</div></div>
+    <div class="role-card rc-trainer"><div class="icon">🎓</div><div class="name">Trainer</div><div class="desc">Manage courses, modules, benchmarks</div></div>
+  </div>
+  <hr class="div">
+  <h3 class="sub">Portal Routes</h3>
+  <table>
+    <tr><th>Role</th><th>Home Route</th><th>Key Sections</th><th>Can Also Access</th></tr>
+    <tr><td><span class="badge b-purple">admin</span></td><td>/admin</td><td>Dashboard · Companies · Staff · Analytics · Payments · Training Manager · Settings · Audit Log</td><td>/hr/* and /outreach/*</td></tr>
+    <tr><td><span class="badge b-blue">hr_staff</span></td><td>/hr</td><td>Dashboard · Employees · Tasks · Reports · Offer Requests · Interview Requests · Invoices · Sourcing</td><td>/outreach/*</td></tr>
+    <tr><td><span class="badge b-orange">company</span></td><td>/company</td><td>Dashboard · Jobs · Talent Pool · Shortlist · Interviews · Offers · Payments · Training · Requests · Profile</td><td>—</td></tr>
+    <tr><td><span class="badge b-green">candidate</span></td><td>/candidate</td><td>Dashboard · Profile · Browse Jobs · Applications · Interviews · Documents</td><td>—</td></tr>
+    <tr><td><span class="badge b-pink">trainer</span></td><td>/admin/training</td><td>Training Manager (Catalogue · Courses · Benchmarks · Assignments · Progress)</td><td>—</td></tr>
+  </table>
+  <hr class="div">
+  <h3 class="sub">Authentication Flow</h3>
+  <div class="flow">
+    <div class="fbox gray">Register / Login</div><div class="arr">→</div>
+    <div class="fbox">Email Verification</div><div class="arr">→</div>
+    <div class="fbox blue">JWT (httpOnly cookie)</div><div class="arr">→</div>
+    <div class="fbox green">Role-based redirect</div><div class="arr">→</div>
+    <div class="fbox green">Portal home</div>
+  </div>
+  <p class="flow-note">Company accounts also require admin approval before accessing the portal. Session restored on reload via GET /auth/me. Password reset via email link. Maintenance mode blocks all non-admin logins.</p>
+</div>
+
+<!-- ══ PAGE 2: RECRUITMENT LIFECYCLE ══════════════════════════════════════ -->
+<div class="page">
+  <h2 class="sec">2. Core Recruitment Lifecycle</h2>
+  <p style="font-size:10px;color:#6b7280;margin-bottom:12px;">The primary revenue workflow — from job posting to placement fee collection. Two mandatory executive approval gates protect Ladder's placement revenue.</p>
+  <div class="big-flow">
+    <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">1. Post Job (draft → active) — title, JD, salary, experience, work mode, deadline</div></div>
+    <div class="bfrow"><div class="bflabel">Candidate</div><div class="bfstep cand">2. Self-Apply — upload resume → offline AI parse → skill vectors → fit score calculated</div></div>
+    <div class="bfrow"><div class="bflabel">HR Executive</div><div class="bfstep hr">3. OR Bulk Source — upload PDF/DOC batch per job → auto-create candidate accounts → applications created with source='executive'</div></div>
+    <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">4. Browse Shortlist (PII masked) → shortlist application → move status</div></div>
+    <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">5. Request Interview Schedule — submit proposed datetime, mode (video/phone/in-person), notes</div></div>
+    <div class="bfrow"><div class="bflabel">HR Executive</div><div class="bfstep gate">⛔ GATE 1 — Executive reviews & approves interview request → interview_slots created</div></div>
+    <div class="bfrow"><div class="bflabel">Auto</div><div class="bfstep auto">7. Company + Candidate notified → candidate confirms slot (or exec confirms on behalf)</div></div>
+    <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">8. Conduct interview → record outcome: selected / hold / rejected</div></div>
+    <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">9. Request Offer Letter Release — provide offered CTC (monthly)</div></div>
+    <div class="bfrow"><div class="bflabel">HR Executive</div><div class="bfstep gate">⛔ GATE 2 — Executive approves offer release → offer_letter_grants created → placement fee invoice auto-raised</div></div>
+    <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep pay">11. Pay Placement Fee Invoice via Cashfree (partial or full payments supported)</div></div>
+    <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">12. Generate &amp; Send Offer Letter → candidate notified</div></div>
+    <div class="bfrow"><div class="bflabel">Candidate</div><div class="bfstep cand">13. Accept / Decline Offer</div></div>
+    <div class="bfrow"><div class="bflabel">Auto</div><div class="bfstep auto">14. On Accept → application.status='hired' · hired_employees record · training assignments auto-created</div></div>
+  </div>
+  <hr class="div">
+  <h3 class="sub">Application Status Pipeline</h3>
+  <div class="status-row">
+    <span class="st" style="background:#e0f2fe;color:#0369a1">applied</span><div class="arr-d">→</div>
+    <span class="st" style="background:#fef9c3;color:#854d0e">under_review</span><div class="arr-d">→</div>
+    <span class="st" style="background:#fef3c7;color:#92400e">shortlisted</span><div class="arr-d">→</div>
+    <span class="st" style="background:#ede9fe;color:#5b21b6">interview_scheduled</span><div class="arr-d">→</div>
+    <span class="st" style="background:#ddd6fe;color:#4c1d95">interviewed</span><div class="arr-d">→</div>
+    <span class="st" style="background:#d1fae5;color:#065f46">offer_sent</span><div class="arr-d">→</div>
+    <span class="st" style="background:#a7f3d0;color:#064e3b">hired ✓</span>
+    <span style="font-size:9px;color:#9ca3af;margin-left:8px">| also: rejected / withdrawn</span>
+  </div>
+  <p class="flow-note">Once any application reaches 'hired', the candidate is locked platform-wide — no further applications, shortlisting, sourcing, or offer-sending allowed for that candidate.</p>
+</div>
+
+<!-- ══ PAGE 3: OUTREACH + PAYMENTS ═══════════════════════════════════════ -->
+<div class="page">
+  <h2 class="sec">3. Cold Outreach Module</h2>
+  <div class="two-col">
+    <div>
+      <h3 class="sub">Email Campaign Flow</h3>
+      <div style="display:flex;flex-direction:column;gap:5px;">
+        <div class="fbox blue">1. Upload Excel/CSV Contact List → background import → outreach_contacts</div>
+        <div class="fbox">2. Create Email Campaign (select list, write template with merge tags)</div>
+        <div class="fbox">3. Send Campaign (batches of 20 with 1s delay, can pause mid-send)</div>
+        <div class="fbox blue">4. IMAP Poller (every 2 min) matches replies via tagged Reply-To address</div>
+        <div class="fbox green">5. Executive receives reply in Replies inbox → reply / convert to lead / ignore</div>
+        <div class="fbox green">6. Convert to Lead → Leads Pipeline with stage progression</div>
+      </div>
+      <p class="flow-note" style="margin-top:6px;">Merge tags: {{first_name}} {{full_name}} {{company_name}} {{designation}} {{city}} {{executive_name}}</p>
+    </div>
+    <div>
+      <h3 class="sub">WhatsApp + Cold Calls</h3>
+      <div class="module mod-orange">
+        <h4>WhatsApp Campaign</h4>
+        <ul>
+          <li>Create template (header/body/footer + variables) → Meta approval</li>
+          <li>Create campaign with variable mapping → send via WhatsApp Cloud API</li>
+          <li>Incoming messages arrive via Meta webhook → same Replies inbox</li>
+        </ul>
+      </div>
+      <div class="module mod-blue">
+        <h4>Cold Calls</h4>
+        <ul>
+          <li>Dial contact, log outcome: no_answer / voicemail / callback_scheduled / interested / converted</li>
+          <li>Callback → notification to executive at scheduled time</li>
+          <li>Convert to lead directly from call log</li>
+        </ul>
+      </div>
+      <h3 class="sub">Lead Pipeline Stages</h3>
+      <div class="status-row">
+        <span class="st" style="background:#f3f4f6;color:#374151">new</span><div class="arr-d">→</div>
+        <span class="st" style="background:#dbeafe;color:#1d4ed8">contacted</span><div class="arr-d">→</div>
+        <span class="st" style="background:#fef9c3;color:#854d0e">interested</span><div class="arr-d">→</div>
+        <span class="st" style="background:#ede9fe;color:#6d28d9">proposal</span><div class="arr-d">→</div>
+        <span class="st" style="background:#dcfce7;color:#166534">converted</span>
+        <span style="font-size:9px;color:#9ca3af;margin-left:4px">| lost</span>
+      </div>
+    </div>
+  </div>
+  <hr class="div">
+  <h2 class="sec">4. Payment &amp; Invoicing System</h2>
+  <div class="three-col">
+    <div class="module mod-purple">
+      <h4>💳 Placement Fee</h4>
+      <ul>
+        <li>Triggered on exec approval of offer-letter request</li>
+        <li>invoice_type = placement_fee in invoices table</li>
+        <li>Amount = placement_fee_multiplier × offered CTC</li>
+        <li>Partial payments supported (amount_paid tracked)</li>
+        <li>PFI status mirrored via syncPlacementFeeStatus()</li>
+      </ul>
+    </div>
+    <div class="module mod-teal">
+      <h4>🎓 Training Fee</h4>
+      <ul>
+        <li>Triggered on admin approval of training request</li>
+        <li>invoice_type = training_fee in invoices table</li>
+        <li>Amount = price_per_user × num_users</li>
+        <li>Same Cashfree payment flow on /company/payments</li>
+        <li>Company emailed invoice number on approval</li>
+      </ul>
+    </div>
+    <div class="module mod-orange">
+      <h4>📄 HR Executive Invoices</h4>
+      <ul>
+        <li>Executive raises manual invoices for their companies</li>
+        <li>Types: placement_fee / partial_payment / other_fee / training_fee</li>
+        <li>Admin sees all via Payments page (Service Invoices tab)</li>
+        <li>Mark paid / partially paid / waived controls</li>
+      </ul>
+    </div>
+  </div>
+  <h3 class="sub">Cashfree Payment Flow</h3>
+  <div class="flow">
+    <div class="fbox">Company clicks Pay</div><div class="arr">→</div>
+    <div class="fbox blue">POST /invoices/company/:id/pay</div><div class="arr">→</div>
+    <div class="fbox">Cashfree createOrder</div><div class="arr">→</div>
+    <div class="fbox orange">payment_link returned</div><div class="arr">→</div>
+    <div class="fbox">Company pays on Cashfree</div><div class="arr">→</div>
+    <div class="fbox blue">GET /payments/verify/:orderId</div><div class="arr">→</div>
+    <div class="fbox green">invoice updated · notification</div>
+  </div>
+  <p class="flow-note">Webhook: POST /api/payments/webhook/cashfree — HMAC signature verified, PAYMENT_SUCCESS processed idempotently. Redirect: /company/payments/:invoiceId/callback</p>
+</div>
+
+<!-- ══ PAGE 4: TRAINING + ADMIN ════════════════════════════════════════════ -->
+<div class="page">
+  <h2 class="sec">5. Training Services Module (Company Subscription)</h2>
+  <div class="two-col">
+    <div>
+      <h3 class="sub">7 Training Topics (Fixed Catalogue)</h3>
+      <table>
+        <tr><th>Topic</th><th>Category</th><th>Duration</th><th>Price / User</th></tr>
+        <tr><td>Onboarding Training</td><td>Onboarding</td><td>5 days</td><td>₹5,000</td></tr>
+        <tr><td>Cultures &amp; Values</td><td>Culture</td><td>2 days</td><td>₹3,000</td></tr>
+        <tr><td>Office Etiquette</td><td>Professionalism</td><td>1 day</td><td>₹2,000</td></tr>
+        <tr><td>Presentation Skills</td><td>Communication</td><td>3 days</td><td>₹4,000</td></tr>
+        <tr><td>Conflict Management</td><td>Leadership</td><td>2 days</td><td>₹4,000</td></tr>
+        <tr><td>Sales Basics</td><td>Sales</td><td>3 days</td><td>₹5,000</td></tr>
+        <tr><td>Sales Advanced</td><td>Sales</td><td>5 days</td><td>₹7,000</td></tr>
+      </table>
+      <p class="flow-note">Admin can add / edit / deactivate topics via Training Manager → Training Catalogue.</p>
+    </div>
+    <div>
+      <h3 class="sub">Training Request Workflow</h3>
+      <div class="big-flow">
+        <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">Browse catalogue at /company/training → select topic + num users</div></div>
+        <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep comp">Submit Training Request → admin notified</div></div>
+        <div class="bfrow"><div class="bflabel">Admin</div><div class="bfstep gate">⛔ Review in Training Manager → Company Requests tab</div></div>
+        <div class="bfrow"><div class="bflabel">On Approve</div><div class="bfstep auto">training_fee invoice raised · company emailed · notified in-app</div></div>
+        <div class="bfrow"><div class="bflabel">Company</div><div class="bfstep pay">Pay invoice via Cashfree on /company/payments</div></div>
+        <div class="bfrow"><div class="bflabel">Admin</div><div class="bfstep hr" style="background:#059669;">Mark request completed after training delivery</div></div>
+      </div>
+    </div>
+  </div>
+  <hr class="div">
+  <h2 class="sec">6. Admin Control Panel</h2>
+  <div class="three-col">
+    <div class="module mod-purple">
+      <h4>👑 Core Admin Actions</h4>
+      <ul>
+        <li>Approve / reject / suspend companies</li>
+        <li>Assign HR executive to company</li>
+        <li>Create / deactivate HR staff accounts</li>
+        <li>Suspend / reactivate candidates</li>
+        <li>Review all company requests (interview / offer / profile)</li>
+        <li>Recruitment pipeline oversight</li>
+      </ul>
+    </div>
+    <div class="module mod-blue">
+      <h4>📊 Platform Analytics</h4>
+      <ul>
+        <li>KPIs: Candidates · Offers · Accept Rate · Avg Match Score</li>
+        <li>Financial: Invoiced / Collected / Outstanding / Overdue</li>
+        <li>Executive Performance table (companies, leads, sourced, fees)</li>
+        <li>Monthly registration charts · Recruitment funnel</li>
+        <li>Outreach summary</li>
+      </ul>
+    </div>
+    <div class="module mod-green">
+      <h4>⚙️ Platform Settings</h4>
+      <ul>
+        <li>Toggles: email verify, Cashfree, mail poller</li>
+        <li>Numbers: poller interval, resume size, offer validity</li>
+        <li>Fees: currency, placement multiplier, access fees</li>
+        <li>Env overrides: SMTP, IMAP, S3, WhatsApp, Cashfree, OpenAI → saved to DB</li>
+        <li>Maintenance mode · Audit log (entity + action filters, CSV export)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="two-col" style="margin-top:8px;">
+    <div class="module mod-teal">
+      <h4>💰 Payments &amp; Placement Fees (merged page)</h4>
+      <ul>
+        <li>Service Invoices tab: all company invoices with status filter</li>
+        <li>Placement Fees tab: all PFIs with pending / collected totals</li>
+        <li>Header KPIs: Total Invoiced · Collected · Outstanding · Overdue · Placement Fees</li>
+      </ul>
+    </div>
+    <div class="module mod-orange">
+      <h4>🎓 Training Manager (6 tabs)</h4>
+      <ul>
+        <li>Training Catalogue — card view · add / edit topics with pricing</li>
+        <li>Company Requests — approve (raise invoice) / reject with reason</li>
+        <li>Internal Courses — post-hire video / quiz modules for hired employees</li>
+        <li>Benchmarks — role skill benchmarks for course auto-assignment</li>
+        <li>Assignments — all training assignments with progress bars</li>
+        <li>Progress — per-employee training completion overview</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- ══ PAGE 5: HR + CANDIDATE + COMPANY ════════════════════════════════════ -->
+<div class="page">
+  <h2 class="sec">7. HR Executive Portal</h2>
+  <div class="three-col">
+    <div class="module mod-blue">
+      <h4>📋 HR Operations</h4>
+      <ul>
+        <li>Employee directory (create / update / deactivate)</li>
+        <li>Department + role assignment, attendance tracking</li>
+        <li>Task management (priority, status, notes, time logging)</li>
+        <li>Dashboard KPIs (employees, leads, calls, tasks)</li>
+        <li>Reports: HR summary, call volume, lead conversion, productivity</li>
+      </ul>
+    </div>
+    <div class="module mod-purple">
+      <h4>🎯 Recruitment Actions</h4>
+      <ul>
+        <li>Bulk Resume Sourcing → upload PDFs per job → auto-create candidates</li>
+        <li>Review / Approve / Reject interview requests from companies</li>
+        <li>Scheduled Interviews view with real candidate contact info</li>
+        <li>Confirm slot on behalf of sourced candidates (never logged in)</li>
+        <li>Review + approve offer letter release requests</li>
+      </ul>
+    </div>
+    <div class="module mod-green">
+      <h4>💼 Invoices &amp; Outreach</h4>
+      <ul>
+        <li>Raise invoices for assigned companies · mark paid / partial</li>
+        <li>Leads Pipeline: manage stage, assign, log calls</li>
+        <li>Outreach replies inbox (email + WhatsApp unified)</li>
+        <li>Reply to contacts, convert to leads, reassign</li>
+        <li>Email + WhatsApp campaign management</li>
+      </ul>
+    </div>
+  </div>
+  <hr class="div">
+  <h2 class="sec">8. Candidate &amp; Company Portals</h2>
+  <div class="three-col">
+    <div class="module mod-green">
+      <h4>👤 Candidate Portal</h4>
+      <ul>
+        <li>Profile: headline, summary, experience, education, skills</li>
+        <li>Upload resume → offline AI parse → skill vectors built</li>
+        <li>Browse AI-ranked job listings (fit score per job)</li>
+        <li>Self-apply with cover letter · track application status</li>
+        <li>Confirm / reschedule interview slots</li>
+        <li>Accept or decline offer letter</li>
+        <li>Accept triggers hired_employees + training assignments</li>
+        <li>Documents: upload certificates, ID etc.</li>
+      </ul>
+    </div>
+    <div class="module mod-orange">
+      <h4>🏢 Company Portal</h4>
+      <ul>
+        <li>Post / edit / close job postings</li>
+        <li>Browse Talent Pool (PII masked per grant)</li>
+        <li>Shortlist applications · move status</li>
+        <li>Request interview schedule (executive must approve)</li>
+        <li>Record interview outcome · request offer release</li>
+        <li>Send offer letter after exec approval + payment</li>
+        <li>View &amp; pay all invoices (placement + training fees)</li>
+        <li>Request training for team → admin approves → pay invoice</li>
+        <li>Company profile + approval status</li>
+      </ul>
+    </div>
+    <div class="module mod-teal">
+      <h4>🔔 Notifications (All Roles)</h4>
+      <ul>
+        <li>lead_assigned · task_assigned · task_completed</li>
+        <li>offer_request · offer_approved · offer_rejected</li>
+        <li>reply_assigned · outreach_reply · whatsapp_reply</li>
+        <li>lead_converted · campaign_sent · callback_scheduled</li>
+        <li>training_request · training_approved · training_rejected</li>
+        <li>bulk_resume_done · outreach_unmatched</li>
+      </ul>
+      <h4 style="margin-top:10px;">🏗 Tech Stack</h4>
+      <ul>
+        <li>Backend: Node.js + Express + mysql2/promise (port 5001)</li>
+        <li>Frontend: React 19 + Vite + Tailwind CSS (port 5173)</li>
+        <li>Auth: JWT in httpOnly cookie · bcrypt passwords</li>
+        <li>Files: local disk (resumes) + AWS S3 (outreach lists)</li>
+        <li>Email: GoDaddy SMTP (transactional + outreach)</li>
+        <li>Payments: Cashfree (sandbox + prod modes)</li>
+        <li>AI: Offline skill parser (no API key needed)</li>
+      </ul>
+    </div>
+  </div>
+  <div class="footer">
+    LadderStep Human Consulting Platform · Internal Reference · Generated 2026-06-16 · Node.js + Express + MySQL | React 19 + Vite + Tailwind CSS · 5 Roles · 54 DB Tables · 8 Modules
+  </div>
+</div>
+
+</body>
+</html>

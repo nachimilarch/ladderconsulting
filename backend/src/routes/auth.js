@@ -4,6 +4,8 @@ const {
     register,
     verifyEmail,
     login,
+    microsoftLogin,
+    googleLogin,
     forgotPassword,
     resetPassword,
     logout,
@@ -15,6 +17,8 @@ const { authenticateToken } = require('../middleware/auth');
 router.post('/register', register);
 router.post('/verify-email', verifyEmail);
 router.post('/login', login);
+router.post('/microsoft', microsoftLogin);
+router.post('/google', googleLogin);
 router.post('/forgot-password', forgotPassword);
 router.post('/reset-password', resetPassword);
 

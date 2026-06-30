@@ -1,17 +1,18 @@
 const nodemailer = require('nodemailer');
 
 const transporter = nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,
-    port: process.env.EMAIL_PORT,
+    host: process.env.SMTP_HOST,
+    port: parseInt(process.env.SMTP_PORT) || 587,
+    secure: process.env.SMTP_SECURE === 'true',
     auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASS,
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
     },
 });
 
 const sendEmail = async ({ to, subject, html }) => {
     await transporter.sendMail({
-        from: `"Ladder Consulting" <${process.env.EMAIL_USER}>`,
+        from: process.env.EMAIL_FROM || `"LadderStep Human Consulting" <${process.env.SMTP_USER}>`,
         to,
         subject,
         html,

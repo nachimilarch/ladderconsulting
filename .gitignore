@@ -16,3 +16,10 @@ build/
 # Logs
 *.log
 npm-debug.log*
+
+# Local file uploads (keep .gitkeep markers)
+backend/uploads/resumes/*
+backend/uploads/certificates/*
+backend/uploads/masked_resumes/*
+!backend/uploads/resumes/.gitkeep
+!backend/uploads/certificates/.gitkeep

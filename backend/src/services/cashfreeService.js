@@ -1,0 +1,79 @@
+const axios = require('axios');
+const crypto = require('crypto');
+
+const getBaseUrl = () => {
+    const env = process.env.CASHFREE_ENV || 'TEST';
+    return env === 'PROD'
+        ? (process.env.CASHFREE_BASE_URL_PROD || 'https://api.cashfree.com/pg')
+        : (process.env.CASHFREE_BASE_URL_TEST || 'https://sandbox.cashfree.com/pg');
+};
+
+const getHeaders = () => ({
+    'x-api-version': '2023-08-01',
+    'x-client-id': process.env.CASHFREE_APP_ID,
+    'x-client-secret': process.env.CASHFREE_SECRET_KEY,
+    'Content-Type': 'application/json',
+});
+
+// Create a Cashfree payment order
+exports.createOrder = async ({
+    orderId, amount, currency = 'INR',
+    customerName, customerEmail, customerPhone,
+    orderNote, returnUrl,
+}) => {
+    const payload = {
+        order_id: orderId,
+        order_amount: parseFloat(amount),
+        order_currency: currency,
+        customer_details: {
+            customer_id: `cust_${Date.now()}`,
+            customer_name: customerName || 'Company User',
+            customer_email: customerEmail,
+            customer_phone: customerPhone || '9999999999',
+        },
+        order_meta: {
+            return_url: returnUrl,
+            notify_url: `${process.env.BACKEND_URL || 'http://localhost:5001'}/api/payments/webhook/cashfree`,
+        },
+        order_note: orderNote || 'Payment to LadderStep Human Consulting',
+    };
+
+    const response = await axios.post(
+        `${getBaseUrl()}/orders`,
+        payload,
+        { headers: getHeaders() }
+    );
+    return response.data; // { order_id, payment_session_id, order_status, ... }
+};
+
+// Fetch order status from Cashfree
+exports.getOrderStatus = async (orderId) => {
+    const response = await axios.get(
+        `${getBaseUrl()}/orders/${orderId}`,
+        { headers: getHeaders() }
+    );
+    return response.data;
+};
+
+// Fetch payments for an order
+exports.getOrderPayments = async (orderId) => {
+    const response = await axios.get(
+        `${getBaseUrl()}/orders/${orderId}/payments`,
+        { headers: getHeaders() }
+    );
+    return response.data;
+};
+
+// Verify webhook signature
+// Cashfree sends: x-webhook-signature header = HMAC-SHA256(payload, secret)
+exports.verifyWebhookSignature = (rawBody, signature) => {
+    const secret = process.env.CASHFREE_WEBHOOK_SECRET;
+    if (!secret || !signature) return false;
+    const expected = crypto
+        .createHmac('sha256', secret)
+        .update(rawBody)
+        .digest('base64');
+    return expected === signature;
+};
+
+exports.getEnv = () => process.env.CASHFREE_ENV || 'TEST';

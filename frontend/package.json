@@ -10,11 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@azure/msal-browser": "^5.15.0",
     "@headlessui/react": "^2.2.10",
     "@heroicons/react": "^2.2.0",
     "@hookform/resolvers": "^5.2.2",
+    "@react-oauth/google": "^0.13.5",
     "axios": "^1.16.0",
+    "chart.js": "^4.5.1",
     "react": "^19.2.5",
+    "react-chartjs-2": "^5.3.1",
     "react-dom": "^19.2.5",
     "react-hook-form": "^7.75.0",
     "react-hot-toast": "^2.6.0",

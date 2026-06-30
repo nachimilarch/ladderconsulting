@@ -1,30 +1,65 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { profileAPI } from '../../api/candidate';
+import { profileAPI, jobAPI, aiAPI } from '../../api/candidate';
 
 export default function CandidateDashboard() {
     const { user } = useAuth();
     const [profile, setProfile] = useState(null);
-    const [stats, setStats] = useState({ skills: 0, education: 0, experience: 0, hasResume: false });
+    const [stats, setStats] = useState({ skills: 0, education: 0, experience: 0, hasResume: false, completeness: 0 });
     const [loading, setLoading] = useState(true);
+    const [topJobs, setTopJobs] = useState([]);
+    const [rematching, setRematching] = useState(false);
 
-    useEffect(() => {
+    const fetchProfile = () => {
         profileAPI.get()
             .then(({ data }) => {
                 setProfile(data.profile);
                 setStats({
                     skills: data.skills?.length || 0,
                     education: data.education?.length || 0,
-                    experience: data.experience?.length || 0,
+                    experience: data.experience_years || 0,
                     hasResume: !!data.resume,
+                    completeness: data.profile_complete_pct || 0,
                 });
             })
             .catch(() => {})
             .finally(() => setLoading(false));
+    };
+
+    useEffect(() => {
+        fetchProfile();
+
+        const onVisible = () => { if (document.visibilityState === 'visible') fetchProfile(); };
+        document.addEventListener('visibilitychange', onVisible);
+        return () => document.removeEventListener('visibilitychange', onVisible);
     }, []);
 
-    const completeness = profile?.profile_complete_pct || 0;
+    useEffect(() => {
+        jobAPI.getMatched({ page: 1, limit: 10 })
+            .then(({ data }) => {
+                // Only show jobs with a computed match score
+                const scored = (data.jobs || []).filter(j => j.match_computed && j.match_score > 0);
+                setTopJobs(scored.slice(0, 3));
+            })
+            .catch(() => {});
+    }, []);
+
+    const handleRetriggerMatch = async () => {
+        setRematching(true);
+        try {
+            await aiAPI.triggerResumeMatch();
+            const { data } = await jobAPI.getMatched({ page: 1, limit: 10 });
+            const scored = (data.jobs || []).filter(j => j.match_computed && j.match_score > 0);
+            setTopJobs(scored.slice(0, 3));
+        } catch {
+            // silently ignore — AI may be unavailable
+        } finally {
+            setRematching(false);
+        }
+    };
+
+    const completeness = stats.completeness;
 
     const quickActions = [
         { label: 'Complete Profile', to: '/candidate/profile', icon: '👤', desc: 'Add your details and experience', color: 'blue' },
@@ -93,7 +128,9 @@ export default function CandidateDashboard() {
                 </div>
                 <div className="kpi-card bg-purple-50 border-purple-100">
                     <div className="kpi-title text-purple-600">Experience</div>
-                    <div className="kpi-value text-purple-700">{stats.experience}</div>
+                    <div className="kpi-value text-purple-700">
+                        {stats.experience > 0 ? `${stats.experience}y` : '—'}
+                    </div>
                 </div>
                 <div className="kpi-card bg-amber-50 border-amber-100">
                     <div className="kpi-title text-amber-600">Resume</div>
@@ -115,6 +152,59 @@ export default function CandidateDashboard() {
                         </div>
                     </Link>
                 ))}
+            </div>
+
+            {/* Top Matched Jobs */}
+            <div className="mt-8">
+                <div className="flex items-center justify-between mb-3">
+                    <h2 className="section-title mb-0">Top Job Matches</h2>
+                    {stats.hasResume && (
+                        <button
+                            onClick={handleRetriggerMatch}
+                            disabled={rematching}
+                            className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
+                        >
+                            {rematching ? 'Refreshing...' : 'Refresh matches'}
+                        </button>
+                    )}
+                </div>
+
+                {topJobs.length > 0 ? (
+                    <div className="flex flex-col gap-3">
+                        {topJobs.map(job => (
+                            <div key={job.id} className="card-p flex items-center justify-between gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-gray-900 truncate">{job.title}</p>
+                                    <p className="text-xs text-gray-500 truncate">
+                                        {job.company_name}{job.location ? ` • ${job.location}` : ''}
+                                    </p>
+                                </div>
+                                <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
+                                    job.match_score >= 80 ? 'bg-green-100 text-green-700' :
+                                    job.match_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
+                                    'bg-red-100 text-red-600'
+                                }`}>
+                                    {job.match_score}% match
+                                </span>
+                            </div>
+                        ))}
+                        <Link to="/candidate/jobs" className="text-xs text-indigo-600 hover:underline mt-1 inline-block">
+                            Browse all jobs →
+                        </Link>
+                    </div>
+                ) : stats.hasResume ? (
+                    <div className="card-p text-center py-8 text-sm text-gray-500">
+                        <p className="mb-2">Match scores are being computed.</p>
+                        <p className="text-xs text-gray-400">Apply to jobs and scores will appear here once processed.</p>
+                    </div>
+                ) : (
+                    <div className="card-p text-center py-8 text-sm text-gray-500">
+                        <Link to="/candidate/profile" className="text-indigo-600 hover:underline font-medium">
+                            Upload your resume
+                        </Link>
+                        <span> to see jobs matched to your skills.</span>
+                    </div>
+                )}
             </div>
         </div>
     );

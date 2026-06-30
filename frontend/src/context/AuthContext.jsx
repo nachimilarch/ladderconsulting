@@ -21,13 +21,25 @@ export const AuthProvider = ({ children }) => {
         return data.user;
     };
 
+    const loginWithMicrosoft = async (idToken) => {
+        const { data } = await api.post('/auth/microsoft', { idToken });
+        setUser(data.user);
+        return data.user;
+    };
+
+    const loginWithGoogle = async (idToken, role) => {
+        const { data } = await api.post('/auth/google', { idToken, role });
+        setUser(data.user);
+        return data.user;
+    };
+
     const logout = async () => {
         await api.post('/auth/logout');
         setUser(null);
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, setUser }}>
+        <AuthContext.Provider value={{ user, loading, login, loginWithMicrosoft, loginWithGoogle, logout, setUser }}>
             {children}
         </AuthContext.Provider>
     );

@@ -7,6 +7,8 @@ const navItems = [
     { label: 'My Profile', to: '/candidate/profile', icon: '👤' },
     { label: 'Browse Jobs', to: '/candidate/jobs', icon: '💼' },
     { label: 'Applications', to: '/candidate/applications', icon: '📋' },
+    { label: 'Interviews', to: '/candidate/interviews', icon: '🗓' },
+    { label: 'Documents', to: '/candidate/documents', icon: '📁' },
 ];
 
 export default function CandidateLayout() {
@@ -24,9 +26,9 @@ export default function CandidateLayout() {
             {/* Navbar */}
             <nav className="navbar">
                 <div className="navbar-brand">
-                    <div className="navbar-badge">L</div>
+                    <img src="/logo-icon.png" alt="LadderStep" className="w-9 h-9 object-contain shrink-0" />
                     <div>
-                        <div className="navbar-title">Ladder Consulting</div>
+                        <div className="navbar-title">LadderStep <span className="text-brand-600">Human Consulting</span></div>
                         <div className="navbar-subtitle">Candidate Portal</div>
                     </div>
                 </div>

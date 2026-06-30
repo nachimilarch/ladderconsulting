@@ -27,8 +27,12 @@ export default function ResetPassword() {
     };
 
     return (
-        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-            <div className="bg-white shadow-md rounded-xl p-8 w-full max-w-sm">
+        <div className="auth-page">
+            <div className="auth-card-sm">
+                <div className="flex justify-center mb-6">
+                    <img src="/logo-full.png" alt="LadderStep Human Consulting" className="h-20 object-contain" />
+                </div>
+
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">Reset Password</h1>
                 <p className="text-sm text-gray-500 mb-6">Enter your new password below.</p>
 

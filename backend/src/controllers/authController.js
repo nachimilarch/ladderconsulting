@@ -1,10 +1,18 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const { OAuth2Client } = require('google-auth-library');
 const db = require('../config/db');
 const { sendEmail } = require('../utils/email');
+const { verifyMicrosoftIdToken } = require('../utils/msVerify');
 
 const DEV_MODE = process.env.NODE_ENV !== 'production';
+const googleClient = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+
+// SSO is mandatory for these roles — password login is rejected outright
+// regardless of whether the account predates this change.
+const MICROSOFT_ONLY_ROLES = ['hr_staff', 'admin'];
+const GOOGLE_ONLY_ROLES = ['candidate', 'company'];
 
 // Safe email helper — never crashes the request
 const trySendEmail = async (options) => {
@@ -15,77 +23,40 @@ const trySendEmail = async (options) => {
     }
 };
 
+const issueSessionCookie = (res, user) => {
+    const payload = { id: user.id, email: user.email, role: user.role };
+    const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
+    const isProd = process.env.NODE_ENV === 'production';
+    res.cookie('token', token, {
+        httpOnly: true,
+        secure: isProd,
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+};
+
+const linkOAuthIdentity = async (userId, provider, providerUserId, email) => {
+    await db.query(
+        `INSERT IGNORE INTO user_oauth_identities (user_id, provider, provider_user_id, email)
+         VALUES (?, ?, ?, ?)`,
+        [userId, provider, providerUserId, email]
+    );
+};
+
 // ─── REGISTER ────────────────────────────────────────────────────────────────
+// Password-based self-registration is retired in favour of SSO (see
+// microsoftLogin/googleLogin below). Kept as a clear redirect rather than a
+// 404 in case anything still links here.
 exports.register = async (req, res) => {
-    const { name, email, password, role } = req.body;
+    const { role } = req.body;
 
-    const allowedRoles = ['candidate', 'company', 'hr_staff'];
-    if (!allowedRoles.includes(role)) {
-        return res.status(400).json({ message: 'Invalid role selected.' });
+    if (GOOGLE_ONLY_ROLES.includes(role)) {
+        return res.status(400).json({ message: 'Self-registration with a password is no longer available. Please use "Sign up with Google" instead.' });
     }
-
-    try {
-        const [existing] = await db.query('SELECT id FROM users WHERE email = ?', [email]);
-        if (existing.length > 0) {
-            return res.status(409).json({ message: 'Email already registered.' });
-        }
-
-        const [roleRow] = await db.query('SELECT id FROM roles WHERE name = ?', [role]);
-        if (roleRow.length === 0) {
-            return res.status(400).json({ message: 'Role not found. Ensure roles table is seeded.' });
-        }
-
-        const hashedPassword = await bcrypt.hash(password, 12);
-        const verifyToken = crypto.randomBytes(32).toString('hex');
-        const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
-        const status = role === 'company' ? 'pending' : 'active';
-
-        // In dev mode, auto-verify email so you can login immediately
-        const isVerified = DEV_MODE ? 1 : 0;
-
-        const [result] = await db.query(
-            `INSERT INTO users (name, email, password, role_id, status, is_email_verified, email_verify_token, email_verify_token_expires)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-            [name, email, hashedPassword, roleRow[0].id, status, isVerified,
-                DEV_MODE ? null : verifyToken,
-                DEV_MODE ? null : tokenExpiry]
-        );
-
-        const userId = result.insertId;
-
-        if (role === 'company') {
-            await db.query(
-                `INSERT INTO company_approvals (user_id, status) VALUES (?, 'pending')`,
-                [userId]
-            );
-        }
-        // Send email without blocking or crashing the response
-        if (!DEV_MODE) {
-            const verifyUrl = `${process.env.CLIENT_URL}/verify-email?token=${verifyToken}`;
-            await trySendEmail({
-                to: email,
-                subject: 'Verify your Ladder Consulting account',
-                html: `
-          <p>Hello ${name},</p>
-          <p>Please verify your email: <a href="${verifyUrl}">${verifyUrl}</a></p>
-          <p>Expires in 24 hours.</p>
-          ${role === 'company' ? '<p><strong>Note:</strong> Admin approval required after verification.</p>' : ''}
-        `,
-            });
-        }
-
-        res.status(201).json({
-            message: DEV_MODE
-                ? 'Registration successful. Dev mode: email auto-verified, you can login now.'
-                : role === 'company'
-                    ? 'Registration successful. Please verify your email. Admin approval required.'
-                    : 'Registration successful. Please verify your email.',
-        });
-
-    } catch (err) {
-        console.error('Register error:', err);
-        res.status(500).json({ message: 'Server error during registration.', detail: err.message });
+    if (MICROSOFT_ONLY_ROLES.includes(role)) {
+        return res.status(400).json({ message: 'Staff accounts are created by an administrator. Please contact your admin, then sign in with Microsoft.' });
     }
+    return res.status(400).json({ message: 'Invalid role selected.' });
 };
 
 // ─── VERIFY EMAIL ─────────────────────────────────────────────────────────────
@@ -140,6 +111,16 @@ exports.login = async (req, res) => {
 
         const user = rows[0];
 
+        // Password login is retired for SSO-only roles — checked before the
+        // password compare so this also covers accounts that predate the
+        // change and still remember a real password.
+        if (MICROSOFT_ONLY_ROLES.includes(user.role)) {
+            return res.status(403).json({ message: 'Please sign in with Microsoft.' });
+        }
+        if (GOOGLE_ONLY_ROLES.includes(user.role)) {
+            return res.status(403).json({ message: 'Please sign in with Google.' });
+        }
+
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ message: 'Invalid email or password.' });
@@ -149,25 +130,11 @@ exports.login = async (req, res) => {
             return res.status(403).json({ message: 'Please verify your email before logging in.' });
         }
 
-        if (user.role === 'company' && user.status === 'pending') {
-            return res.status(403).json({
-                message: 'Your account is pending admin approval.',
-            });
-        }
-
         if (user.status === 'suspended') {
             return res.status(403).json({ message: 'Account suspended. Contact support.' });
         }
 
-        const payload = { id: user.id, email: user.email, role: user.role };
-        const token = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
-
-        res.cookie('token', token, {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
-            maxAge: 7 * 24 * 60 * 60 * 1000,
-        });
+        issueSessionCookie(res, user);
 
         res.json({
             message: 'Login successful.',
@@ -176,6 +143,129 @@ exports.login = async (req, res) => {
     } catch (err) {
         console.error('Login error:', err);
         res.status(500).json({ message: 'Server error during login.' });
+    }
+};
+
+// ─── MICROSOFT LOGIN (hr_staff, admin) ────────────────────────────────────────
+// No auto-provisioning — the users row must already exist (created via
+// adminController.createStaff). Matched purely by email since "any Microsoft
+// account" is allowed (no tenant restriction).
+exports.microsoftLogin = async (req, res) => {
+    const { idToken } = req.body;
+    if (!idToken) return res.status(400).json({ message: 'idToken is required.' });
+
+    try {
+        const claims = await verifyMicrosoftIdToken(idToken);
+        if (!claims.email) {
+            return res.status(400).json({ message: 'Your Microsoft account has no email address.' });
+        }
+
+        const [rows] = await db.query(
+            `SELECT u.id, u.name, u.email, u.status, r.name AS role
+             FROM users u JOIN roles r ON u.role_id = r.id
+             WHERE u.email = ? AND u.deleted_at IS NULL`,
+            [claims.email]
+        );
+
+        if (rows.length === 0) {
+            return res.status(403).json({ message: 'No account found for this email. Ask your administrator to create one, then try again.' });
+        }
+
+        const user = rows[0];
+        if (!MICROSOFT_ONLY_ROLES.includes(user.role)) {
+            return res.status(403).json({ message: 'Microsoft sign-in is not available for your account type.' });
+        }
+        if (user.status === 'suspended') {
+            return res.status(403).json({ message: 'Account suspended. Contact support.' });
+        }
+
+        await linkOAuthIdentity(user.id, 'microsoft', claims.providerUserId, claims.email);
+        await db.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
+        issueSessionCookie(res, user);
+
+        res.json({
+            message: 'Login successful.',
+            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+        });
+    } catch (err) {
+        console.error('Microsoft login error:', err);
+        res.status(401).json({ message: 'Microsoft sign-in failed. Please try again.' });
+    }
+};
+
+// ─── GOOGLE LOGIN (candidate, company) ────────────────────────────────────────
+// Auto-provisions on first sign-in, mirroring the retired register() flow:
+// candidates get instant active access, companies get status='pending' +
+// a company_approvals row for admin review (email is already verified by
+// Google so no separate verify-email step is needed either way).
+exports.googleLogin = async (req, res) => {
+    const { idToken, role } = req.body;
+    if (!idToken) return res.status(400).json({ message: 'idToken is required.' });
+
+    try {
+        const ticket = await googleClient.verifyIdToken({ idToken, audience: process.env.GOOGLE_CLIENT_ID });
+        const payload = ticket.getPayload();
+
+        if (!payload.email || !payload.email_verified) {
+            return res.status(400).json({ message: 'Your Google account email is not verified.' });
+        }
+        const email = payload.email;
+
+        const [rows] = await db.query(
+            `SELECT u.id, u.name, u.email, u.status, r.name AS role
+             FROM users u JOIN roles r ON u.role_id = r.id
+             WHERE u.email = ? AND u.deleted_at IS NULL`,
+            [email]
+        );
+
+        let user = rows[0];
+
+        if (user) {
+            if (!GOOGLE_ONLY_ROLES.includes(user.role)) {
+                return res.status(403).json({ message: 'Google sign-in is not available for your account type.' });
+            }
+            if (user.status === 'suspended') {
+                return res.status(403).json({ message: 'Account suspended. Contact support.' });
+            }
+        } else {
+            if (!GOOGLE_ONLY_ROLES.includes(role)) {
+                return res.status(400).json({ message: 'role must be candidate or company.' });
+            }
+
+            const [[roleRow]] = await db.query('SELECT id FROM roles WHERE name = ?', [role]);
+            const randomHash = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 12);
+            const status = role === 'company' ? 'pending' : 'active';
+
+            const [result] = await db.query(
+                `INSERT INTO users (name, email, password, role_id, status, is_email_verified)
+                 VALUES (?, ?, ?, ?, ?, 1)`,
+                [payload.name || email, email, randomHash, roleRow.id, status]
+            );
+            const userId = result.insertId;
+
+            if (role === 'company') {
+                await db.query(`INSERT INTO company_approvals (user_id, status) VALUES (?, 'pending')`, [userId]);
+            }
+
+            user = { id: userId, name: payload.name || email, email, status, role };
+        }
+
+        await linkOAuthIdentity(user.id, 'google', payload.sub, email);
+
+        if (user.role === 'company' && user.status === 'pending') {
+            return res.status(403).json({ message: 'Registration successful. Your account is pending admin approval.' });
+        }
+
+        await db.query('UPDATE users SET last_login_at = NOW() WHERE id = ?', [user.id]);
+        issueSessionCookie(res, user);
+
+        res.json({
+            message: 'Login successful.',
+            user: { id: user.id, name: user.name, email: user.email, role: user.role },
+        });
+    } catch (err) {
+        console.error('Google login error:', err);
+        res.status(401).json({ message: 'Google sign-in failed. Please try again.' });
     }
 };
 
@@ -203,7 +293,7 @@ exports.forgotPassword = async (req, res) => {
 
         await trySendEmail({
             to: email,
-            subject: 'Reset your Ladder Consulting password',
+            subject: 'Reset your LadderStep Human Consulting password',
             html: `
         <p>Hello ${user.name},</p>
         <p>Reset your password (valid 1 hour): <a href="${resetUrl}">${resetUrl}</a></p>
