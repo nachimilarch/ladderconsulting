@@ -249,6 +249,20 @@ exports.googleLogin = async (req, res) => {
 
             if (role === 'company') {
                 await db.query(`INSERT INTO company_approvals (user_id, status) VALUES (?, 'pending')`, [userId]);
+                sendEmail({
+                    to: 'crm@theladderconsulting.com',
+                    subject: `New Company Registration — Approval Required`,
+                    html: `
+                        <p>A new hiring company has registered on LadderStep and is awaiting your approval.</p>
+                        <table style="border-collapse:collapse;margin:16px 0">
+                            <tr><td style="padding:4px 12px 4px 0;color:#666">Name</td><td><strong>${payload.name || email}</strong></td></tr>
+                            <tr><td style="padding:4px 12px 4px 0;color:#666">Email</td><td>${email}</td></tr>
+                            <tr><td style="padding:4px 12px 4px 0;color:#666">Registered via</td><td>Google SSO</td></tr>
+                        </table>
+                        <p><a href="https://theladderconsulting.com/ladder" style="background:#6a47d4;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block">Login to Admin Panel</a></p>
+                        <p style="color:#888;font-size:12px">Go to Admin → Company Approvals to approve or reject this registration.</p>
+                    `,
+                }).catch(e => console.error('[authController] company registration email error:', e.message));
             }
 
             user = { id: userId, name: payload.name || email, email, status, role };
