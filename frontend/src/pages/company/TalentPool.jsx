@@ -140,22 +140,25 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
 }
 
 // ── Package request modal (shown when company has no credits/platinum) ────────
-function PackageRequestModal({ onClose }) {
+function PackageRequestModal({ onClose, hasPackage }) {
+    const isTopUp = hasPackage; // already bought before, just out of credits
     return (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
                 <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold text-gray-900">Request a Resume Unlock Package</h2>
+                    <h2 className="font-semibold text-gray-900">
+                        {isTopUp ? 'Top Up Resume Credits' : 'Request a Resume Unlock Package'}
+                    </h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
                 </div>
                 <p className="text-sm text-gray-500 mb-5">
-                    To see full candidate details and download resumes, select a package below.
-                    Your LadderStep executive will activate it for you — no payment gateway needed right now.
+                    {isTopUp
+                        ? 'You have no unlock credits remaining. Request more credits or upgrade to Platinum for unlimited unlocks.'
+                        : 'To see full candidate details and download resumes, select a package below. Your LadderStep executive will activate it for you.'}
                 </p>
                 <PackagePicker
-                    title="Choose a Package"
+                    title={isTopUp ? 'Get More Credits' : 'Choose a Package'}
                     subtitle="Unlock credits let you access full profiles and resumes for any candidate in the pool."
-                    onSelected={(hasPackage) => { if (hasPackage) onClose(); }}
                 />
             </div>
         </div>
@@ -610,7 +613,7 @@ export default function TalentPool() {
 
             {/* Package request modal */}
             {pkgRequestModal && (
-                <PackageRequestModal onClose={() => setPkgRequestModal(false)} />
+                <PackageRequestModal onClose={() => setPkgRequestModal(false)} hasPackage={hasPackage} />
             )}
 
             {/* Full unlocked profile */}
