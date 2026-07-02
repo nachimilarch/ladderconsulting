@@ -212,7 +212,7 @@ export default function ShortlistView() {
                                                 </span>
                                             )}
                                             {app.contact_unlocked && (
-                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200" title="Resume unlocked via Single/4-Pack — contact info shown directly, no executive needed">
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200" title="Resume unlocked via Single/5-Pack — contact info shown directly, no executive needed">
                                                     🔓 Contact Unlocked
                                                 </span>
                                             )}

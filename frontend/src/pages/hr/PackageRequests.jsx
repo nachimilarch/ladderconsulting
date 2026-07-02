@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 const TIER_LABELS = {
     single: 'Single Resume Unlock (₹999)',
-    pack_4: '4-Resume Pack (₹3,999)',
+    pack_4: '5-Resume Pack (₹3,999)',
 };
 
 export default function PackageRequests() {

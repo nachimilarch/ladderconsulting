@@ -4,7 +4,7 @@ const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.
 
 const PACKAGE_CONFIG = {
     single: { credits: 1, amount: 999,  label: 'Single Resume Unlock' },
-    pack_4: { credits: 4, amount: 3999, label: '4-Resume Pack'         },
+    pack_4: { credits: 5, amount: 3999, label: '5-Resume Pack'         },
 };
 
 const parseMeta = (m) => (typeof m === 'string' ? JSON.parse(m) : m) || {};
@@ -33,7 +33,7 @@ exports.listPackageRequests = async (req, res) => {
 };
 
 // POST /api/hr/package-requests/:id/activate
-// Activates a Single or 4-Pack for the company (offline payment confirmed).
+// Activates a Single or 5-Pack for the company (offline payment confirmed).
 // Platinum requests cannot be activated here — admin sets the rate via CompanyApprovals.
 exports.activatePackage = async (req, res) => {
     const notificationId = parseInt(req.params.id);

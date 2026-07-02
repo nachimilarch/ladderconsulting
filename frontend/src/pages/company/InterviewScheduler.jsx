@@ -289,7 +289,7 @@ export default function InterviewScheduler() {
     // ctcVal is the ANNUAL CTC the company enters. feePercent (Platinum contracted
     // rate) applies directly to it — 8.33% = 1/12 = exactly one month's salary.
     // Default (no contracted rate) fee is 1x monthly CTC, i.e. annual / 12.
-    // Placement fees (Platinum %) carry 18% GST on top; Single/4-Pack are GST-inclusive.
+    // Placement fees (Platinum %) carry 18% GST on top; Single/5-Pack are GST-inclusive.
     const ctcVal = parseFloat(offerReqForm.offered_ctc);
     const estimatedFee = !isNaN(ctcVal) && ctcVal > 0
         ? Math.round(feePercent != null ? ctcVal * (parseFloat(feePercent) / 100) : ctcVal / 12)

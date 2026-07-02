@@ -108,7 +108,7 @@ export default function CompanyApprovals() {
 
     const handleActivatePackage = async (tier) => {
         if (!detail) return;
-        const label = tier === 'single' ? 'Single (₹999)' : '4-Pack (₹3,999)';
+        const label = tier === 'single' ? 'Single (₹999)' : '5-Pack (₹3,999)';
         if (!window.confirm(`Activate ${label} for ${detail.company_name}? This creates a paid invoice without Cashfree.`)) return;
         try {
             const { data } = await adminCompanyAPI.activatePackage(detail.id, tier);
@@ -305,7 +305,7 @@ export default function CompanyApprovals() {
                             </div>
                         </div>
 
-                        {/* Package Activation (Single / 4-Pack — offline payment) */}
+                        {/* Package Activation (Single / 5-Pack — offline payment) */}
                         <div className="border-t mt-4 pt-4">
                             <p className="text-xs font-semibold text-gray-600 mb-2">Activate Package (Offline Payment)</p>
                             <p className="text-xs text-gray-400 mb-2">Creates a paid invoice + credits without Cashfree. Use when payment was collected offline.</p>
@@ -320,7 +320,7 @@ export default function CompanyApprovals() {
                                     onClick={() => handleActivatePackage('pack_4')}
                                     className="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 transition"
                                 >
-                                    Activate 4-Pack (₹3,999)
+                                    Activate 5-Pack (₹3,999)
                                 </button>
                             </div>
                         </div>

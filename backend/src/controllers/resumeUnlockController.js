@@ -12,7 +12,7 @@ const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req
 
 const PRICING = {
     single: { amount: 999,  credits: 1 },
-    pack_4: { amount: 3999, credits: 4 },
+    pack_4: { amount: 3999, credits: 5 },
 };
 
 const getCompany = async (userId) => {
@@ -311,7 +311,7 @@ exports.requestPlatinum = async (req, res) => {
 // the admin manually activates the package via POST /api/admin/companies/:id/activate-package.
 exports.requestPackage = async (req, res) => {
     const { tier, note } = req.body;
-    const TIER_LABELS = { single: 'Single Resume Unlock (₹999)', pack_4: '4-Resume Pack (₹3,999)' };
+    const TIER_LABELS = { single: 'Single Resume Unlock (₹999)', pack_4: '5-Resume Pack (₹3,999)' };
     if (!TIER_LABELS[tier]) return res.status(400).json({ message: 'tier must be single or pack_4.' });
 
     try {
@@ -456,7 +456,7 @@ exports.applyToPipeline = async (req, res) => {
             [company.id, candidateId]
         );
         if (!grant || !['single', 'pack'].includes(grant.granted_via)) {
-            return res.status(403).json({ success: false, message: 'Unlock this candidate via Single or 4-Pack first.' });
+            return res.status(403).json({ success: false, message: 'Unlock this candidate via Single or 5-Pack first.' });
         }
 
         const [[job]] = await db.query(
