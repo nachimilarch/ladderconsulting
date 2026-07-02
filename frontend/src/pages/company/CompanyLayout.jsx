@@ -10,7 +10,7 @@ const INDUSTRIES = [
     'Retail', 'E-commerce', 'Consulting', 'Real Estate', 'Media & Entertainment',
     'Logistics', 'Automotive', 'Energy', 'Hospitality', 'Telecommunications', 'Other',
 ];
-const SIZES = ['1–10', '11–50', '51–200', '201–500', '501–1000', '1000+'];
+const SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
 
 const navItems = [
     { label: 'Dashboard',   to: '/company',            icon: '📊', exact: true },
