@@ -407,6 +407,8 @@ const SECTION_WORDS = new Set([
     'projects', 'certifications', 'achievements', 'references', 'languages',
     'synopsis', 'highlights', 'history', 'background', 'overview', 'career',
     'personal', 'details', 'information',
+    // common section-header starters that appear after space-less PDF fixing
+    'job', 'work', 'key', 'professional', 'academic', 'core', 'technical',
 ]);
 
 const TITLE_WORDS = /(engineer|developer|manager|analyst|consultant|designer|specialist|lead|architect|executive|intern|administrator|officer|coordinator|accountant|recruiter|marketer|scientist|associate|head|director|programmer|tester|qa|devops|hr|sales|support|strategist|planner|supervisor|assistant|partner|professional|expert|controller|advisor|communications|copywriter|content|writer|researcher|trainer|coach|founder|ceo|cto|cfo|vp|president)/i;
@@ -621,28 +623,28 @@ function extractExperienceYears(rawText) {
 
 // ── Education ─────────────────────────────────────────────────────────────────
 const DEGREES = [
-    [/ph\.?\s?d|doctorate/i, 'PhD'],
-    [/m\.?\s?tech|master\s+of\s+technology/i, 'M.Tech'],
-    [/b\.?\s?tech|bachelor\s+of\s+technology/i, 'B.Tech'],
-    [/m\.?\s?b\.?a|master\s+of\s+business\s+administration/i, 'MBA'],
-    [/b\.?\s?b\.?a|bachelor\s+of\s+business/i, 'BBA'],
-    [/m\.?\s?c\.?a|master\s+of\s+computer\s+applications/i, 'MCA'],
-    [/b\.?\s?c\.?a|bachelor\s+of\s+computer\s+applications/i, 'BCA'],
-    [/m\.?\s?sc|master\s+of\s+science/i, 'M.Sc'],
-    [/b\.?\s?sc|bachelor\s+of\s+science/i, 'B.Sc'],
-    [/m\.?\s?com|master\s+of\s+commerce/i, 'M.Com'],
-    [/b\.?\s?com|bachelor\s+of\s+commerce/i, 'B.Com'],
-    [/m\.?\s?e\b|master\s+of\s+engineering/i, 'M.E'],
-    [/b\.?\s?e\b|bachelor\s+of\s+engineering/i, 'B.E'],
-    [/m\.?\s?a\b|master\s+of\s+arts/i, 'M.A'],
-    [/b\.?\s?a\b|bachelor\s+of\s+arts/i, 'B.A'],
-    [/pgd|post\s*graduate\s+diploma/i, 'PGD'],
-    [/diploma/i, 'Diploma'],
-    [/10\+2|intermediate|hsc|higher\s+secondary/i, 'HSC'],
-    [/10th|ssc|matriculation\b|secondary\s+school/i, 'SSC'],
+    [/\bph\.?\s?d\b|doctorate/i, 'PhD'],
+    [/\bm\.?\s?tech\b|master\s+of\s+technology/i, 'M.Tech'],
+    [/\bb\.?\s?tech\b|bachelor\s+of\s+technology/i, 'B.Tech'],
+    [/\bmba\b|\bm\.b\.a\.?\b|master\s+of\s+business\s+administration/i, 'MBA'],
+    [/\bbba\b|\bb\.b\.a\.?\b|bachelor\s+of\s+business/i, 'BBA'],
+    [/\bmca\b|\bm\.c\.a\.?\b|master\s+of\s+computer\s+applications/i, 'MCA'],
+    [/\bbca\b|\bb\.c\.a\.?\b|bachelor\s+of\s+computer\s+applications/i, 'BCA'],
+    [/\bm\.?\s?sc\b|\bmsc\b|master\s+of\s+science/i, 'M.Sc'],
+    [/\bb\.?\s?sc\b|\bbsc\b|bachelor\s+of\s+science/i, 'B.Sc'],
+    [/\bm\.?\s?com\b|\bmcom\b|master\s+of\s+commerce/i, 'M.Com'],
+    [/\bb\.?\s?com\b|\bbcom\b|bachelor\s+of\s+commerce/i, 'B.Com'],
+    [/\bm\.e\b|master\s+of\s+engineering/i, 'M.E'],
+    [/\bb\.e\b|bachelor\s+of\s+engineering/i, 'B.E'],
+    [/\bm\.a\b|master\s+of\s+arts/i, 'M.A'],
+    [/\bb\.a\b|bachelor\s+of\s+arts/i, 'B.A'],
+    [/\bpgd\b|post\s*graduate\s+diploma/i, 'PGD'],
+    [/\bdiploma\b/i, 'Diploma'],
+    [/10\+2|\bintermediate\b|\bhsc\b|higher\s+secondary/i, 'HSC'],
+    [/\b10th\b|\bssc\b|matriculation\b|secondary\s+school/i, 'SSC'],
 ];
 
-const INSTITUTION_RE = /(university|institution|institute|college|school|academy|polytechnic|iit|nit|iiit|bits|management|business\s+school)/i;
+const INSTITUTION_RE = /(university|institution|institute|college|school|academy|polytechnic|iit|iim|nit|iiit|bits|management|business\s+school)/i;
 
 // strip leading junk chars and parentheses wrapping from education lines
 function cleanEduLine(s) {
@@ -702,7 +704,9 @@ function extractEducation(text) {
                 const fyIdx = cleanStripped.indexOf(firstYearM[0]);
                 if (!field && fyIdx > 1) {
                     const bf = cleanStripped.slice(0, fyIdx).trim().replace(/[,\-]+$/, '').trim();
-                    if (bf && bf.length < 60 && !/\d/.test(bf) && !INSTITUTION_RE.test(bf)) {
+                    const bfFirstWord = bf.split(/\s+/)[0]?.toLowerCase();
+                    if (bf && bf.length < 60 && !/\d/.test(bf) && !INSTITUTION_RE.test(bf)
+                        && !SECTION_WORDS.has(bfFirstWord)) {
                         field = bf;
                     }
                 }
@@ -718,9 +722,11 @@ function extractEducation(text) {
         }
 
         // Look at next 2 lines if institution still not found
+        // Skip lines that are themselves degree entries (they'll be parsed on their own iteration)
         if (!institution) {
             for (let k = i + 1; k <= i + 2 && k < lines.length; k++) {
                 const nl = cleanEduLine(lines[k]);
+                if (DEGREES.some(([re]) => re.test(nl))) break;
                 if (INSTITUTION_RE.test(nl)) { institution = nl.split(/,/)[0].trim(); break; }
             }
         }
