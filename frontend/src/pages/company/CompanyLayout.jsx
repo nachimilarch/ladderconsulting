@@ -1,7 +1,16 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
+import { companyAPI } from '../../api/company';
+import toast from 'react-hot-toast';
+
+const INDUSTRIES = [
+    'Technology', 'Finance', 'Banking', 'Healthcare', 'Education', 'Manufacturing',
+    'Retail', 'E-commerce', 'Consulting', 'Real Estate', 'Media & Entertainment',
+    'Logistics', 'Automotive', 'Energy', 'Hospitality', 'Telecommunications', 'Other',
+];
+const SIZES = ['1–10', '11–50', '51–200', '201–500', '501–1000', '1000+'];
 
 const navItems = [
     { label: 'Dashboard',   to: '/company',            icon: '📊', exact: true },
@@ -20,6 +29,55 @@ export default function CompanyLayout() {
     const { user, logout } = useAuth();
     const location = useLocation();
     const [mobileOpen, setMobileOpen] = useState(false);
+
+    // Onboarding modal state
+    const [showOnboarding, setShowOnboarding] = useState(false);
+    const [onboardChecked, setOnboardChecked] = useState(false);
+    const [saving, setSaving] = useState(false);
+    const [form, setForm] = useState({
+        company_name: '', industry: '', size: '', headquarters: '',
+        website: '', description: '', contact_phone: '',
+    });
+
+    // Check profile completeness on first load
+    useEffect(() => {
+        companyAPI.getProfile()
+            .then(r => {
+                const co = r.data?.company || r.data;
+                if (!co?.industry || !co?.headquarters) {
+                    setForm(f => ({
+                        ...f,
+                        company_name:   co?.company_name  || user?.name || '',
+                        industry:       co?.industry      || '',
+                        size:           co?.size          || '',
+                        headquarters:   co?.headquarters  || '',
+                        website:        co?.website       || '',
+                        description:    co?.description   || '',
+                        contact_phone:  co?.contact_phone || '',
+                    }));
+                    setShowOnboarding(true);
+                }
+            })
+            .catch(() => {})
+            .finally(() => setOnboardChecked(true));
+    }, []); // eslint-disable-line
+
+    const handleOnboardSubmit = async (e) => {
+        e.preventDefault();
+        if (!form.company_name.trim()) { toast.error('Company name is required'); return; }
+        if (!form.industry)            { toast.error('Please select an industry'); return; }
+        if (!form.headquarters.trim()) { toast.error('Location / HQ is required'); return; }
+        setSaving(true);
+        try {
+            await companyAPI.updateProfile(form);
+            toast.success('Company profile saved!');
+            setShowOnboarding(false);
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Failed to save profile');
+        } finally {
+            setSaving(false);
+        }
+    };
 
     const isActive = (item) =>
         item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
@@ -109,6 +167,112 @@ export default function CompanyLayout() {
                     <Outlet />
                 </main>
             </div>
+
+            {/* ── Onboarding modal ─────────────────────────────────────────── */}
+            {onboardChecked && showOnboarding && (
+                <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
+                            <div className="flex items-center gap-3 mb-1">
+                                <img src="/logo-icon.png" alt="" className="w-8 h-8 object-contain" />
+                                <h2 className="text-lg font-bold text-gray-900">Welcome to LadderStep!</h2>
+                            </div>
+                            <p className="text-sm text-gray-500">
+                                Complete your company profile so our team can best assist you with hiring.
+                            </p>
+                        </div>
+
+                        <form onSubmit={handleOnboardSubmit} className="px-6 py-5 space-y-4">
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Company Name <span className="text-red-500">*</span></label>
+                                <input
+                                    value={form.company_name}
+                                    onChange={e => setForm(f => ({ ...f, company_name: e.target.value }))}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="Acme Corp"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Industry <span className="text-red-500">*</span></label>
+                                    <select
+                                        value={form.industry}
+                                        onChange={e => setForm(f => ({ ...f, industry: e.target.value }))}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="">Select…</option>
+                                        {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Company Size</label>
+                                    <select
+                                        value={form.size}
+                                        onChange={e => setForm(f => ({ ...f, size: e.target.value }))}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    >
+                                        <option value="">Select…</option>
+                                        {SIZES.map(s => <option key={s} value={s}>{s} employees</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Location / Headquarters <span className="text-red-500">*</span></label>
+                                <input
+                                    value={form.headquarters}
+                                    onChange={e => setForm(f => ({ ...f, headquarters: e.target.value }))}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                    placeholder="Bangalore, Karnataka"
+                                />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Website</label>
+                                    <input
+                                        value={form.website}
+                                        onChange={e => setForm(f => ({ ...f, website: e.target.value }))}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="https://example.com"
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Phone</label>
+                                    <input
+                                        value={form.contact_phone}
+                                        onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        placeholder="+91 98765 43210"
+                                    />
+                                </div>
+                            </div>
+
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">About the Company</label>
+                                <textarea
+                                    value={form.description}
+                                    onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                                    rows={3}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 resize-none"
+                                    placeholder="Brief description of your company, culture, and what you do…"
+                                />
+                            </div>
+
+                            <div className="flex justify-end pt-2">
+                                <button
+                                    type="submit"
+                                    disabled={saving}
+                                    className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+                                >
+                                    {saving ? 'Saving…' : 'Save & Continue'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

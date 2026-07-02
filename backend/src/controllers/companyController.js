@@ -41,7 +41,8 @@ const getOrCreateCompany = async (userId) => {
 exports.getProfile = async (req, res) => {
     try {
         const company = await getOrCreateCompany(req.user.id);
-        res.json({ company });
+        const [[user]] = await db.query('SELECT name, phone FROM users WHERE id = ? AND deleted_at IS NULL', [req.user.id]);
+        res.json({ company: { ...company, contact_name: user?.name, contact_phone: user?.phone || null } });
     } catch (err) {
         console.error('getProfile error:', err);
         res.status(500).json({ message: 'Failed to load company profile.' });
@@ -50,7 +51,7 @@ exports.getProfile = async (req, res) => {
 
 // ── PUT /api/companies/me ────────────────────────────────────────────────────
 exports.updateProfile = async (req, res) => {
-    const { company_name, industry, size, website, headquarters, description } = req.body;
+    const { company_name, industry, size, website, headquarters, description, contact_phone } = req.body;
     if (!company_name) return res.status(400).json({ message: 'Company name is required.' });
 
     try {
@@ -61,10 +62,61 @@ exports.updateProfile = async (req, res) => {
             [company_name, industry || null, size || null, website || null,
              headquarters || null, description || null, company.id]
         );
+        if (contact_phone !== undefined) {
+            await db.query('UPDATE users SET phone=? WHERE id=?', [contact_phone || null, req.user.id]);
+        }
         res.json({ message: 'Profile updated.' });
     } catch (err) {
         console.error('updateProfile error:', err);
         res.status(500).json({ message: 'Failed to update profile.' });
+    }
+};
+
+// ── GET /api/hr/companies ─────────────────────────────────────────────────────
+// Executive sees their assigned companies; admin sees all approved companies.
+exports.getMyCompanies = async (req, res) => {
+    try {
+        let rows;
+        if (req.user.role === 'admin') {
+            [rows] = await db.query(
+                `SELECT co.id, co.company_name, co.industry, co.size, co.headquarters, co.website,
+                        co.description, co.placement_fee_percent, co.assigned_executive_id,
+                        co.executive_assigned_at,
+                        u.name AS contact_name, u.email AS contact_email, u.phone AS contact_phone,
+                        eu.name AS exec_name,
+                        (SELECT COUNT(*) FROM job_postings jp WHERE jp.company_id = co.id AND jp.deleted_at IS NULL) AS job_count,
+                        (SELECT COUNT(*) FROM applications a
+                           JOIN job_postings jp2 ON jp2.id = a.job_id
+                           WHERE jp2.company_id = co.id AND a.deleted_at IS NULL) AS application_count
+                 FROM companies co
+                 JOIN users u ON u.id = co.user_id AND u.deleted_at IS NULL
+                 LEFT JOIN employees e ON e.id = co.assigned_executive_id AND e.deleted_at IS NULL
+                 LEFT JOIN users eu ON eu.id = e.user_id
+                 WHERE co.deleted_at IS NULL AND co.is_approved = 1
+                 ORDER BY co.company_name`
+            );
+        } else {
+            [rows] = await db.query(
+                `SELECT co.id, co.company_name, co.industry, co.size, co.headquarters, co.website,
+                        co.description, co.placement_fee_percent, co.assigned_executive_id,
+                        co.executive_assigned_at,
+                        u.name AS contact_name, u.email AS contact_email, u.phone AS contact_phone,
+                        (SELECT COUNT(*) FROM job_postings jp WHERE jp.company_id = co.id AND jp.deleted_at IS NULL) AS job_count,
+                        (SELECT COUNT(*) FROM applications a
+                           JOIN job_postings jp2 ON jp2.id = a.job_id
+                           WHERE jp2.company_id = co.id AND a.deleted_at IS NULL) AS application_count
+                 FROM companies co
+                 JOIN users u ON u.id = co.user_id AND u.deleted_at IS NULL
+                 JOIN employees e ON e.id = co.assigned_executive_id AND e.user_id = ? AND e.deleted_at IS NULL
+                 WHERE co.deleted_at IS NULL AND co.is_approved = 1
+                 ORDER BY co.company_name`,
+                [req.user.id]
+            );
+        }
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        console.error('[getMyCompanies]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
 

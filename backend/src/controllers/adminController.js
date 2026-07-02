@@ -76,7 +76,7 @@ exports.getCompanyDetail = async (req, res) => {
 
         // First try: by companies.id (approved/existing companies)
         let [[company]] = await db.query(
-            `SELECT co.*, u.name AS contact_name, u.email, u.status,
+            `SELECT co.*, u.name AS contact_name, u.email, u.phone AS contact_phone, u.status,
                     u.id AS user_id,
                     CASE WHEN u.status = 'suspended' THEN 'suspended'
                          WHEN co.is_approved = 1 THEN 'approved' ELSE 'pending'

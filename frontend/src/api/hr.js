@@ -53,3 +53,7 @@ export const packageRequestAPI = {
     activate: (id)         => api.post(`/hr/package-requests/${id}/activate`),
     dismiss:  (id, reason) => api.post(`/hr/package-requests/${id}/dismiss`, { reason }),
 };
+
+export const hrCompanyAPI = {
+    list: () => api.get('/hr/companies'),
+};

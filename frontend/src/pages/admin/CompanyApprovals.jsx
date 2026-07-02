@@ -226,9 +226,11 @@ export default function CompanyApprovals() {
 
                         <dl className="space-y-2 text-sm mb-4">
                             {[
+                                ['Contact', detail.contact_name],
+                                ['Phone', detail.contact_phone],
                                 ['Industry', detail.industry],
-                                ['Size', detail.company_size],
-                                ['Location', detail.location],
+                                ['Size', detail.company_size || detail.size],
+                                ['Location', detail.location || detail.headquarters],
                                 ['Website', detail.website],
                                 ['Status', detail.company_status],
                                 ['Job Postings', detail.job_count],
