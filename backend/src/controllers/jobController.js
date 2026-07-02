@@ -4,6 +4,9 @@ const { extractAndSaveJobSkills } = require('../services/jobSkillExtractor');
 const { maskCandidateForCompany } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
 const { hasSelectedPackage } = require('./resumeUnlockController');
+const { sendEmail } = require('../utils/email');
+
+const safeEmail = (opts) => sendEmail(opts).catch(err => console.error('[Email]', err.message));
 
 // Helper: resolve or create the companies row for req.user.id
 const getCompanyId = async (userId) => {
@@ -320,8 +323,17 @@ exports.shortlistApplication = async (req, res) => {
         const companyId = await getCompanyId(req.user.id);
 
         const [check] = await db.query(
-            `SELECT a.id, a.candidate_id FROM applications a
-             JOIN job_postings jp ON jp.id=a.job_id
+            `SELECT a.id, a.candidate_id,
+                    u.name AS candidate_name, u.email AS candidate_email,
+                    jp.title AS job_title,
+                    co.company_name,
+                    eu.email AS exec_email
+             FROM applications a
+             JOIN job_postings jp ON jp.id = a.job_id
+             JOIN companies co ON co.id = jp.company_id
+             JOIN candidates c ON c.id = a.candidate_id
+             JOIN users u ON u.id = c.user_id
+             LEFT JOIN users eu ON eu.id = co.assigned_executive_id
              WHERE a.id=? AND jp.id=? AND jp.company_id=? AND a.deleted_at IS NULL`,
             [req.params.appId, req.params.jobId, companyId]
         );
@@ -343,6 +355,22 @@ exports.shortlistApplication = async (req, res) => {
             `UPDATE applications SET status='shortlisted' WHERE id=? AND deleted_at IS NULL`,
             [req.params.appId]
         );
+
+        const { candidate_name, candidate_email, job_title, company_name, exec_email } = check[0];
+
+        if (candidate_email) {
+            safeEmail({
+                to: candidate_email,
+                cc: exec_email,
+                subject: `You've been shortlisted — ${job_title}`,
+                html: `
+                    <p>Hi ${candidate_name},</p>
+                    <p>Congratulations! Your profile has been reviewed and you have been <strong>shortlisted</strong> for the position of <strong>${job_title}</strong> at <strong>${company_name}</strong>.</p>
+                    <p>The hiring team will be in touch soon to schedule an interview. Please log in to your <strong>Candidate Portal → Applications</strong> to track your status.</p>
+                    <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                `,
+            });
+        }
 
         res.json({ message: 'Candidate shortlisted.' });
     } catch (err) {

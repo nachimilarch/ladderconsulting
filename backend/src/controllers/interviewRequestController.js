@@ -142,6 +142,21 @@ exports.submitRequest = async (req, res) => {
             });
         }
 
+        // Email company to confirm their request was received
+        if (req.user.email) {
+            safeEmail({
+                to: req.user.email,
+                subject: `Interview Request Received — ${app.candidate_name}`,
+                html: `
+                    <p>Hi,</p>
+                    <p>Your interview request for <strong>${app.candidate_name}</strong> (${app.job_title}) has been received and is pending review by your LadderStep Human Consulting executive.</p>
+                    <p><strong>Proposed Date/Time:</strong> ${fmtDateTime(proposed_datetime)}</p>
+                    <p>You will be notified once the interview is confirmed. You can track the status via <strong>Company Portal → Interviews</strong>.</p>
+                    <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                `,
+            });
+        }
+
         res.status(201).json({
             message: 'Interview request submitted. Awaiting executive confirmation.',
             request_id: result.insertId,
@@ -405,7 +420,9 @@ exports.approveRequest = async (req, res) => {
                     co.company_name,
                     co_u.id AS company_user_id, co_u.email AS company_email,
                     cand_u.name AS candidate_name, cand_u.id AS candidate_user_id,
-                    jp.title AS job_title
+                    cand_u.email AS candidate_email,
+                    jp.title AS job_title,
+                    eu.email AS exec_email
              FROM company_requests cr
              JOIN companies co ON co.id = cr.company_id
              JOIN users co_u ON co_u.id = co.user_id
@@ -413,6 +430,7 @@ exports.approveRequest = async (req, res) => {
              JOIN job_postings jp ON jp.id = a.job_id
              JOIN candidates cand ON cand.id = a.candidate_id
              JOIN users cand_u ON cand_u.id = cand.user_id
+             LEFT JOIN users eu ON eu.id = co.assigned_executive_id
              WHERE cr.id = ? AND cr.deleted_at IS NULL
                AND (? OR co.assigned_executive_id = ? OR a.sourced_by = ?)`,
             [req.params.id, isAdmin, req.user.id, req.user.id]
@@ -482,6 +500,7 @@ exports.approveRequest = async (req, res) => {
             if (cr.company_email) {
                 safeEmail({
                     to: cr.company_email,
+                    cc: cr.exec_email,
                     subject: `Interview Confirmed — ${cr.candidate_name}`,
                     html: `
                         <p>Hi,</p>
@@ -491,6 +510,25 @@ exports.approveRequest = async (req, res) => {
                         ${finalLink ? `<p><strong>Meeting Link:</strong> ${finalLink}</p>` : ''}
                         ${finalLocation && finalMode === 'in_person' ? `<p><strong>Location:</strong> ${finalLocation}</p>` : ''}
                         <p>The candidate has been notified and will confirm their availability.</p>
+                        <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                    `,
+                });
+            }
+
+            // Email candidate with interview details
+            if (cr.candidate_email) {
+                safeEmail({
+                    to: cr.candidate_email,
+                    cc: cr.exec_email,
+                    subject: `Interview Scheduled — ${cr.job_title} at ${cr.company_name}`,
+                    html: `
+                        <p>Hi ${cr.candidate_name},</p>
+                        <p>An interview has been scheduled for your application for <strong>${cr.job_title}</strong> at <strong>${cr.company_name}</strong>.</p>
+                        <p><strong>Date & Time:</strong> ${fmtDateTime(finalDatetime)}</p>
+                        <p><strong>Mode:</strong> ${modeLabel}</p>
+                        ${finalLink ? `<p><strong>Meeting Link:</strong> ${finalLink}</p>` : ''}
+                        ${finalLocation && finalMode === 'in_person' ? `<p><strong>Location:</strong> ${finalLocation}</p>` : ''}
+                        <p>Please log in to your <strong>Candidate Portal → Applications</strong> to confirm your availability.</p>
                         <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
                     `,
                 });

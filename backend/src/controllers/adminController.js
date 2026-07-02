@@ -172,8 +172,20 @@ exports.approveCompany = async (req, res) => {
              JSON.stringify({ user_id: company.user_id })]
         ).catch(e => console.error('[notify]', e.message));
 
+        // Fetch the assigned executive's email for CC (if any)
+        let execEmail = null;
+        if (company.company_id) {
+            const [[execRow]] = await db.query(
+                `SELECT u.email FROM companies co JOIN users u ON u.id = co.assigned_executive_id
+                 WHERE co.id = ? AND co.assigned_executive_id IS NOT NULL AND co.deleted_at IS NULL`,
+                [company.company_id]
+            );
+            execEmail = execRow?.email || null;
+        }
+
         safeEmail({
             to: company.email,
+            cc: execEmail,
             subject: 'Your LadderStep Human Consulting Account is Approved!',
             html: `
                 <p>Hi ${company.contact_name},</p>
@@ -229,8 +241,20 @@ exports.rejectCompany = async (req, res) => {
         await logAction(req.user.id, 'reject_company', 'company', company.company_id || company.user_id,
             { company_name: company.company_name, reason }, ip(req));
 
+        // Fetch exec email for CC if company already has one assigned
+        let rejectExecEmail = null;
+        if (company.company_id) {
+            const [[execRow]] = await db.query(
+                `SELECT u.email FROM companies co JOIN users u ON u.id = co.assigned_executive_id
+                 WHERE co.id = ? AND co.assigned_executive_id IS NOT NULL AND co.deleted_at IS NULL`,
+                [company.company_id]
+            );
+            rejectExecEmail = execRow?.email || null;
+        }
+
         safeEmail({
             to: company.email,
+            cc: rejectExecEmail,
             subject: 'LadderStep Human Consulting — Account Application Update',
             html: `
                 <p>Hi ${company.contact_name},</p>

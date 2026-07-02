@@ -230,13 +230,16 @@ exports.recordOutcome = async (req, res) => {
         const [check] = await db.query(
             `SELECT is2.id, a.id AS application_id, a.sourced_by,
                     u.name AS candidate_name, u.email AS candidate_email, jp.title AS job_title,
-                    co.company_name
+                    co.company_name, co_u.email AS company_email,
+                    eu.email AS exec_email
              FROM interview_slots is2
              JOIN applications a ON a.id = is2.application_id
              JOIN job_postings jp ON jp.id = a.job_id
              JOIN companies co ON co.id = jp.company_id
+             JOIN users co_u ON co_u.id = co.user_id
              JOIN candidates c ON c.id = a.candidate_id
              JOIN users u ON u.id = c.user_id
+             LEFT JOIN users eu ON eu.id = co.assigned_executive_id
              WHERE is2.id = ? AND jp.company_id = ? AND is2.deleted_at IS NULL`,
             [req.params.id, companyId]
         );
@@ -262,24 +265,61 @@ exports.recordOutcome = async (req, res) => {
             [appStatus, ctx.application_id]
         );
 
+        const target = await getNotifyTarget(companyId, ctx.sourced_by);
+        const resultLabel = result === 'selected' ? 'Selected' : result === 'hold' ? 'On Hold' : 'Rejected';
+        const execCc = ctx.exec_email || target?.email || null;
+
         if (result === 'selected') {
-            safeEmail({
-                to: ctx.candidate_email,
-                subject: `Exciting update on your ${ctx.job_title} application!`,
-                html: `
-                    <p>Hi ${ctx.candidate_name},</p>
-                    <p>Congratulations! You have been <strong>selected</strong> after your interview for <strong>${ctx.job_title}</strong>.</p>
-                    <p>You will receive a formal offer letter shortly. Please keep an eye on your <strong>Candidate Portal → Applications</strong>.</p>
-                    <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
-                `,
-            });
+            if (ctx.candidate_email) {
+                safeEmail({
+                    to: ctx.candidate_email,
+                    cc: execCc,
+                    subject: `Exciting update on your ${ctx.job_title} application!`,
+                    html: `
+                        <p>Hi ${ctx.candidate_name},</p>
+                        <p>Congratulations! You have been <strong>selected</strong> after your interview for <strong>${ctx.job_title}</strong> at <strong>${ctx.company_name}</strong>.</p>
+                        <p>You will receive a formal offer letter shortly. Please keep an eye on your <strong>Candidate Portal → Applications</strong>.</p>
+                        <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                    `,
+                });
+            }
+        }
+
+        if (result === 'rejected') {
+            if (ctx.candidate_email) {
+                safeEmail({
+                    to: ctx.candidate_email,
+                    cc: execCc,
+                    subject: `Update on your ${ctx.job_title} application`,
+                    html: `
+                        <p>Hi ${ctx.candidate_name},</p>
+                        <p>Thank you for interviewing for <strong>${ctx.job_title}</strong> at <strong>${ctx.company_name}</strong>.</p>
+                        <p>After careful consideration, the hiring team has decided not to move forward with your application at this time.</p>
+                        ${feedback ? `<p><strong>Feedback:</strong> ${feedback}</p>` : ''}
+                        <p>We encourage you to continue exploring other opportunities on the LadderStep Human Consulting platform.</p>
+                        <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                    `,
+                });
+            }
+            if (ctx.company_email) {
+                safeEmail({
+                    to: ctx.company_email,
+                    cc: execCc,
+                    subject: `Interview Outcome Recorded — ${ctx.candidate_name}`,
+                    html: `
+                        <p>Hi,</p>
+                        <p>The interview outcome for <strong>${ctx.candidate_name}</strong> (${ctx.job_title}) has been recorded as <strong>Not Selected</strong>.</p>
+                        ${feedback ? `<p><strong>Your Feedback:</strong> ${feedback}</p>` : ''}
+                        <p>You can continue reviewing other candidates via <strong>Company Portal → Shortlist</strong>.</p>
+                        <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                    `,
+                });
+            }
         }
 
         // LadderStep Human Consulting otherwise has no visibility into outcomes — the executive
         // can't act on the next step (offer-letter request, re-engagement) without this.
-        const target = await getNotifyTarget(companyId, ctx.sourced_by);
         if (target) {
-            const resultLabel = result === 'selected' ? 'Selected' : result === 'hold' ? 'On Hold' : 'Rejected';
             notify(
                 target.userId,
                 'interview_outcome',
@@ -316,14 +356,19 @@ exports.generateOffer = async (req, res) => {
         const companyId = await getCompanyId(req.user.id);
 
         const [check] = await db.query(
-            `SELECT is2.id, a.id AS application_id,
+            `SELECT is2.id, a.id AS application_id, a.sourced_by,
                     io.result, jp.title AS job_title,
-                    u.name AS candidate_name, u.email AS candidate_email
+                    u.name AS candidate_name, u.email AS candidate_email,
+                    co.company_name, co_u.email AS company_email,
+                    eu.email AS exec_email
              FROM interview_slots is2
              JOIN applications a ON a.id = is2.application_id
              JOIN job_postings jp ON jp.id = a.job_id
+             JOIN companies co ON co.id = jp.company_id
+             JOIN users co_u ON co_u.id = co.user_id
              JOIN candidates c ON c.id = a.candidate_id
              JOIN users u ON u.id = c.user_id
+             LEFT JOIN users eu ON eu.id = co.assigned_executive_id
              LEFT JOIN interview_outcomes io ON io.interview_id = is2.id AND io.deleted_at IS NULL
              WHERE is2.id = ? AND jp.company_id = ? AND is2.deleted_at IS NULL`,
             [req.params.id, companyId]
@@ -364,10 +409,11 @@ exports.generateOffer = async (req, res) => {
 
         safeEmail({
             to: ctx.candidate_email,
+            cc: ctx.exec_email,
             subject: `Offer Letter — ${ctx.job_title}`,
             html: `
                 <p>Hi ${ctx.candidate_name},</p>
-                <p>We are delighted to extend an offer for the position of <strong>${ctx.job_title}</strong>.</p>
+                <p>We are delighted to extend an offer for the position of <strong>${ctx.job_title}</strong> at <strong>${ctx.company_name}</strong>.</p>
                 <table style="border-collapse:collapse;margin:16px 0;font-family:sans-serif;">
                     <tr><td style="padding:6px 16px 6px 0;font-weight:600;color:#374151;">CTC</td><td style="padding:6px 0;color:#111827;">${ctcFormatted}</td></tr>
                     ${joining_date ? `<tr><td style="padding:6px 16px 6px 0;font-weight:600;color:#374151;">Joining Date</td><td style="padding:6px 0;color:#111827;">${fmtDate(joining_date)}</td></tr>` : ''}
@@ -378,6 +424,26 @@ exports.generateOffer = async (req, res) => {
                 <br/><p>Warm regards,<br/>LadderStep Human Consulting Team</p>
             `,
         });
+
+        // Notify company that the offer has been sent to the candidate
+        if (ctx.company_email) {
+            safeEmail({
+                to: ctx.company_email,
+                cc: ctx.exec_email,
+                subject: `Offer Sent to ${ctx.candidate_name} — ${ctx.job_title}`,
+                html: `
+                    <p>Hi,</p>
+                    <p>The offer letter for <strong>${ctx.candidate_name}</strong> (${ctx.job_title}) has been sent successfully.</p>
+                    <table style="border-collapse:collapse;margin:16px 0;font-family:sans-serif;">
+                        <tr><td style="padding:6px 16px 6px 0;font-weight:600;color:#374151;">CTC</td><td style="padding:6px 0;color:#111827;">${ctcFormatted}</td></tr>
+                        ${joining_date ? `<tr><td style="padding:6px 16px 6px 0;font-weight:600;color:#374151;">Joining Date</td><td style="padding:6px 0;color:#111827;">${fmtDate(joining_date)}</td></tr>` : ''}
+                        ${valid_until ? `<tr><td style="padding:6px 16px 6px 0;font-weight:600;color:#374151;">Offer Valid Until</td><td style="padding:6px 0;color:#111827;">${fmtDate(valid_until)}</td></tr>` : ''}
+                    </table>
+                    <p>The candidate will accept or decline via their portal. You will be notified of their response.</p>
+                    <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                `,
+            });
+        }
 
         res.status(201).json({ message: 'Offer sent.', id: result.insertId });
     } catch (err) {
@@ -433,12 +499,14 @@ exports.confirmSlot = async (req, res) => {
         const [check] = await db.query(
             `SELECT is2.id, is2.slot_datetime, is2.status, jp.title AS job_title,
                     co.id AS company_id, a.sourced_by,
-                    cu.email AS company_email, cu.name AS company_contact
+                    cu.email AS company_email, cu.name AS company_contact,
+                    eu.email AS exec_email
              FROM interview_slots is2
              JOIN applications a ON a.id = is2.application_id
              JOIN job_postings jp ON jp.id = a.job_id
              JOIN companies co ON co.id = jp.company_id
              JOIN users cu ON cu.id = co.user_id
+             LEFT JOIN users eu ON eu.id = co.assigned_executive_id
              WHERE is2.id = ? AND a.candidate_id = ? AND is2.deleted_at IS NULL`,
             [req.params.id, candidateId]
         );
@@ -458,6 +526,7 @@ exports.confirmSlot = async (req, res) => {
 
         safeEmail({
             to: ctx.company_email,
+            cc: ctx.exec_email,
             subject: `Interview Confirmed — ${ctx.job_title}`,
             html: `
                 <p>Hi ${ctx.company_contact},</p>

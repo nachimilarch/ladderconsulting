@@ -44,7 +44,7 @@ const parseAddr = (str) => {
  *   saveToSent (bool, default false — avoids filling the mailbox for bulk sends)
  */
 const sendGraphMail = async ({
-    from, to, subject,
+    from, to, cc, subject,
     html, text,
     replyTo, headers,
     inReplyTo, references,
@@ -72,6 +72,16 @@ const sendGraphMail = async ({
         // Explicitly overriding it with the same address causes ErrorAccessDenied on
         // accounts where mail != userPrincipalName (shared mailboxes, null-mail accounts).
     };
+
+    if (cc) {
+        const ccList = (Array.isArray(cc) ? cc : [cc]).filter(Boolean);
+        if (ccList.length > 0) {
+            message.ccRecipients = ccList.map(addr => {
+                const p = parseAddr(addr);
+                return { emailAddress: p || { address: addr } };
+            });
+        }
+    }
 
     if (replyTo) {
         const rt = parseAddr(typeof replyTo === 'string' ? replyTo : null);
