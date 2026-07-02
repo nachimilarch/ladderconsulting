@@ -63,6 +63,7 @@ router.get('/analytics/conversion',              ...admin, ctrl.getConversionFun
 router.get('/analytics/executive-performance',   ...admin, ctrl.getExecutivePerformance);
 
 // AI Matching admin
+router.post('/resumes/reparse-skills',     ...admin, ctrl.reparseResumeSkills);
 router.post('/match/recompute',            ...admin, ctrl.recomputeMatchScores);
 router.post('/jobs/backfill-skills',       ...admin, ctrl.backfillJobSkills);
 

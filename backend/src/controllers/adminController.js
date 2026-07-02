@@ -885,6 +885,36 @@ exports.getAuditLogs = async (req, res) => {
 
 // ── AI MATCHING ADMIN ─────────────────────────────────────────────────────────
 
+exports.reparseResumeSkills = async (req, res) => {
+    try {
+        const [resumes] = await db.query(
+            `SELECT r.id, r.candidate_id, r.parsed_text
+             FROM resumes r
+             WHERE r.deleted_at IS NULL AND r.parsed_text IS NOT NULL AND r.parsed_text != ''
+             ORDER BY r.id DESC`
+        );
+        res.json({ message: `Re-parsing skills for ${resumes.length} resumes in background.` });
+
+        const { parseResumeToSkills } = require('../services/matchingService');
+        setImmediate(async () => {
+            let success = 0, failed = 0;
+            for (const r of resumes) {
+                try {
+                    await parseResumeToSkills(r.candidate_id, r.parsed_text);
+                    success++;
+                } catch (err) {
+                    console.error(`[Admin] Reparse failed for resume ${r.id}:`, err.message);
+                    failed++;
+                }
+            }
+            console.log(`[Admin] reparseResumeSkills done: ${success} success, ${failed} failed`);
+        });
+    } catch (err) {
+        console.error('reparseResumeSkills:', err);
+        res.status(500).json({ message: 'Failed to start re-parse.' });
+    }
+};
+
 exports.recomputeMatchScores = async (req, res) => {
     try {
         const [apps] = await db.query(

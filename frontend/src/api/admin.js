@@ -62,6 +62,12 @@ export const adminSettingsAPI = {
     update: (data) => api.patch('/admin/settings', data),
 };
 
+export const adminAIAPI = {
+    reparseSkills: () => api.post('/admin/resumes/reparse-skills'),
+    recomputeMatchScores: () => api.post('/admin/match/recompute'),
+    backfillJobSkills: () => api.post('/admin/jobs/backfill-skills'),
+};
+
 export const adminOfferRequestAPI = {
     listAll: (params) => api.get('/admin/offer-requests', { params }),
     listFees: (params) => api.get('/admin/placement-fees', { params }),

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { adminSettingsAPI } from '../../api/admin';
+import { adminSettingsAPI, adminAIAPI } from '../../api/admin';
 import toast from 'react-hot-toast';
 
 // ── Platform behaviour settings ───────────────────────────────────────────────
@@ -383,6 +383,38 @@ export default function PlatformSettings() {
             </div>
 
             <div className="space-y-3">
+                {/* ── Data Maintenance ── */}
+                <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-5">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-1">Data Maintenance</h3>
+                    <p className="text-xs text-gray-500 mb-4">Re-run offline parsers on existing data. Each job runs in the background — check server logs for completion.</p>
+                    <div className="flex flex-wrap gap-3">
+                        <button
+                            onClick={() => adminAIAPI.reparseSkills()
+                                .then(r => toast.success(r.data?.message || 'Re-parse started'))
+                                .catch(() => toast.error('Failed to start re-parse'))}
+                            className="btn-primary text-sm"
+                        >
+                            Re-parse Resume Skills
+                        </button>
+                        <button
+                            onClick={() => adminAIAPI.recomputeMatchScores()
+                                .then(r => toast.success(r.data?.message || 'Recompute started'))
+                                .catch(() => toast.error('Failed to start recompute'))}
+                            className="btn-primary text-sm"
+                        >
+                            Recompute Match Scores
+                        </button>
+                        <button
+                            onClick={() => adminAIAPI.backfillJobSkills()
+                                .then(r => toast.success(r.data?.message || 'Backfill started'))
+                                .catch(() => toast.error('Failed to start backfill'))}
+                            className="btn-primary text-sm"
+                        >
+                            Backfill Job Skills
+                        </button>
+                    </div>
+                </div>
+
                 {ENV_SECTIONS.map(section => {
                     const isOpen = openSection === section.id;
                     const filledCount = section.fields.filter(f => settings[f.key] && settings[f.key] !== '').length;
