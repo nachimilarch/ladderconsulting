@@ -190,12 +190,22 @@ export default function CandidateDocuments() {
                                         <p className="text-xs text-gray-400 mt-0.5">{fmtSize(doc.file_size)} · Uploaded {fmtDate(doc.created_at)}</p>
                                     </div>
                                 </div>
-                                <button
-                                    onClick={() => handleDelete(doc.id, doc.original_name)}
-                                    className="text-xs text-red-400 hover:text-red-600 ml-4 shrink-0 mt-1"
-                                >
-                                    Remove
-                                </button>
+                                <div className="flex items-center gap-3 ml-4 shrink-0 mt-1">
+                                    <a
+                                        href={documentAPI.downloadUrl(doc.id)}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-xs text-blue-500 hover:text-blue-700"
+                                    >
+                                        View
+                                    </a>
+                                    <button
+                                        onClick={() => handleDelete(doc.id, doc.original_name)}
+                                        className="text-xs text-red-400 hover:text-red-600"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                         ))}
                     </div>

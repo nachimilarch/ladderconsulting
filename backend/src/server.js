@@ -43,7 +43,7 @@ const path = require('path');
 const fs = require('fs');
 
 // Ensure upload directories exist before any route tries to use them
-['uploads/resumes', 'uploads/masked_resumes'].forEach(dir => {
+['uploads/resumes', 'uploads/masked_resumes', 'uploads/documents'].forEach(dir => {
   const full = path.join(__dirname, '..', dir);
   if (!fs.existsSync(full)) fs.mkdirSync(full, { recursive: true });
 });

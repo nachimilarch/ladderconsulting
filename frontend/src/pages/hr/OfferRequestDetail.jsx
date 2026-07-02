@@ -149,6 +149,9 @@ export default function OfferRequestDetail() {
                         { label: 'Contact Email', val: req.company_email },
                         { label: 'Candidate', val: req.candidate_name },
                         { label: 'Job Role', val: req.job_title },
+                        { label: 'Documents', val: req.candidate_id
+                            ? <Link to={`/hr/candidates/${req.candidate_id}/documents`} className="text-blue-600 hover:underline text-sm">View Documents ↗</Link>
+                            : '—' },
                         { label: 'Submitted', val: fmtDate(req.created_at) },
                     ].map(({ label, val }) => (
                         <div key={label}>

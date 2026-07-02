@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { adminCandidateAPI } from '../../api/admin';
 import toast from 'react-hot-toast';
 
@@ -163,7 +164,15 @@ export default function CandidateManagement() {
                             </div>
                         )}
 
-                        <div className="flex gap-2 mt-2">
+                        <div className="flex flex-wrap gap-2 mt-2">
+                            {selected.candidate_id && (
+                                <Link
+                                    to={`/hr/candidates/${selected.candidate_id}/documents`}
+                                    className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs rounded hover:bg-blue-100 border border-blue-200"
+                                >
+                                    View Documents
+                                </Link>
+                            )}
                             {selected.status === 'active' ? (
                                 <button
                                     onClick={() => setActionModal({ type: 'suspend', id: selected.id })}

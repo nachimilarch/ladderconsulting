@@ -36,9 +36,17 @@ export const aiAPI = {
 };
 
 export const documentAPI = {
-    list: () => api.get('/candidates/documents'),
+    list:     ()   => api.get('/candidates/documents'),
+    // Returns a URL string (open in new tab — auth cookie sent automatically)
+    downloadUrl: (id) => `${api.defaults.baseURL}/candidates/documents/${id}/download`,
     upload: (formData) => api.post('/candidates/documents', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
     }),
     remove: (id) => api.delete(`/candidates/documents/${id}`),
+};
+
+// HR / admin access to a specific candidate's documents
+export const hrDocumentAPI = {
+    list:        (candidateId)         => api.get(`/candidates/${candidateId}/documents`),
+    downloadUrl: (candidateId, docId)  => `${api.defaults.baseURL}/candidates/${candidateId}/documents/${docId}/download`,
 };

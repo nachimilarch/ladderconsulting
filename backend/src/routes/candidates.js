@@ -688,7 +688,6 @@ router.delete('/documents/:id', authenticateToken, authorizeRole('candidate'), a
             [doc.id]
         );
 
-        // Remove file from disk
         const fullPath = path.join(process.cwd(), 'uploads', 'documents', doc.file_path);
         fs.unlink(fullPath, () => {});
 
@@ -696,6 +695,71 @@ router.delete('/documents/:id', authenticateToken, authorizeRole('candidate'), a
     } catch (err) {
         console.error('[docs.delete]', err);
         res.status(500).json({ success: false, message: 'Failed to delete document.' });
+    }
+});
+
+// ── GET /api/candidates/documents/:id/download  (candidate — own docs) ────────
+router.get('/documents/:id/download', authenticateToken, authorizeRole('candidate'), async (req, res) => {
+    try {
+        const candidateId = await getCandidateId(req.user.id);
+        const [[doc]] = await db.query(
+            `SELECT id, original_name, file_path, mime_type FROM candidate_documents
+             WHERE id = ? AND candidate_id = ? AND deleted_at IS NULL`,
+            [req.params.id, candidateId]
+        );
+        if (!doc) return res.status(404).json({ message: 'Document not found.' });
+
+        const fullPath = path.join(process.cwd(), 'uploads', 'documents', doc.file_path);
+        if (!fs.existsSync(fullPath)) return res.status(404).json({ message: 'File not found on server.' });
+
+        res.setHeader('Content-Disposition', `inline; filename="${doc.original_name}"`);
+        res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
+        fs.createReadStream(fullPath).pipe(res);
+    } catch (err) {
+        console.error('[docs.download]', err);
+        res.status(500).json({ success: false, message: 'Failed to serve document.' });
+    }
+});
+
+// ── GET /api/candidates/:candidateId/documents  (hr_staff, admin) ─────────────
+router.get('/:candidateId/documents', authenticateToken, authorizeRole('hr_staff', 'admin'), async (req, res) => {
+    try {
+        const [docs] = await db.query(
+            `SELECT cd.id, cd.doc_type, cd.original_name, cd.file_size, cd.mime_type, cd.notes, cd.created_at,
+                    u.name AS candidate_name, u.email AS candidate_email
+             FROM candidate_documents cd
+             JOIN candidates c ON c.id = cd.candidate_id
+             JOIN users u ON u.id = c.user_id
+             WHERE cd.candidate_id = ? AND cd.deleted_at IS NULL
+             ORDER BY cd.created_at DESC`,
+            [req.params.candidateId]
+        );
+        res.json({ success: true, data: docs });
+    } catch (err) {
+        console.error('[hr.docs.list]', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch documents.' });
+    }
+});
+
+// ── GET /api/candidates/:candidateId/documents/:docId/download (hr_staff, admin)
+router.get('/:candidateId/documents/:docId/download', authenticateToken, authorizeRole('hr_staff', 'admin'), async (req, res) => {
+    try {
+        const [[doc]] = await db.query(
+            `SELECT id, original_name, file_path, mime_type FROM candidate_documents
+             WHERE id = ? AND candidate_id = ? AND deleted_at IS NULL`,
+            [req.params.docId, req.params.candidateId]
+        );
+        if (!doc) return res.status(404).json({ message: 'Document not found.' });
+
+        const fullPath = path.join(process.cwd(), 'uploads', 'documents', doc.file_path);
+        if (!fs.existsSync(fullPath)) return res.status(404).json({ message: 'File not found on server.' });
+
+        res.setHeader('Content-Disposition', `inline; filename="${doc.original_name}"`);
+        res.setHeader('Content-Type', doc.mime_type || 'application/octet-stream');
+        fs.createReadStream(fullPath).pipe(res);
+    } catch (err) {
+        console.error('[hr.docs.download]', err);
+        res.status(500).json({ success: false, message: 'Failed to serve document.' });
     }
 });
 

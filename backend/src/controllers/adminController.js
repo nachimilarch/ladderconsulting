@@ -309,6 +309,7 @@ exports.listCandidates = async (req, res) => {
 
         const [candidates] = await db.query(
             `SELECT u.id, u.name, u.email, u.status, u.created_at,
+                    c.id AS candidate_id,
                     cp.current_location, cp.total_experience, cp.headline,
                     COUNT(DISTINCT a.id) AS application_count,
                     COUNT(DISTINCT cert.id) AS certificate_count
@@ -320,7 +321,7 @@ exports.listCandidates = async (req, res) => {
              LEFT JOIN hired_employees he ON he.candidate_id = c.id AND he.deleted_at IS NULL
              LEFT JOIN certificates cert ON cert.hired_employee_id = he.id AND cert.deleted_at IS NULL
              WHERE ${where.join(' AND ')}
-             GROUP BY u.id, u.name, u.email, u.status, u.created_at,
+             GROUP BY u.id, c.id, u.name, u.email, u.status, u.created_at,
                       cp.current_location, cp.total_experience, cp.headline
              ORDER BY u.created_at DESC
              LIMIT ? OFFSET ?`,
