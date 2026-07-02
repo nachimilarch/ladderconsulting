@@ -90,12 +90,12 @@ exports.getMyCompanies = async (req, res) => {
                            WHERE jp2.company_id = co.id AND a.deleted_at IS NULL) AS application_count
                  FROM companies co
                  JOIN users u ON u.id = co.user_id AND u.deleted_at IS NULL
-                 LEFT JOIN employees e ON e.id = co.assigned_executive_id AND e.deleted_at IS NULL
-                 LEFT JOIN users eu ON eu.id = e.user_id
+                 LEFT JOIN users eu ON eu.id = co.assigned_executive_id AND eu.deleted_at IS NULL
                  WHERE co.deleted_at IS NULL AND co.is_approved = 1
                  ORDER BY co.company_name`
             );
         } else {
+            // assigned_executive_id is a users.id FK — match directly against logged-in user
             [rows] = await db.query(
                 `SELECT co.id, co.company_name, co.industry, co.size, co.headquarters, co.website,
                         co.description, co.placement_fee_percent, co.assigned_executive_id,
@@ -107,8 +107,8 @@ exports.getMyCompanies = async (req, res) => {
                            WHERE jp2.company_id = co.id AND a.deleted_at IS NULL) AS application_count
                  FROM companies co
                  JOIN users u ON u.id = co.user_id AND u.deleted_at IS NULL
-                 JOIN employees e ON e.id = co.assigned_executive_id AND e.user_id = ? AND e.deleted_at IS NULL
                  WHERE co.deleted_at IS NULL AND co.is_approved = 1
+                   AND co.assigned_executive_id = ?
                  ORDER BY co.company_name`,
                 [req.user.id]
             );
