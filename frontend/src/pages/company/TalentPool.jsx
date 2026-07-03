@@ -23,7 +23,9 @@ function SkillChip({ label }) {
     );
 }
 
-function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, onDownload, downloading, onMoveToPipeline }) {
+const SCORE_COLOR_CLS = (s) => s >= 70 ? 'text-green-700 bg-green-50 border-green-200' : s >= 40 ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-600 bg-red-50 border-red-200';
+
+function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, onPreview, onDownload, downloading, onMoveToPipeline }) {
     const skills = Array.isArray(cand.skills) ? cand.skills.filter(Boolean) : [];
     const shown = skills.slice(0, 5);
     const extra = skills.length - shown.length;
@@ -48,6 +50,11 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                     </div>
                 </div>
                 <div className="shrink-0 flex flex-col items-end gap-1">
+                    {cand.match_score != null && cand.match_score > 0 && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SCORE_COLOR_CLS(cand.match_score)}`}>
+                            {cand.match_score}% match
+                        </span>
+                    )}
                     {cand.total_experience != null && (
                         <span className="text-xs font-medium text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full">
                             {parseFloat(cand.total_experience).toFixed(1)} yrs
@@ -120,10 +127,16 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                     ) : (
                         <>
                             <button
+                                onClick={() => onPreview(cand)}
+                                className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium"
+                            >
+                                Preview
+                            </button>
+                            <button
                                 onClick={() => onInterest(cand)}
                                 className="text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium"
                             >
-                                Express Interest
+                                Interest
                             </button>
                             <button
                                 onClick={() => onUnlock(cand)}
@@ -241,6 +254,90 @@ function FullProfileModal({ candidateId, candidateName, onClose }) {
     );
 }
 
+// ── Masked preview for non-unlocked candidates ────────────────────────────────
+function PreviewProfileModal({ candidateId, onClose }) {
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        talentPoolAPI.previewProfile(candidateId)
+            .then(r => setProfile(r.data?.data || null))
+            .catch(() => toast.error('Failed to load profile.'))
+            .finally(() => setLoading(false));
+    }, [candidateId]);
+
+    const education = (() => {
+        try { return Array.isArray(profile?.education) ? profile.education : JSON.parse(profile?.education || '[]'); }
+        catch { return []; }
+    })();
+
+    return (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
+                    <div>
+                        <h2 className="font-semibold text-gray-900">
+                            {loading ? 'Loading…' : profile?.candidate_name || 'Candidate Profile'}
+                        </h2>
+                        <p className="text-xs text-gray-400 mt-0.5">🔒 Contact details hidden — unlock to reveal</p>
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+                </div>
+
+                {loading ? (
+                    <p className="text-sm text-gray-400 py-12 text-center">Loading…</p>
+                ) : !profile ? (
+                    <p className="text-sm text-gray-400 py-12 text-center">Could not load profile.</p>
+                ) : (
+                    <div className="px-6 py-4 flex flex-col gap-5">
+                        {profile.headline && <p className="text-sm font-medium text-gray-700">{profile.headline}</p>}
+                        {profile.summary  && <p className="text-sm text-gray-600 leading-relaxed">{profile.summary}</p>}
+
+                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
+                            {profile.total_experience != null && <span>💼 {parseFloat(profile.total_experience).toFixed(1)} yrs experience</span>}
+                            {profile.current_location && <span>📍 {profile.current_location}</span>}
+                            {profile.notice_period_days != null && <span>🕐 {profile.notice_period_days}d notice</span>}
+                            {profile.expected_salary && <span>💰 {fmtINR(profile.expected_salary)}/yr expected</span>}
+                        </div>
+
+                        {profile.skills?.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Skills</h3>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {profile.skills.map(s => (
+                                        <span key={s.name} className="bg-indigo-50 text-indigo-700 text-[11px] px-2 py-1 rounded-full border border-indigo-100 capitalize">
+                                            {s.name}{s.years_exp ? ` · ${s.years_exp}y` : ''}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {education.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Education</h3>
+                                <div className="flex flex-col gap-2">
+                                    {education.map((e, i) => (
+                                        <div key={i} className="text-sm text-gray-700">
+                                            <p className="font-medium">{e.degree}{e.field ? ` in ${e.field}` : ''}</p>
+                                            <p className="text-xs text-gray-400">{e.institution}{e.end_year ? ` · ${e.end_year}` : ''}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-xs text-amber-700">
+                            <p className="font-semibold mb-1">Contact details are hidden</p>
+                            <p>Unlock this candidate (Single credit or 4-Pack) to see their name, email, phone, and download their resume — or express interest and your LadderStep executive will facilitate an introduction.</p>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function TalentPool() {
     const [candidates, setCandidates] = useState([]);
     const [total, setTotal] = useState(0);
@@ -266,6 +363,9 @@ export default function TalentPool() {
     const [profileModal, setProfileModal] = useState(null); // candidate object (full profile view)
     const [downloading, setDownloading] = useState(null); // candidateId while downloading
     const [hasPackage, setHasPackage] = useState(false); // banner only — browsing is always allowed
+
+    // Preview profile modal (non-unlocked candidates)
+    const [previewModal, setPreviewModal] = useState(null); // candidate object
 
     // Move-to-pipeline (paid-unlock candidates only)
     const [pipelineModal, setPipelineModal] = useState(null); // candidate object
@@ -389,7 +489,8 @@ export default function TalentPool() {
         setPkgRequestModal(true);
     };
 
-    const handleViewProfile = (cand) => setProfileModal(cand);
+    const handleViewProfile   = (cand) => setProfileModal(cand);
+    const handlePreviewProfile = (cand) => setPreviewModal(cand);
 
     const handleDownloadResume = async (cand) => {
         setDownloading(cand.candidate_id);
@@ -517,6 +618,7 @@ export default function TalentPool() {
                                 unlockInfo={unlockMap[c.candidate_id]}
                                 onUnlock={handleUnlockClick}
                                 onViewProfile={handleViewProfile}
+                                onPreview={handlePreviewProfile}
                                 onDownload={handleDownloadResume}
                                 downloading={downloading}
                                 onMoveToPipeline={openPipelineModal}
@@ -614,6 +716,14 @@ export default function TalentPool() {
             {/* Package request modal */}
             {pkgRequestModal && (
                 <PackageRequestModal onClose={() => setPkgRequestModal(false)} hasPackage={hasPackage} />
+            )}
+
+            {/* Preview profile (non-unlocked, masked) */}
+            {previewModal && (
+                <PreviewProfileModal
+                    candidateId={previewModal.candidate_id}
+                    onClose={() => setPreviewModal(null)}
+                />
             )}
 
             {/* Full unlocked profile */}

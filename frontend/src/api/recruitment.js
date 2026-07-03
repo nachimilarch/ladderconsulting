@@ -25,6 +25,9 @@ export const recruitmentAPI = {
     assignCandidateToJob: (jobId, candidateId) =>
         api.post(`/recruitment/jobs/${jobId}/assign-candidate`, { candidateId }),
 
+    getCandidateProfile: (candidateId, jobId) =>
+        api.get(`/recruitment/candidates/${candidateId}/profile`, jobId ? { params: { jobId } } : {}),
+
     listTalentInterests: () => api.get('/recruitment/talent-interests'),
     actOnTalentInterest: (notifId, jobId) =>
         api.post(`/recruitment/talent-interests/${notifId}/assign`, { job_id: jobId || undefined }),

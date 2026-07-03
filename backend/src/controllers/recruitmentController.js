@@ -485,6 +485,83 @@ const logAction = (adminId, action, entityType, entityId, details, ipAddr) => {
     ).catch(e => console.error('[logAction]', e.message));
 };
 
+// ── GET /api/recruitment/candidates/:candidateId/profile ─────────────────────
+// Full candidate profile for HR executives — PII exposed, no masking.
+// Optional ?jobId= returns fit_score + matched/missing skills for that JD.
+exports.getCandidateProfile = async (req, res) => {
+    const { candidateId } = req.params;
+    const { jobId } = req.query;
+
+    try {
+        const [[profile]] = await db.query(
+            `SELECT c.id AS candidate_id, u.id AS user_id,
+                    u.name AS candidate_name, u.email AS candidate_email,
+                    u.phone AS candidate_phone, u.status, u.created_at AS registered_at,
+                    cp.headline, cp.summary, cp.total_experience,
+                    cp.current_location, cp.preferred_locations,
+                    cp.expected_salary, cp.current_salary,
+                    cp.notice_period_days, cp.linkedin_url, cp.portfolio_url, cp.education
+             FROM candidates c
+             JOIN users u ON u.id = c.user_id
+             LEFT JOIN candidate_profiles cp ON cp.candidate_id = c.id
+             WHERE c.id = ? AND c.deleted_at IS NULL`,
+            [candidateId]
+        );
+        if (!profile) return res.status(404).json({ success: false, message: 'Candidate not found.' });
+
+        const [skills] = await db.query(
+            `SELECT st.name, csv.proficiency, csv.years_exp
+             FROM candidate_skill_vectors csv
+             JOIN skill_tags st ON st.id = csv.skill_tag_id
+             WHERE csv.candidate_id = ?
+             ORDER BY csv.years_exp DESC, st.name`,
+            [candidateId]
+        );
+
+        const [resumes] = await db.query(
+            `SELECT id, file_name, is_primary, created_at
+             FROM resumes
+             WHERE candidate_id = ? AND deleted_at IS NULL
+             ORDER BY is_primary DESC, created_at DESC`,
+            [candidateId]
+        );
+
+        let fitScore = null;
+        let matchedSkills = [];
+        let missingSkills = [];
+        if (jobId) {
+            const [[mr]] = await db.query(
+                `SELECT mr.fit_score, mr.matched_skills, mr.missing_skills
+                 FROM applications a
+                 JOIN match_results mr ON mr.application_id = a.id
+                 WHERE a.candidate_id = ? AND a.job_id = ? AND a.deleted_at IS NULL
+                 ORDER BY mr.created_at DESC LIMIT 1`,
+                [candidateId, jobId]
+            );
+            if (mr) {
+                fitScore = mr.fit_score;
+                try { matchedSkills = typeof mr.matched_skills === 'string' ? JSON.parse(mr.matched_skills) : (mr.matched_skills || []); } catch {}
+                try { missingSkills = typeof mr.missing_skills === 'string' ? JSON.parse(mr.missing_skills) : (mr.missing_skills || []); } catch {}
+            }
+        }
+
+        res.json({
+            success: true,
+            data: {
+                ...profile,
+                skills,
+                resumes,
+                fit_score: fitScore,
+                matched_skills: matchedSkills,
+                missing_skills: missingSkills,
+            },
+        });
+    } catch (err) {
+        console.error('[recruitment.candidateProfile]', err);
+        res.status(500).json({ success: false, message: 'Failed to load candidate profile.' });
+    }
+};
+
 // ── GET /api/recruitment/talent ───────────────────────────────────────────────
 // Executive talent pool — real names, no masking. Supports search + skill + exp.
 // Optional ?jobId= to mark which candidates already have an application for that JD.
@@ -546,6 +623,10 @@ exports.listTalentPoolExec = async (req, res) => {
                 ${jobIdInt ? `(SELECT 1 FROM applications a2
                  WHERE a2.candidate_id = c.id AND a2.job_id = ? AND a2.deleted_at IS NULL
                  LIMIT 1) AS already_applied,` : '0 AS already_applied,'}
+                ${jobIdInt ? `(SELECT mr.fit_score FROM applications a_fs
+                 JOIN match_results mr ON mr.application_id = a_fs.id
+                 WHERE a_fs.candidate_id = c.id AND a_fs.job_id = ? AND a_fs.deleted_at IS NULL
+                 ORDER BY mr.created_at DESC LIMIT 1) AS fit_score,` : 'NULL AS fit_score,'}
                 (SELECT COUNT(*) FROM applications a3
                  WHERE a3.candidate_id = c.id AND a3.deleted_at IS NULL) AS total_applications
              FROM candidates c
@@ -564,7 +645,7 @@ exports.listTalentPoolExec = async (req, res) => {
              ORDER BY cp.total_experience DESC, c.id DESC
              LIMIT ? OFFSET ?`,
             jobIdInt
-                ? [jobIdInt, ...params, limit, offset]
+                ? [jobIdInt, jobIdInt, ...params, limit, offset]
                 : [...params, limit, offset]
         );
 
@@ -593,6 +674,7 @@ exports.listTalentPoolExec = async (req, res) => {
                 catch { return []; }
             })(),
             already_applied: !!row.already_applied,
+            fit_score: row.fit_score ?? null,
         }));
 
         res.json({ success: true, data: candidates, total: countRows[0].total, page: parseInt(page), limit });

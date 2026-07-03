@@ -9,8 +9,9 @@ const ITEM_ST = { pending:'badge-gray', parsing:'badge-blue', done:'badge-green'
 const ACCEPTED = ['.pdf','.doc','.docx'];
 const MAX_FILES = 20;
 const MAX_MB    = 5 * 1024 * 1024;
+const SCORE_COLOR = (s) => s >= 70 ? 'text-green-600' : s >= 40 ? 'text-yellow-600' : 'text-red-500';
+const SCORE_BG    = (s) => s >= 70 ? 'bg-green-50 border-green-200 text-green-700' : s >= 40 ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-red-50 border-red-200 text-red-600';
 
-// Parse structured tags embedded in batch item error_message
 const parseBatchNote = (status, msg) => {
     if (!msg) return { tag: null, text: null };
     if (msg.startsWith('[hired]'))            return { tag: 'hired',     text: msg.replace('[hired]', '').trim() };
@@ -22,28 +23,159 @@ const parseBatchNote = (status, msg) => {
 
 function BatchResultCell({ status, errorMessage }) {
     const { tag, text } = parseBatchNote(status, errorMessage);
-    if (status === 'done' && tag === 'existing') {
-        return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded-full" title={text}>Pool profile matched</span>;
-    }
-    if (status === 'done' && tag === 'pool') {
-        return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full" title={text}>Added to pool</span>;
-    }
-    if (status === 'done') {
-        return <span className="text-[10px] text-green-600 font-medium">New profile created</span>;
-    }
-    if (status === 'skipped' && tag === 'hired') {
-        return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full" title={text}>Hired — off market</span>;
-    }
-    if (status === 'skipped' && tag === 'dup-job') {
-        return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full" title={text}>Already in this JD</span>;
-    }
-    if (status === 'skipped') {
-        return <span className="text-[10px] text-yellow-700">{text || 'Skipped'}</span>;
-    }
-    if (status === 'failed') {
-        return <span className="text-[10px] text-red-600">{text || 'Failed'}</span>;
-    }
+    if (status === 'done' && tag === 'existing') return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-teal-50 text-teal-700 border border-teal-200 px-1.5 py-0.5 rounded-full" title={text}>Pool profile matched</span>;
+    if (status === 'done' && tag === 'pool')     return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-purple-50 text-purple-700 border border-purple-200 px-1.5 py-0.5 rounded-full" title={text}>Added to pool</span>;
+    if (status === 'done')                       return <span className="text-[10px] text-green-600 font-medium">New profile created</span>;
+    if (status === 'skipped' && tag === 'hired') return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full" title={text}>Hired — off market</span>;
+    if (status === 'skipped' && tag === 'dup-job') return <span className="inline-flex items-center gap-1 text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200 px-1.5 py-0.5 rounded-full" title={text}>Already in this JD</span>;
+    if (status === 'skipped')                    return <span className="text-[10px] text-yellow-700">{text || 'Skipped'}</span>;
+    if (status === 'failed')                     return <span className="text-[10px] text-red-600">{text || 'Failed'}</span>;
     return <span className="text-[10px] text-gray-400">—</span>;
+}
+
+// ── HR Candidate Profile Drawer (full PII, no masking) ────────────────────────
+function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
+    const [data, setData]       = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        setLoading(true);
+        recruitmentAPI.getCandidateProfile(candidateId, jobId)
+            .then(r => setData(r.data?.data || null))
+            .catch(() => toast.error('Failed to load candidate profile.'))
+            .finally(() => setLoading(false));
+    }, [candidateId, jobId]);
+
+    const education = (() => {
+        try { return Array.isArray(data?.education) ? data.education : JSON.parse(data?.education || '[]'); }
+        catch { return []; }
+    })();
+
+    return (
+        <div className="fixed inset-0 z-50 flex">
+            <div className="flex-1 bg-black/40" onClick={onClose} />
+            <div className="w-full max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+                    <h2 className="font-semibold text-gray-900 text-base">Candidate Profile</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center flex-1 text-gray-400 text-sm">Loading…</div>
+                ) : !data ? (
+                    <div className="flex items-center justify-center flex-1 text-gray-400 text-sm">Could not load profile.</div>
+                ) : (
+                    <div className="px-5 py-4 flex flex-col gap-5">
+                        {/* Identity */}
+                        <div>
+                            <div className="flex items-center gap-3 mb-1">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-base font-bold shrink-0">
+                                    {(data.candidate_name || 'C')[0].toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-gray-900">{data.candidate_name}</p>
+                                    {data.headline && <p className="text-xs text-gray-500">{data.headline}</p>}
+                                </div>
+                            </div>
+                            <div className="flex flex-col gap-0.5 mt-2 text-xs text-gray-500">
+                                {data.candidate_email && <span>✉ {data.candidate_email}</span>}
+                                {data.candidate_phone && <span>📞 {data.candidate_phone}</span>}
+                                {data.linkedin_url   && <a href={data.linkedin_url}  target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">LinkedIn ↗</a>}
+                                {data.portfolio_url  && <a href={data.portfolio_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">Portfolio ↗</a>}
+                            </div>
+                        </div>
+
+                        {/* Fit score (when job context provided) */}
+                        {jobId && data.fit_score != null && (
+                            <div className={`rounded-xl border px-4 py-3 ${SCORE_BG(data.fit_score)}`}>
+                                <div className="flex items-center justify-between mb-2">
+                                    <span className="text-xs font-semibold uppercase tracking-wide">Fit Score</span>
+                                    <span className="text-lg font-bold">{data.fit_score}%</span>
+                                </div>
+                                {data.matched_skills?.length > 0 && (
+                                    <div className="mb-1">
+                                        <p className="text-[10px] font-medium mb-1 opacity-70">Matched</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {data.matched_skills.map(s => <span key={s} className="text-[10px] bg-green-100 text-green-700 px-1.5 py-0.5 rounded capitalize">{s}</span>)}
+                                        </div>
+                                    </div>
+                                )}
+                                {data.missing_skills?.length > 0 && (
+                                    <div>
+                                        <p className="text-[10px] font-medium mb-1 opacity-70">Missing</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {data.missing_skills.map(s => <span key={s} className="text-[10px] bg-white/60 text-gray-500 px-1.5 py-0.5 rounded line-through capitalize">{s}</span>)}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Quick stats */}
+                        <div className="grid grid-cols-2 gap-1.5 text-xs text-gray-500">
+                            {data.total_experience != null && <span>💼 {parseFloat(data.total_experience).toFixed(1)} yrs exp</span>}
+                            {data.current_location && <span>📍 {data.current_location}</span>}
+                            {data.notice_period_days != null && <span>🕐 {data.notice_period_days}d notice</span>}
+                            {data.expected_salary   && <span>💰 ₹{(parseFloat(data.expected_salary)/100000).toFixed(1)}L/yr expected</span>}
+                        </div>
+
+                        {/* Summary */}
+                        {data.summary && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Summary</h3>
+                                <p className="text-sm text-gray-700 leading-relaxed">{data.summary}</p>
+                            </div>
+                        )}
+
+                        {/* Skills */}
+                        {data.skills?.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Skills</h3>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {data.skills.map(s => (
+                                        <span key={s.name} className="bg-indigo-50 text-indigo-700 text-[11px] px-2 py-1 rounded-full border border-indigo-100 capitalize">
+                                            {s.name}{s.years_exp ? ` · ${s.years_exp}y` : ''}{s.proficiency && s.proficiency !== 'intermediate' ? ` · ${s.proficiency}` : ''}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Education */}
+                        {education.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Education</h3>
+                                <div className="flex flex-col gap-2">
+                                    {education.map((e, i) => (
+                                        <div key={i} className="text-sm">
+                                            <p className="font-medium text-gray-800">{e.degree}{e.field ? ` in ${e.field}` : ''}</p>
+                                            {e.institution && <p className="text-xs text-gray-500">{e.institution}{e.end_year ? ` · ${e.end_year}` : ''}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Resumes on file */}
+                        {data.resumes?.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Resumes on file</h3>
+                                <div className="flex flex-col gap-1">
+                                    {data.resumes.map(r => (
+                                        <div key={r.id} className="flex items-center gap-2 text-xs text-gray-600">
+                                            <span className="text-gray-300">📄</span>
+                                            <span className="truncate flex-1">{r.file_name}</span>
+                                            {r.is_primary ? <span className="badge-blue text-[10px] shrink-0">Primary</span> : null}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
 }
 
 // ── Job Picker (shared between Upload + Pool tabs) ────────────────────────────
@@ -124,17 +256,22 @@ function JDDetail({ job, jobDetail, loading }) {
     );
 }
 
-// ── Candidate Pool Card ───────────────────────────────────────────────────────
-function PoolCard({ candidate, jobSelected, onAssign, assigning }) {
+// ── Pool Card (Assign from Pool tab) ─────────────────────────────────────────
+function PoolCard({ candidate, jobSelected, onAssign, assigning, onViewProfile, jobId }) {
     const exp = candidate.total_experience != null ? `${candidate.total_experience} yr${candidate.total_experience !== 1 ? 's' : ''}` : null;
     return (
-        <div className={`bg-white rounded-2xl border shadow-sm p-4 transition ${candidate.already_applied ? 'border-green-200 opacity-80' : 'border-gray-100'}`}>
+        <div className={`bg-white rounded-2xl border shadow-sm p-4 transition ${candidate.already_applied ? 'border-green-200 opacity-90' : 'border-gray-100'}`}>
             <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <span className="font-semibold text-sm text-gray-900">{candidate.candidate_name}</span>
                         {candidate.already_applied && <span className="badge-green text-[10px]">Assigned ✓</span>}
                         {!candidate.latest_resume_id && <span className="badge-yellow text-[10px]">No resume</span>}
+                        {candidate.already_applied && candidate.fit_score != null && (
+                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${SCORE_BG(candidate.fit_score)}`}>
+                                {candidate.fit_score}% fit
+                            </span>
+                        )}
                     </div>
                     {candidate.headline && <p className="text-xs text-gray-600 mb-1 truncate">{candidate.headline}</p>}
                     <div className="flex flex-wrap gap-2 text-xs text-gray-400">
@@ -151,7 +288,13 @@ function PoolCard({ candidate, jobSelected, onAssign, assigning }) {
                     )}
                     <p className="text-[10px] text-gray-400 mt-1">{candidate.total_applications || 0} application(s) on record</p>
                 </div>
-                <div className="shrink-0">
+                <div className="shrink-0 flex flex-col gap-1.5 items-end">
+                    <button
+                        onClick={() => onViewProfile(candidate.candidate_id, jobId)}
+                        className="text-[11px] text-indigo-600 hover:underline whitespace-nowrap"
+                    >
+                        View Profile
+                    </button>
                     {candidate.already_applied ? (
                         <span className="text-xs text-green-600 font-medium">Assigned</span>
                     ) : !jobSelected ? (
@@ -173,15 +316,19 @@ function PoolCard({ candidate, jobSelected, onAssign, assigning }) {
     );
 }
 
-// ── Free Pool Card (view + delete, no job context) ────────────────────────────
-function FreePoolCard({ candidate, onDelete, deleting }) {
+// ── Free Pool Card ────────────────────────────────────────────────────────────
+function FreePoolCard({ candidate, onDelete, deleting, onViewProfile }) {
     const exp = candidate.total_experience != null ? `${candidate.total_experience} yr${candidate.total_experience !== 1 ? 's' : ''}` : null;
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
             <div className="flex items-start justify-between gap-3">
-                <div className="flex-1 min-w-0">
+                <button
+                    type="button"
+                    onClick={() => onViewProfile(candidate.candidate_id, null)}
+                    className="flex-1 min-w-0 text-left"
+                >
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
-                        <span className="font-semibold text-sm text-gray-900">{candidate.candidate_name}</span>
+                        <span className="font-semibold text-sm text-gray-900 hover:text-indigo-700 transition">{candidate.candidate_name}</span>
                         {!candidate.latest_resume_id && <span className="badge-yellow text-[10px]">No resume</span>}
                         {candidate.total_applications > 0 && <span className="badge-blue text-[10px]">{candidate.total_applications} application(s)</span>}
                     </div>
@@ -191,7 +338,6 @@ function FreePoolCard({ candidate, onDelete, deleting }) {
                         {exp && <span>💼 {exp}</span>}
                         {candidate.current_location && <span>📍 {candidate.current_location}</span>}
                         {candidate.notice_period_days != null && <span>🕐 {candidate.notice_period_days}d notice</span>}
-                        {candidate.expected_salary && <span>💰 {fmtSal(candidate.expected_salary)}</span>}
                     </div>
                     {candidate.skills?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
@@ -199,8 +345,9 @@ function FreePoolCard({ candidate, onDelete, deleting }) {
                             {candidate.skills.length > 6 && <span className="text-[10px] text-gray-400">+{candidate.skills.length - 6}</span>}
                         </div>
                     )}
-                </div>
-                <div className="shrink-0">
+                </button>
+                <div className="shrink-0 flex flex-col items-end gap-1.5">
+                    <span className="text-[11px] text-indigo-600">Click name to view</span>
                     <button
                         onClick={() => onDelete(candidate.candidate_id, candidate.candidate_name)}
                         disabled={deleting === candidate.candidate_id}
@@ -215,7 +362,7 @@ function FreePoolCard({ candidate, onDelete, deleting }) {
 }
 
 // ── Interest Card ─────────────────────────────────────────────────────────────
-function InterestCard({ interest, jobs, onAssign, assigning }) {
+function InterestCard({ interest, jobs, onAssign, assigning, onViewProfile }) {
     const [jobOverride, setJobOverride] = useState(interest.job_id || '');
     const isHired = interest.is_hired;
 
@@ -239,13 +386,19 @@ function InterestCard({ interest, jobs, onAssign, assigning }) {
                         </div>
                         <span className="text-[10px] text-gray-400">{new Date(interest.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}</span>
                     </div>
-                    <p className="text-xs text-gray-600 mb-1">
-                        Interested in: <span className={`font-medium ${isHired ? 'line-through text-gray-400' : 'text-gray-800'}`}>{interest.candidate_name}</span>
-                        {interest.headline && <span className="text-gray-400"> · {interest.headline}</span>}
-                    </p>
-                    {interest.job_title && (
-                        <p className="text-xs text-indigo-600 mb-1">For: {interest.job_title}</p>
-                    )}
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                        <p className="text-xs text-gray-600">
+                            Interested in: <span className={`font-medium ${isHired ? 'line-through text-gray-400' : 'text-gray-800'}`}>{interest.candidate_name}</span>
+                            {interest.headline && <span className="text-gray-400"> · {interest.headline}</span>}
+                        </p>
+                        <button
+                            onClick={() => onViewProfile(interest.candidate_id, null)}
+                            className="text-[11px] text-indigo-600 hover:underline shrink-0"
+                        >
+                            View Profile
+                        </button>
+                    </div>
+                    {interest.job_title && <p className="text-xs text-indigo-600 mb-1">For: {interest.job_title}</p>}
                     <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-2">
                         {interest.total_experience != null && <span>💼 {interest.total_experience} yrs</span>}
                         {interest.current_location && <span>📍 {interest.current_location}</span>}
@@ -271,9 +424,7 @@ function InterestCard({ interest, jobs, onAssign, assigning }) {
                                 className="form-input-sm flex-1 min-w-0 text-xs"
                             >
                                 <option value="">— Select job to assign —</option>
-                                {jobs.map(j => (
-                                    <option key={j.id} value={j.id}>{j.company_name} · {j.title}</option>
-                                ))}
+                                {jobs.map(j => <option key={j.id} value={j.id}>{j.company_name} · {j.title}</option>)}
                             </select>
                             <button
                                 onClick={() => onAssign(interest.notif_id, jobOverride || null)}
@@ -292,16 +443,16 @@ function InterestCard({ interest, jobs, onAssign, assigning }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ResumeSourcing() {
-    const [tab, setTab] = useState('upload'); // 'upload' | 'pool' | 'interests'
+    const [tab, setTab] = useState('upload');
 
     // Shared state
-    const [jobs, setJobs]             = useState([]);
+    const [jobs, setJobs]               = useState([]);
     const [selectedJob, setSelectedJob] = useState(null);
-    const [jobDetail, setJobDetail]   = useState(null);
+    const [jobDetail, setJobDetail]     = useState(null);
     const [loadingDetail, setLoadingDetail] = useState(false);
 
-    // Upload tab state
-    const [uploadMode, setUploadMode] = useState('jd'); // 'jd' | 'pool'
+    // Upload tab
+    const [uploadMode, setUploadMode] = useState('jd');
     const [files, setFiles]           = useState([]);
     const [uploading, setUploading]   = useState(false);
     const [batches, setBatches]       = useState([]);
@@ -312,7 +463,7 @@ export default function ResumeSourcing() {
     const fileInputRef = useRef(null);
     const pollRef      = useRef(null);
 
-    // Pool tab state
+    // Pool tab
     const [poolSearch, setPoolSearch] = useState('');
     const [poolSkill,  setPoolSkill]  = useState('');
     const [poolExpMin, setPoolExpMin] = useState('');
@@ -323,22 +474,39 @@ export default function ResumeSourcing() {
     const [poolLoading, setPoolLoading] = useState(false);
     const [assigning,  setAssigning]  = useState(null);
 
-    // Interest tab state
+    // Interests tab
     const [interests,  setInterests]  = useState([]);
     const [intLoading, setIntLoading] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const [actioning,  setActioning]  = useState(null);
 
-    // Free Pool tab state (view + delete, no job context)
-    const [fpSearch,   setFpSearch]   = useState('');
-    const [fpSkill,    setFpSkill]    = useState('');
-    const [fpExpMin,   setFpExpMin]   = useState('');
-    const [fpExpMax,   setFpExpMax]   = useState('');
-    const [fpPage,     setFpPage]     = useState(1);
-    const [freePool,   setFreePool]   = useState([]);
-    const [fpTotal,    setFpTotal]    = useState(0);
-    const [fpLoading,  setFpLoading]  = useState(false);
+    // Free Pool tab
+    const [fpSearch, setFpSearch] = useState('');
+    const [fpSkill,  setFpSkill]  = useState('');
+    const [fpExpMin, setFpExpMin] = useState('');
+    const [fpExpMax, setFpExpMax] = useState('');
+    const [fpPage,   setFpPage]   = useState(1);
+    const [freePool, setFreePool] = useState([]);
+    const [fpTotal,  setFpTotal]  = useState(0);
+    const [fpLoading, setFpLoading] = useState(false);
     const [deletingFP, setDeletingFP] = useState(null);
+
+    // Profile drawer
+    const [profileOpen,   setProfileOpen]   = useState(false);
+    const [profileCandId, setProfileCandId] = useState(null);
+    const [profileJobId,  setProfileJobId]  = useState(null);
+
+    const openProfile = useCallback((candidateId, jobId = null) => {
+        setProfileCandId(candidateId);
+        setProfileJobId(jobId || null);
+        setProfileOpen(true);
+    }, []);
+
+    const closeProfile = useCallback(() => {
+        setProfileOpen(false);
+        setProfileCandId(null);
+        setProfileJobId(null);
+    }, []);
 
     // ── Data loaders ──────────────────────────────────────────────────────────
     const loadJobs = useCallback(() => {
@@ -424,7 +592,7 @@ export default function ResumeSourcing() {
             .finally(() => setLoadingDetail(false));
     };
 
-    // ── Upload tab handlers ───────────────────────────────────────────────────
+    // ── Upload handlers ───────────────────────────────────────────────────────
     const addFiles = (incoming) => {
         const next = [...files];
         for (const f of incoming) {
@@ -472,7 +640,7 @@ export default function ResumeSourcing() {
         else { setExpandedBatch(id); setBatchDetail(null); loadBatchDetail(id); }
     };
 
-    // ── Pool tab handlers ─────────────────────────────────────────────────────
+    // ── Pool handlers ─────────────────────────────────────────────────────────
     const handleAssign = async (candidateId) => {
         if (!selectedJob) return toast.error('Select a job posting first.');
         setAssigning(candidateId);
@@ -480,14 +648,13 @@ export default function ResumeSourcing() {
             const r = await recruitmentAPI.assignCandidateToJob(selectedJob.id, candidateId);
             toast.success(r.data?.message || 'Candidate assigned.');
             setPool(prev => prev.map(c => c.candidate_id === candidateId ? { ...c, already_applied: true } : c));
-            // Refresh job counters
             loadJobs();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to assign candidate.');
         } finally { setAssigning(null); }
     };
 
-    // ── Interest tab handlers ─────────────────────────────────────────────────
+    // ── Interest handlers ─────────────────────────────────────────────────────
     const handleActOnInterest = async (notifId, jobId) => {
         if (!jobId) return toast.error('Select a job posting to assign this candidate.');
         setActioning(notifId);
@@ -502,13 +669,13 @@ export default function ResumeSourcing() {
         } finally { setActioning(null); }
     };
 
-    // ── Free Pool tab handlers ────────────────────────────────────────────────
+    // ── Free Pool handlers ────────────────────────────────────────────────────
     const handleDeleteFromPool = async (candidateId, name) => {
         if (!window.confirm(`Permanently delete ${name || 'this candidate'} and all of their resumes? This cannot be undone.`)) return;
         setDeletingFP(candidateId);
         try {
-            const r = await recruitmentAPI.deleteCandidate(candidateId);
-            toast.success(r.data?.message || 'Candidate deleted.');
+            await recruitmentAPI.deleteCandidate(candidateId);
+            toast.success('Candidate deleted.');
             setFreePool(prev => prev.filter(c => c.candidate_id !== candidateId));
             setFpTotal(t => Math.max(0, t - 1));
         } catch (err) {
@@ -517,12 +684,20 @@ export default function ResumeSourcing() {
     };
 
     const POOL_LIMIT = 20;
-    const totalPages = Math.ceil(poolTotal / POOL_LIMIT);
+    const totalPages   = Math.ceil(poolTotal / POOL_LIMIT);
     const fpTotalPages = Math.ceil(fpTotal / POOL_LIMIT);
 
     return (
         <div className="max-w-6xl mx-auto">
-            {/* Page header */}
+            {/* Profile drawer */}
+            {profileOpen && profileCandId && (
+                <CandidateProfileDrawer
+                    candidateId={profileCandId}
+                    jobId={profileJobId}
+                    onClose={closeProfile}
+                />
+            )}
+
             <div className="mb-5">
                 <h1 className="text-2xl font-bold text-gray-900">Resume Sourcing</h1>
                 <p className="text-sm text-gray-500 mt-0.5">
@@ -551,18 +726,17 @@ export default function ResumeSourcing() {
             {tab === 'upload' && (
                 <>
                     <div className="flex gap-1.5 mb-5">
-                        <button type="button" onClick={() => setUploadMode('jd')}
-                            className={`text-sm font-medium px-4 py-2 rounded-xl border transition ${uploadMode === 'jd'
-                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                                : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                            🎯 Target a Job
-                        </button>
-                        <button type="button" onClick={() => setUploadMode('pool')}
-                            className={`text-sm font-medium px-4 py-2 rounded-xl border transition ${uploadMode === 'pool'
-                                ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                                : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
-                            🗂️ Free Talent Pool
-                        </button>
+                        {[
+                            { mode: 'jd',   icon: '🎯', label: 'Target a Job' },
+                            { mode: 'pool', icon: '🗂️', label: 'Free Talent Pool' },
+                        ].map(m => (
+                            <button key={m.mode} type="button" onClick={() => setUploadMode(m.mode)}
+                                className={`text-sm font-medium px-4 py-2 rounded-xl border transition ${uploadMode === m.mode
+                                    ? 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                                    : 'border-gray-200 text-gray-500 hover:border-gray-300'}`}>
+                                {m.icon} {m.label}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -635,8 +809,8 @@ export default function ResumeSourcing() {
                                                 ) : (
                                                     <span className="badge-purple text-xs">🗂️ Free Talent Pool</span>
                                                 )}
-                                                <span className={b.status==='processing' ? 'badge-blue' : b.status==='done' ? 'badge-green' : 'badge-red'}>
-                                                    {b.status==='processing' ? `processing ${b.processed_files}/${b.total_files}` : b.status}
+                                                <span className={b.status==='processing'?'badge-blue':b.status==='done'?'badge-green':'badge-red'}>
+                                                    {b.status==='processing'?`processing ${b.processed_files}/${b.total_files}`:b.status}
                                                 </span>
                                             </div>
                                             <div className="text-xs text-gray-500 mt-1">
@@ -659,12 +833,35 @@ export default function ResumeSourcing() {
                                                         {batchDetail.items?.map(item => (
                                                             <tr key={item.id}>
                                                                 <td className="max-w-[160px] truncate" title={item.file_name}>{item.file_name}</td>
-                                                                <td>{item.extracted_name||'—'}</td>
+                                                                <td>
+                                                                    {item.candidate_id && item.status === 'done' ? (
+                                                                        <button
+                                                                            onClick={() => openProfile(item.candidate_id, b.job_id || null)}
+                                                                            className="text-indigo-600 hover:underline text-xs font-medium text-left"
+                                                                        >
+                                                                            {item.extracted_name || '—'}
+                                                                        </button>
+                                                                    ) : (item.extracted_name || '—')}
+                                                                </td>
                                                                 <td>{item.extracted_email||'—'}</td>
                                                                 <td><span className={ITEM_ST[item.status]||'badge-gray'}>{item.status}</span></td>
-                                                                <td>{item.fit_score!=null ? <span className={item.fit_score>=70?'text-green-600 font-semibold':item.fit_score>=40?'text-yellow-600 font-semibold':'text-red-500 font-semibold'}>{item.fit_score}%</span> : '—'}</td>
+                                                                <td>
+                                                                    {item.fit_score != null
+                                                                        ? <span className={`font-semibold ${SCORE_COLOR(item.fit_score)}`}>{item.fit_score}%</span>
+                                                                        : '—'}
+                                                                </td>
                                                                 <td><BatchResultCell status={item.status} errorMessage={item.error_message} /></td>
-                                                                <td>{item.candidate_id && item.status !== 'skipped' && item.status !== 'failed' && <button onClick={()=>handleDeleteCandidate(item.candidate_id,item.extracted_name)} disabled={deletingCandidate===item.candidate_id} className="text-xs text-red-500 hover:text-red-700 hover:underline disabled:opacity-50">{deletingCandidate===item.candidate_id?'…':'Delete'}</button>}</td>
+                                                                <td>
+                                                                    {item.candidate_id && item.status !== 'skipped' && item.status !== 'failed' && (
+                                                                        <button
+                                                                            onClick={() => handleDeleteCandidate(item.candidate_id, item.extracted_name)}
+                                                                            disabled={deletingCandidate === item.candidate_id}
+                                                                            className="text-xs text-red-500 hover:text-red-700 hover:underline disabled:opacity-50"
+                                                                        >
+                                                                            {deletingCandidate === item.candidate_id ? '…' : 'Delete'}
+                                                                        </button>
+                                                                    )}
+                                                                </td>
                                                             </tr>
                                                         ))}
                                                     </tbody>
@@ -684,26 +881,18 @@ export default function ResumeSourcing() {
                 <>
                     <div className="mb-4">
                         <h2 className="text-lg font-display font-bold text-gray-900">{fpTotal} candidate{fpTotal !== 1 ? 's' : ''} in the free pool</h2>
-                        <p className="text-sm text-gray-500 mt-0.5">
-                            Every sourced and self-registered candidate available for placement, independent of any job. Hired candidates are excluded automatically.
-                        </p>
+                        <p className="text-sm text-gray-500 mt-0.5">All sourced and self-registered candidates, available for placement. Click any name to view their full profile. Hired candidates are excluded.</p>
                     </div>
-
                     <div className="card-p mb-4">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-                            <input value={fpSearch} onChange={e=>{setFpSearch(e.target.value);setFpPage(1);}}
-                                placeholder="Search name / headline…" className="form-input-sm col-span-2" />
-                            <input value={fpSkill} onChange={e=>{setFpSkill(e.target.value);setFpPage(1);}}
-                                placeholder="Skill (e.g. React)" className="form-input-sm" />
+                            <input value={fpSearch} onChange={e=>{setFpSearch(e.target.value);setFpPage(1);}} placeholder="Search name / headline…" className="form-input-sm col-span-2" />
+                            <input value={fpSkill}  onChange={e=>{setFpSkill(e.target.value);setFpPage(1);}}  placeholder="Skill (e.g. React)" className="form-input-sm" />
                             <div className="flex gap-1">
-                                <input type="number" value={fpExpMin} onChange={e=>{setFpExpMin(e.target.value);setFpPage(1);}}
-                                    placeholder="Min exp" className="form-input-sm w-full" />
-                                <input type="number" value={fpExpMax} onChange={e=>{setFpExpMax(e.target.value);setFpPage(1);}}
-                                    placeholder="Max exp" className="form-input-sm w-full" />
+                                <input type="number" value={fpExpMin} onChange={e=>{setFpExpMin(e.target.value);setFpPage(1);}} placeholder="Min exp" className="form-input-sm w-full" />
+                                <input type="number" value={fpExpMax} onChange={e=>{setFpExpMax(e.target.value);setFpPage(1);}} placeholder="Max exp" className="form-input-sm w-full" />
                             </div>
                         </div>
                     </div>
-
                     {fpLoading ? (
                         <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading…</div>
                     ) : freePool.length === 0 ? (
@@ -712,7 +901,7 @@ export default function ResumeSourcing() {
                         <>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                                 {freePool.map(c => (
-                                    <FreePoolCard key={c.candidate_id} candidate={c} onDelete={handleDeleteFromPool} deleting={deletingFP} />
+                                    <FreePoolCard key={c.candidate_id} candidate={c} onDelete={handleDeleteFromPool} deleting={deletingFP} onViewProfile={openProfile} />
                                 ))}
                             </div>
                             {fpTotalPages > 1 && (
@@ -727,14 +916,13 @@ export default function ResumeSourcing() {
                 </>
             )}
 
-            {/* ── POOL TAB ── */}
+            {/* ── ASSIGN FROM POOL TAB ── */}
             {tab === 'pool' && (
                 <>
                     <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-6">
                         <div className="lg:col-span-2">
                             <JobPicker jobs={jobs} selected={selectedJob} onSelect={selectJob} />
                         </div>
-
                         <div className="lg:col-span-3">
                             {!selectedJob ? (
                                 <div className="card-p h-full flex items-center justify-center text-sm text-gray-400 min-h-[120px]">
@@ -744,22 +932,19 @@ export default function ResumeSourcing() {
                                 <div className="card-p">
                                     <h2 className="section-title mb-3">Filter Candidates</h2>
                                     <div className="grid grid-cols-2 gap-2 mb-2">
-                                        <input value={poolSearch} onChange={e=>{setPoolSearch(e.target.value);setPoolPage(1);}}
-                                            placeholder="Search name / headline…" className="form-input-sm col-span-2" />
-                                        <input value={poolSkill} onChange={e=>{setPoolSkill(e.target.value);setPoolPage(1);}}
-                                            placeholder="Skill (e.g. React)" className="form-input-sm" />
+                                        <input value={poolSearch} onChange={e=>{setPoolSearch(e.target.value);setPoolPage(1);}} placeholder="Search name / headline…" className="form-input-sm col-span-2" />
+                                        <input value={poolSkill}  onChange={e=>{setPoolSkill(e.target.value);setPoolPage(1);}}  placeholder="Skill (e.g. React)" className="form-input-sm" />
                                         <div className="flex gap-1">
-                                            <input type="number" value={poolExpMin} onChange={e=>{setPoolExpMin(e.target.value);setPoolPage(1);}}
-                                                placeholder="Min exp" className="form-input-sm w-full" />
-                                            <input type="number" value={poolExpMax} onChange={e=>{setPoolExpMax(e.target.value);setPoolPage(1);}}
-                                                placeholder="Max exp" className="form-input-sm w-full" />
+                                            <input type="number" value={poolExpMin} onChange={e=>{setPoolExpMin(e.target.value);setPoolPage(1);}} placeholder="Min" className="form-input-sm w-full" />
+                                            <input type="number" value={poolExpMax} onChange={e=>{setPoolExpMax(e.target.value);setPoolPage(1);}} placeholder="Max" className="form-input-sm w-full" />
                                         </div>
                                     </div>
                                     <p className="text-xs text-gray-400">
                                         {poolTotal} candidate{poolTotal !== 1 ? 's' : ''} in pool
                                         {selectedJob && <> · assigning to <span className="font-medium text-gray-600">{selectedJob.title} — {selectedJob.company_name}</span></>}
                                     </p>
-                                    <p className="text-[11px] text-red-400 mt-1">Hired candidates are automatically excluded from this pool.</p>
+                                    <p className="text-[11px] text-red-400 mt-1">Hired candidates are automatically excluded.</p>
+                                    <p className="text-[11px] text-indigo-400 mt-0.5">Fit score shown on already-assigned candidates. Click "View Profile" to see full details.</p>
                                 </div>
                             )}
                         </div>
@@ -776,10 +961,15 @@ export default function ResumeSourcing() {
                             <>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
                                     {pool.map(c => (
-                                        <PoolCard key={c.candidate_id} candidate={c}
+                                        <PoolCard
+                                            key={c.candidate_id}
+                                            candidate={c}
                                             jobSelected={!!selectedJob}
                                             onAssign={handleAssign}
-                                            assigning={assigning} />
+                                            assigning={assigning}
+                                            onViewProfile={openProfile}
+                                            jobId={selectedJob?.id}
+                                        />
                                     ))}
                                 </div>
                                 {totalPages > 1 && (
@@ -799,14 +989,9 @@ export default function ResumeSourcing() {
             {tab === 'interests' && (
                 <>
                     <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <p className="text-sm text-gray-600">
-                                Companies who expressed interest in pool candidates. Assign the candidate to their open JD and they'll be notified.
-                            </p>
-                        </div>
+                        <p className="text-sm text-gray-600">Companies who expressed interest in pool candidates. Assign the candidate to their open JD to notify them.</p>
                         <button onClick={loadInterests} className="text-xs text-indigo-600 hover:underline">Refresh</button>
                     </div>
-
                     {intLoading ? (
                         <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading…</div>
                     ) : interests.length === 0 ? (
@@ -824,6 +1009,7 @@ export default function ResumeSourcing() {
                                     jobs={jobs}
                                     onAssign={handleActOnInterest}
                                     assigning={actioning}
+                                    onViewProfile={openProfile}
                                 />
                             ))}
                         </div>

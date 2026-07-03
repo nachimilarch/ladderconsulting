@@ -1,6 +1,118 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { companyJobAPI, candidateResumeAPI } from '../../api/company';
+import { companyJobAPI, candidateResumeAPI, talentPoolAPI } from '../../api/company';
+
+// ── Candidate profile drawer (masked unless contact_unlocked) ─────────────────
+function CandidateProfileDrawer({ candidateId, contactUnlocked, onClose }) {
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        // Use previewProfile — it handles masking server-side based on unlock status
+        talentPoolAPI.previewProfile(candidateId)
+            .then(r => setProfile(r.data?.data || null))
+            .catch(() => toast.error('Failed to load profile.'))
+            .finally(() => setLoading(false));
+    }, [candidateId]);
+
+    const education = (() => {
+        try { return Array.isArray(profile?.education) ? profile.education : JSON.parse(profile?.education || '[]'); }
+        catch { return []; }
+    })();
+
+    return (
+        <div className="fixed inset-0 z-50 flex">
+            <div className="flex-1 bg-black/40" onClick={onClose} />
+            <div className="w-full max-w-md bg-white h-full overflow-y-auto shadow-2xl flex flex-col">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 sticky top-0 bg-white z-10">
+                    <div>
+                        <h2 className="font-semibold text-gray-900 text-base">
+                            {loading ? 'Loading…' : profile?.candidate_name || 'Candidate Profile'}
+                        </h2>
+                        {!contactUnlocked && <p className="text-xs text-gray-400 mt-0.5">🔒 Contact details protected</p>}
+                    </div>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+                </div>
+
+                {loading ? (
+                    <div className="flex items-center justify-center flex-1 text-gray-400 text-sm">Loading…</div>
+                ) : !profile ? (
+                    <div className="flex items-center justify-center flex-1 text-gray-400 text-sm">Could not load profile.</div>
+                ) : (
+                    <div className="px-5 py-4 flex flex-col gap-5">
+                        {/* Identity */}
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-base font-bold shrink-0">
+                                    {(profile.candidate_name || 'C')[0].toUpperCase()}
+                                </div>
+                                <div>
+                                    <p className="font-semibold text-gray-900">{profile.candidate_name}</p>
+                                    {profile.headline && <p className="text-xs text-gray-500">{profile.headline}</p>}
+                                </div>
+                            </div>
+                            {contactUnlocked && (
+                                <div className="flex flex-col gap-0.5 text-xs text-gray-500">
+                                    {profile.candidate_email && <span>✉ {profile.candidate_email}</span>}
+                                    {profile.candidate_phone && <span>📞 {profile.candidate_phone}</span>}
+                                    {profile.linkedin_url   && <a href={profile.linkedin_url}  target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">LinkedIn ↗</a>}
+                                    {profile.portfolio_url  && <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">Portfolio ↗</a>}
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5 text-xs text-gray-500">
+                            {profile.total_experience != null && <span>💼 {parseFloat(profile.total_experience).toFixed(1)} yrs exp</span>}
+                            {profile.current_location && <span>📍 {profile.current_location}</span>}
+                            {profile.notice_period_days != null && <span>🕐 {profile.notice_period_days}d notice</span>}
+                            {profile.expected_salary   && <span>💰 ₹{(parseFloat(profile.expected_salary)/100000).toFixed(1)}L/yr</span>}
+                        </div>
+
+                        {profile.summary && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Summary</h3>
+                                <p className="text-sm text-gray-700 leading-relaxed">{profile.summary}</p>
+                            </div>
+                        )}
+
+                        {profile.skills?.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Skills</h3>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {profile.skills.map(s => (
+                                        <span key={s.name} className="bg-indigo-50 text-indigo-700 text-[11px] px-2 py-1 rounded-full border border-indigo-100 capitalize">
+                                            {s.name}{s.years_exp ? ` · ${s.years_exp}y` : ''}
+                                        </span>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {education.length > 0 && (
+                            <div>
+                                <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Education</h3>
+                                <div className="flex flex-col gap-2">
+                                    {education.map((e, i) => (
+                                        <div key={i} className="text-sm">
+                                            <p className="font-medium text-gray-800">{e.degree}{e.field ? ` in ${e.field}` : ''}</p>
+                                            {e.institution && <p className="text-xs text-gray-500">{e.institution}{e.end_year ? ` · ${e.end_year}` : ''}</p>}
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {!contactUnlocked && (
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
+                                Contact details are protected. To reach this candidate, go through your assigned LadderStep executive.
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 const STATUS_COLORS = {
     applied:             'bg-blue-100 text-blue-700',
@@ -29,6 +141,7 @@ export default function ShortlistView() {
     const [loadingApps, setLoadingApps] = useState(false);
     const [actionLoading, setActionLoading] = useState(null);
     const [downloadingResume, setDownloadingResume] = useState(null);
+    const [profileDrawer, setProfileDrawer] = useState(null); // { candidateId, contactUnlocked }
 
     useEffect(() => {
         companyJobAPI.list()
@@ -119,6 +232,13 @@ export default function ShortlistView() {
 
     return (
         <div className="max-w-6xl mx-auto">
+            {profileDrawer && (
+                <CandidateProfileDrawer
+                    candidateId={profileDrawer.candidateId}
+                    contactUnlocked={profileDrawer.contactUnlocked}
+                    onClose={() => setProfileDrawer(null)}
+                />
+            )}
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Applications & Shortlist</h1>
 
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex items-start gap-2">
@@ -193,6 +313,12 @@ export default function ShortlistView() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap mb-1">
                                             <h3 className="font-semibold text-gray-900">{app.candidate_name}</h3>
+                                            <button
+                                                onClick={() => setProfileDrawer({ candidateId: app.candidate_id, contactUnlocked: !!app.contact_unlocked })}
+                                                className="text-[11px] text-indigo-600 hover:underline"
+                                            >
+                                                View Profile
+                                            </button>
                                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusCls}`}>
                                                 {app.status.replace('_', ' ')}
                                             </span>

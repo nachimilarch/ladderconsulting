@@ -351,6 +351,86 @@ exports.requestPackage = async (req, res) => {
 
 // ── GET /api/companies/talent/:candidateId/profile ────────────────────────────
 // Full profile detail (complete skills w/ proficiency, education, links) — gated.
+// ── GET /api/companies/talent/:candidateId/preview ────────────────────────────
+// Masked profile preview — available to any company that has a package OR has
+// this candidate as an applicant on one of their jobs. PII is stripped unless
+// the candidate was unlocked via Single/4-Pack (contact_unlocked=true).
+exports.getPreviewProfile = async (req, res) => {
+    const { candidateId } = req.params;
+    try {
+        const company = await getCompany(req.user.id);
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found.' });
+
+        const via = await isUnlocked(company.id, candidateId, company.placement_fee_percent);
+
+        if (!via) {
+            // Allow if company has a paid package OR if candidate applied to one of their jobs
+            const hasPkg = await hasSelectedPackage(company.id, company.placement_fee_percent);
+            const [[hasApp]] = await db.query(
+                `SELECT 1 FROM applications a
+                 JOIN job_postings jp ON jp.id = a.job_id
+                 WHERE a.candidate_id = ? AND jp.company_id = ? AND a.deleted_at IS NULL LIMIT 1`,
+                [candidateId, company.id]
+            );
+            if (!hasPkg && !hasApp) {
+                return res.status(403).json({ success: false, code: 'PACKAGE_REQUIRED', message: 'Select a package to view candidate profiles.' });
+            }
+        }
+
+        const [[row]] = await db.query(
+            `SELECT u.name AS candidate_name, u.email AS candidate_email, u.phone AS candidate_phone,
+                    cp.headline, cp.summary, cp.total_experience,
+                    cp.current_location, cp.notice_period_days, cp.expected_salary,
+                    cp.linkedin_url, cp.portfolio_url, cp.education
+             FROM candidates c
+             JOIN users u ON u.id = c.user_id
+             LEFT JOIN candidate_profiles cp ON cp.candidate_id = c.id
+             WHERE c.id = ? AND c.deleted_at IS NULL`,
+            [candidateId]
+        );
+        if (!row) return res.status(404).json({ success: false, message: 'Candidate not found.' });
+
+        const [skills] = await db.query(
+            `SELECT st.name, csv.proficiency, csv.years_exp
+             FROM candidate_skill_vectors csv JOIN skill_tags st ON st.id = csv.skill_tag_id
+             WHERE csv.candidate_id = ? ORDER BY csv.years_exp DESC`,
+            [candidateId]
+        );
+
+        // Single/4-Pack unlocks expose full contact info; Platinum keeps PII masked
+        const isPaidUnlock = via && via !== 'platinum';
+        const profile = {
+            headline: row.headline,
+            summary: row.summary,
+            total_experience: row.total_experience,
+            current_location: row.current_location,
+            notice_period_days: row.notice_period_days,
+            expected_salary: row.expected_salary,
+            education: row.education,
+            skills,
+            contact_unlocked: isPaidUnlock,
+            unlocked_via: via,
+        };
+
+        if (isPaidUnlock) {
+            profile.candidate_name  = row.candidate_name;
+            profile.candidate_email = row.candidate_email;
+            profile.candidate_phone = row.candidate_phone;
+            profile.linkedin_url    = row.linkedin_url;
+            profile.portfolio_url   = row.portfolio_url;
+        } else {
+            // Show initials only
+            const parts = (row.candidate_name || '').split(/\s+/).filter(Boolean);
+            profile.candidate_name = parts.map(p => p[0] + '.').join(' ');
+        }
+
+        res.json({ success: true, data: profile });
+    } catch (err) {
+        console.error('[resumeUnlock.previewProfile]', err);
+        res.status(500).json({ success: false, message: 'Failed to load profile.' });
+    }
+};
+
 exports.getFullProfile = async (req, res) => {
     const { candidateId } = req.params;
     try {

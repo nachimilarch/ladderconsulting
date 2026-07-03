@@ -35,6 +35,7 @@ router.get('/talent/unlock-status',           unlockCtrl.getUnlockStatus);
 router.post('/talent/buy-pack',               unlockCtrl.buyPack);
 router.post('/talent/:candidateId/unlock',    unlockCtrl.purchaseUnlock);
 router.get('/talent/:candidateId/profile',    unlockCtrl.getFullProfile);
+router.get('/talent/:candidateId/preview',    unlockCtrl.getPreviewProfile);
 router.get('/talent/:candidateId/resume',     unlockCtrl.downloadUnlockedResume);
 
 // Package selection from the company's own profile page

@@ -56,8 +56,9 @@ export const talentPoolAPI = {
 
     unlockStatus: (candidateIds = [])   => api.get('/companies/talent/unlock-status', { params: candidateIds.length ? { candidateIds: candidateIds.join(',') } : {} }),
     unlock:       (candidateId, tier)   => api.post(`/companies/talent/${candidateId}/unlock`, tier ? { tier } : {}),
-    fullProfile:  (candidateId)         => api.get(`/companies/talent/${candidateId}/profile`),
-    downloadResume: (candidateId)       => api.get(`/companies/talent/${candidateId}/resume`, { responseType: 'blob' }),
+    fullProfile:    (candidateId)         => api.get(`/companies/talent/${candidateId}/profile`),
+    previewProfile: (candidateId)         => api.get(`/companies/talent/${candidateId}/preview`),
+    downloadResume: (candidateId)         => api.get(`/companies/talent/${candidateId}/resume`, { responseType: 'blob' }),
     applyToPipeline: (candidateId, jobId) => api.post(`/companies/talent/${candidateId}/apply`, { job_id: jobId }),
 
     packageStatus:   ()                 => api.get('/companies/package-status'),
