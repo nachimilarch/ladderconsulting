@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const { parseFullProfile } = require('../utils/aiParser');
-const { parseRecruiterFilename, isNoiseName } = require('../utils/resumeParser');
+const { parseRecruiterFilename, isNoiseName, chooseName } = require('../utils/resumeParser');
 const { maskResumeText } = require('../utils/maskPII');
 const matchingService = require('../services/matchingService');
 const { isCandidateHired } = require('../utils/candidateStatus');
@@ -139,15 +139,7 @@ const processResumeItem = async (item, job, uploadedBy) => {
     //     section header / job title / address fragment (isNoiseName).
     //   • experience — use the filename figure whenever it is a real (>0) number.
     const fromFile = parseRecruiterFilename(item.file_name);
-    let name = (profile.full_name || '').trim();
-    if (fromFile.name) {
-        // Keep the body-parsed name only when it clearly agrees with the recruiter's
-        // filename (shares at least one token — the parse just formats it better).
-        // Otherwise the parse is empty/noise/fused garbage → trust the filename.
-        const ftok = new Set(fromFile.name.toLowerCase().split(/\s+/).filter(Boolean));
-        const shares = name && name.toLowerCase().split(/\s+/).some(t => ftok.has(t));
-        if (!name || isNoiseName(name) || !shares) name = fromFile.name;
-    }
+    const name = chooseName(profile.full_name, fromFile.name);
     const experienceYears = (fromFile.experienceYears != null && fromFile.experienceYears > 0)
         ? fromFile.experienceYears
         : (profile.experience_years || 0);

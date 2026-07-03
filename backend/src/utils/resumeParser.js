@@ -1018,6 +1018,25 @@ function parseRecruiterFilename(fileName = '') {
     return out;
 }
 
+// Choose the better of the body-parsed name and the recruiter-filename name.
+// Rules (in order): if there's no filename name, keep the parse; if the parse is
+// empty/noise, take the filename; if they share a token they agree (parse is
+// usually better-formatted, keep it); if the parse looks like a phrase (>3 tokens
+// that don't match the filename) it's garbage → take the filename; otherwise
+// prefer whichever is more complete, tie-breaking to the recruiter's filename.
+function chooseName(parsedName, filenameName) {
+    const parsed = (parsedName || '').trim();
+    const ff = (filenameName || '').trim();
+    if (!ff) return parsed;
+    if (!parsed || isNoiseName(parsed)) return ff;
+    const pt = parsed.toLowerCase().split(/\s+/).filter(Boolean);
+    const ftok = new Set(ff.toLowerCase().split(/\s+/).filter(Boolean));
+    if (pt.some(t => ftok.has(t))) return parsed;   // agree on a token
+    if (pt.length > 3) return ff;                   // parse looks like a phrase
+    if (ftok.size > pt.length) return ff;           // filename is more complete
+    return parsed;
+}
+
 // ── Public composite parsers ──────────────────────────────────────────────────
 function parseFullProfile(text) {
     const raw = normalizeText(String(text || ''));
@@ -1059,4 +1078,5 @@ module.exports = {
     extractJobSkills,
     parseRecruiterFilename,
     isNoiseName,
+    chooseName,
 };
