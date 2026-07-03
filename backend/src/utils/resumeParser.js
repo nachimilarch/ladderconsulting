@@ -672,11 +672,17 @@ const CITIES = [
 const CITY_RE = new RegExp(`(?<![A-Za-z])(${CITIES.map(escapeRegex).join('|')})(?![A-Za-z])`, 'i');
 
 function extractLocation(text) {
-    // 1. Explicit "Location:" label
-    const lm = text.match(/(?:location|city|address)\s*[:\-–]\s*([^\n,]{3,60})/i);
+    // 1. Explicit "Location:"/"City:" label. Prefer a known city inside the value;
+    //    reject street-address fragments (door/house/plot numbers, digits).
+    const lm = text.match(/(?:location|current\s+location|city|address)\s*[:\-–]\s*([^\n]{3,80})/i);
     if (lm) {
-        const loc = lm[1].trim().replace(/,.*$/, '').trim();
-        if (loc.length > 2 && loc.length < 60) return titleCase(loc);
+        const val = lm[1].trim();
+        const cityInVal = val.match(CITY_RE);
+        if (cityInVal) return titleCase(cityInVal[1]);
+        const loc = val.replace(/,.*$/, '').trim();
+        // A real city label has no digits and isn't a door/plot/flat number.
+        const isAddress = /\d/.test(loc) || /\b(h\.?\s*no|d\.?\s*no|door|flat|plot|street|road|lane|colony)\b/i.test(loc);
+        if (!isAddress && loc.length > 2 && loc.length < 40) return titleCase(loc);
     }
     // 2. City name anywhere in text
     const m = text.match(CITY_RE);
