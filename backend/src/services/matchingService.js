@@ -30,6 +30,42 @@ async function parseJobToSkills(jobId, jdText) {
     return replaceJobSkills(jobId, required, preferred);
 }
 
+// ── Pure scoring math (shared by the persisted scorer and the live pool scorer) ─
+// Weighting: required skills 60% · experience 25% · education 15%.
+function scoreVectors(jobSkills, candidateSet, exp, expMin, eduCnt) {
+    const mandatory = jobSkills.filter(s => s.is_mandatory);
+    const optional  = jobSkills.filter(s => !s.is_mandatory);
+
+    const matchedMandatory = mandatory.filter(s => candidateSet.has(s.skill_tag_id));
+    const missingMandatory = mandatory.filter(s => !candidateSet.has(s.skill_tag_id));
+    const matchedOptional  = optional.filter(s => candidateSet.has(s.skill_tag_id));
+
+    const skillScore = mandatory.length > 0
+        ? (matchedMandatory.length / mandatory.length) * 60
+        : 30; // partial credit when no mandatory skills defined
+    const experienceScore = expMin === 0 ? 25 : Math.min(25, (exp / expMin) * 25);
+    const educationScore  = eduCnt > 0 ? 15 : 0;
+
+    return {
+        score: Math.min(100, Math.round(skillScore + experienceScore + educationScore)),
+        matchedIds: [
+            ...matchedMandatory.map(s => s.skill_tag_id),
+            ...matchedOptional.map(s => s.skill_tag_id),
+        ],
+        missingIds: missingMandatory.map(s => s.skill_tag_id),
+        jobSkillCount: jobSkills.length,
+    };
+}
+
+const parseEduCount = (education) => {
+    try {
+        const edu = education
+            ? (typeof education === 'string' ? JSON.parse(education) : education)
+            : [];
+        return Array.isArray(edu) ? edu.length : 0;
+    } catch { return 0; }
+};
+
 // ── 3. Compute and persist match score for a single application ───────────────
 async function calculateMatchScore(applicationId) {
     const [[app]] = await db.query(
@@ -58,40 +94,12 @@ async function calculateMatchScore(applicationId) {
     if (jobSkills.length === 0 || candidateSkills.length === 0) return null;
 
     const candidateSet = new Set(candidateSkills.map(s => s.skill_tag_id));
-    const mandatory = jobSkills.filter(s => s.is_mandatory);
-    const optional  = jobSkills.filter(s => !s.is_mandatory);
-
-    const matchedMandatory = mandatory.filter(s => candidateSet.has(s.skill_tag_id));
-    const missingMandatory = mandatory.filter(s => !candidateSet.has(s.skill_tag_id));
-    const matchedOptional  = optional.filter(s => candidateSet.has(s.skill_tag_id));
-
-    // Required skills: 60%
-    const skillScore = mandatory.length > 0
-        ? (matchedMandatory.length / mandatory.length) * 60
-        : 30; // Partial credit when no mandatory skills defined
-
-    // Experience: 25%
     const exp    = parseFloat(app.total_experience) || 0;
     const expMin = parseFloat(app.experience_min) || 0;
-    const experienceScore = expMin === 0 ? 25 : Math.min(25, (exp / expMin) * 25);
+    const eduCnt = parseEduCount(app.education);
 
-    // Education: 15% — stored in candidate_profiles.education as a JSON array
-    let eduCnt = 0;
-    try {
-        const edu = app.education
-            ? (typeof app.education === 'string' ? JSON.parse(app.education) : app.education)
-            : [];
-        eduCnt = Array.isArray(edu) ? edu.length : 0;
-    } catch (_) {}
-    const educationScore = eduCnt > 0 ? 15 : 0;
-
-    const totalScore = Math.min(100, Math.round(skillScore + experienceScore + educationScore));
-
-    const matchedIds = [
-        ...matchedMandatory.map(s => s.skill_tag_id),
-        ...matchedOptional.map(s => s.skill_tag_id),
-    ];
-    const missingIds = missingMandatory.map(s => s.skill_tag_id);
+    const { score: totalScore, matchedIds, missingIds } =
+        scoreVectors(jobSkills, candidateSet, exp, expMin, eduCnt);
 
     const matchedNames = await idsToNames(matchedIds);
     const missingNames = await idsToNames(missingIds);
@@ -162,10 +170,75 @@ async function triggerJobMatching(jobId, jdText) {
     }
 }
 
+// ── 6. Live (non-persisted) scoring of many pool candidates against one job ────
+// Used by the Talent Pool (company + executive) so a match % can be shown for a
+// selected JD even for candidates who have not applied. Fully batched: one query
+// for the job's skill vectors, one for every candidate's profile, one for every
+// candidate's skill vectors, one to resolve skill names. Returns
+//   Map<candidateId, { score, matched_skills, missing_skills } | null>
+// (null = candidate has no parsed skills yet, so no meaningful score).
+async function scorePoolAgainstJob(jobId, candidateIds) {
+    const out = new Map();
+    const ids = [...new Set((candidateIds || []).map(Number).filter(Boolean))];
+    if (!jobId || ids.length === 0) return out;
+
+    const [jobSkills] = await db.query(
+        'SELECT skill_tag_id, is_mandatory FROM job_skill_vectors WHERE job_id = ?', [jobId]
+    );
+    if (jobSkills.length === 0) return out; // JD has no skill vectors → cannot score
+
+    const [[job]] = await db.query('SELECT experience_min FROM job_postings WHERE id = ?', [jobId]);
+    const expMin = parseFloat(job?.experience_min) || 0;
+
+    const ph = ids.map(() => '?').join(',');
+    const [profiles] = await db.query(
+        `SELECT candidate_id, total_experience, education FROM candidate_profiles WHERE candidate_id IN (${ph})`, ids
+    );
+    const profById = new Map(profiles.map(p => [p.candidate_id, p]));
+
+    const [vecs] = await db.query(
+        `SELECT candidate_id, skill_tag_id FROM candidate_skill_vectors WHERE candidate_id IN (${ph})`, ids
+    );
+    const skillsById = new Map();
+    for (const v of vecs) {
+        if (!skillsById.has(v.candidate_id)) skillsById.set(v.candidate_id, new Set());
+        skillsById.get(v.candidate_id).add(v.skill_tag_id);
+    }
+
+    const allSkillIds = new Set();
+    const prelim = [];
+    for (const id of ids) {
+        const set = skillsById.get(id);
+        if (!set || set.size === 0) { out.set(id, null); continue; }
+        const prof = profById.get(id) || {};
+        const r = scoreVectors(jobSkills, set, parseFloat(prof.total_experience) || 0, expMin, parseEduCount(prof.education));
+        r.matchedIds.forEach(i => allSkillIds.add(i));
+        r.missingIds.forEach(i => allSkillIds.add(i));
+        prelim.push({ id, r });
+    }
+
+    const nameById = new Map();
+    if (allSkillIds.size) {
+        const idArr = [...allSkillIds];
+        const ph2 = idArr.map(() => '?').join(',');
+        const [names] = await db.query(`SELECT id, name FROM skill_tags WHERE id IN (${ph2})`, idArr);
+        for (const n of names) nameById.set(n.id, n.name);
+    }
+    for (const { id, r } of prelim) {
+        out.set(id, {
+            score: r.score,
+            matched_skills: r.matchedIds.map(i => nameById.get(i)).filter(Boolean),
+            missing_skills: r.missingIds.map(i => nameById.get(i)).filter(Boolean),
+        });
+    }
+    return out;
+}
+
 module.exports = {
     parseResumeToSkills,
     parseJobToSkills,
     calculateMatchScore,
     triggerCandidateMatching,
     triggerJobMatching,
+    scorePoolAgainstJob,
 };

@@ -4,6 +4,7 @@ const fs = require('fs');
 const { maskName, maskCandidateForCompany, maskLocation } = require('../utils/maskPII');
 const { logAction } = require('../utils/auditLog');
 const { hasSelectedPackage } = require('./resumeUnlockController');
+const { scorePoolAgainstJob } = require('../services/matchingService');
 const { sendEmail } = require('../utils/email');
 
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
@@ -606,9 +607,20 @@ exports.getTalentPool = async (req, res) => {
         // whether to show the credit-spend flow or the request-a-package flow.
         const companyHasPkg = await hasSelectedPackage(company.id, company.placement_fee_percent);
 
-        const { search = '', experience_min, experience_max, skill, page = 1 } = req.query;
+        const { search = '', experience_min, experience_max, skill, page = 1, jobId } = req.query;
         const limit = 24;
         const offset = (Math.max(1, parseInt(page)) - 1) * limit;
+
+        // Optional "match against this JD" — only the company's own active jobs,
+        // and only when they've selected a package (match % is a paid signal).
+        let matchJobId = null;
+        if (jobId) {
+            const [[ownJob]] = await db.query(
+                `SELECT id FROM job_postings WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
+                [parseInt(jobId), company.id]
+            );
+            if (ownJob && companyHasPkg) matchJobId = ownJob.id;
+        }
 
         const params = [];
         let having = '';
@@ -702,15 +714,24 @@ exports.getTalentPool = async (req, res) => {
             params
         );
 
+        // Live match % against the selected JD (masking never touches match_score).
+        let scoreMap = new Map();
+        if (matchJobId) {
+            try { scoreMap = await scorePoolAgainstJob(matchJobId, rows.map(r => r.candidate_id)); }
+            catch (e) { console.error('[getTalentPool] scoring failed:', e.message); }
+        }
+
         const candidates = rows.map(row => {
             const skills = (() => {
                 try { return Array.isArray(row.skills) ? row.skills : JSON.parse(row.skills || '[]'); }
                 catch { return []; }
             })();
+            const live = scoreMap.get(row.candidate_id);
             return maskCandidateForCompany({
                 ...row,
                 skills,
                 current_location: row.current_location,
+                match_score: live ? live.score : null,
             });
         });
 
@@ -721,6 +742,7 @@ exports.getTalentPool = async (req, res) => {
             page: parseInt(page),
             limit,
             has_package: companyHasPkg,
+            match_job_id: matchJobId,
         });
     } catch (err) {
         console.error('[getTalentPool]', err.message);

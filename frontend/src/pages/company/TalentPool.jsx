@@ -372,6 +372,10 @@ export default function TalentPool() {
     const [pipelineJob, setPipelineJob] = useState('');
     const [applyingToPipeline, setApplyingToPipeline] = useState(false);
 
+    // "Match against this JD" — show a live fit % per candidate for a chosen job
+    const [matchJob, setMatchJob] = useState('');
+    const matchJobRef = useRef('');
+
     const fetchUnlockStatus = useCallback((rows) => {
         const ids = rows.map(c => c.candidate_id).filter(Boolean);
         if (!ids.length) return;
@@ -394,6 +398,7 @@ export default function TalentPool() {
                 ...(sk.trim() ? { skill: sk.trim() } : {}),
                 ...(range.min !== '' ? { experience_min: range.min } : {}),
                 ...(range.max !== '' ? { experience_max: range.max } : {}),
+                ...(matchJobRef.current ? { jobId: matchJobRef.current } : {}),
             });
             const rows = data?.data || [];
             setCandidates(rows);
@@ -428,6 +433,13 @@ export default function TalentPool() {
         setSkill(val);
         clearTimeout(searchTimer.current);
         searchTimer.current = setTimeout(() => { setPage(1); fetchCandidates(1, search, val, expRange); }, 400);
+    };
+
+    const handleMatchJobChange = (id) => {
+        setMatchJob(id);
+        matchJobRef.current = id;
+        setPage(1);
+        fetchCandidates(1);
     };
 
     const handleExpChange = (idx) => {
@@ -589,13 +601,34 @@ export default function TalentPool() {
                         ))}
                     </select>
                 </div>
+                <div className="min-w-[190px]">
+                    <label className="block text-xs text-gray-500 mb-1 font-medium">🎯 Match against job</label>
+                    <select
+                        value={matchJob}
+                        onChange={e => handleMatchJobChange(e.target.value)}
+                        disabled={!hasPackage}
+                        title={!hasPackage ? 'Select a package to see match %' : ''}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+                    >
+                        <option value="">— No match scoring —</option>
+                        {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+                    </select>
+                </div>
                 <button
-                    onClick={() => { setSearch(''); setSkill(''); setExpRange(0); setPage(1); fetchCandidates(1, '', '', 0); }}
+                    onClick={() => { setSearch(''); setSkill(''); setExpRange(0); setMatchJob(''); matchJobRef.current = ''; setPage(1); fetchCandidates(1, '', '', 0); }}
                     className="text-xs text-gray-400 hover:text-gray-600 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
                 >
                     Clear
                 </button>
             </div>
+            {matchJob && (
+                <p className="text-xs text-indigo-500 -mt-4 mb-4">
+                    Showing each candidate's live <b>% match</b> against <b>{jobs.find(j => String(j.id) === String(matchJob))?.title}</b>. Candidates with no parsed skills yet won't show a score.
+                </p>
+            )}
+            {!hasPackage && (
+                <p className="text-xs text-amber-600 -mt-4 mb-4">🔒 Select a package to enable AI match scoring against your job postings.</p>
+            )}
 
             {/* Grid */}
             {loading ? (

@@ -680,15 +680,29 @@ exports.listTalentPoolExec = async (req, res) => {
             params
         );
 
-        const candidates = rows.map(row => ({
-            ...row,
-            skills: (() => {
-                try { return Array.isArray(row.skills) ? row.skills : JSON.parse(row.skills || '[]'); }
-                catch { return []; }
-            })(),
-            already_applied: !!row.already_applied,
-            fit_score: row.fit_score ?? null,
-        }));
+        // Live-score every pool candidate against the selected JD (not just those
+        // who already applied) so the executive sees a match % for anyone.
+        let scoreMap = new Map();
+        if (jobIdInt) {
+            try { scoreMap = await matchingService.scorePoolAgainstJob(jobIdInt, rows.map(r => r.candidate_id)); }
+            catch (e) { console.error('[recruitment.talentPool] scoring failed:', e.message); }
+        }
+
+        const candidates = rows.map(row => {
+            const live = scoreMap.get(row.candidate_id);
+            return {
+                ...row,
+                skills: (() => {
+                    try { return Array.isArray(row.skills) ? row.skills : JSON.parse(row.skills || '[]'); }
+                    catch { return []; }
+                })(),
+                already_applied: !!row.already_applied,
+                // Prefer the persisted score for applied candidates; otherwise the live one.
+                fit_score: row.fit_score ?? (live ? live.score : null),
+                matched_skills: live ? live.matched_skills : [],
+                missing_skills: live ? live.missing_skills : [],
+            };
+        });
 
         res.json({ success: true, data: candidates, total: countRows[0].total, page: parseInt(page), limit });
     } catch (err) {

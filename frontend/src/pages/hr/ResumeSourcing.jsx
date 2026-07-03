@@ -267,8 +267,11 @@ function PoolCard({ candidate, jobSelected, onAssign, assigning, onViewProfile, 
                         <span className="font-semibold text-sm text-gray-900">{candidate.candidate_name}</span>
                         {candidate.already_applied && <span className="badge-green text-[10px]">Assigned ✓</span>}
                         {!candidate.latest_resume_id && <span className="badge-yellow text-[10px]">No resume</span>}
-                        {candidate.already_applied && candidate.fit_score != null && (
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${SCORE_BG(candidate.fit_score)}`}>
+                        {candidate.fit_score != null && (
+                            <span
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${SCORE_BG(candidate.fit_score)}`}
+                                title={candidate.already_applied ? 'Match score for this JD' : 'Estimated match if assigned to this JD'}
+                            >
                                 {candidate.fit_score}% fit
                             </span>
                         )}
@@ -944,7 +947,7 @@ export default function ResumeSourcing() {
                                         {selectedJob && <> · assigning to <span className="font-medium text-gray-600">{selectedJob.title} — {selectedJob.company_name}</span></>}
                                     </p>
                                     <p className="text-[11px] text-red-400 mt-1">Hired candidates are automatically excluded.</p>
-                                    <p className="text-[11px] text-indigo-400 mt-0.5">Fit score shown on already-assigned candidates. Click "View Profile" to see full details.</p>
+                                    <p className="text-[11px] text-indigo-400 mt-0.5">Every candidate shows a live <b>% fit</b> against this JD. Click "View Profile" for matched/missing skills.</p>
                                 </div>
                             )}
                         </div>
