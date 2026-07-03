@@ -606,9 +606,7 @@ export default function TalentPool() {
                     <select
                         value={matchJob}
                         onChange={e => handleMatchJobChange(e.target.value)}
-                        disabled={!hasPackage}
-                        title={!hasPackage ? 'Select a package to see match %' : ''}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white disabled:bg-gray-50 disabled:text-gray-400"
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
                     >
                         <option value="">— No match scoring —</option>
                         {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
@@ -625,9 +623,6 @@ export default function TalentPool() {
                 <p className="text-xs text-indigo-500 -mt-4 mb-4">
                     Showing each candidate's live <b>% match</b> against <b>{jobs.find(j => String(j.id) === String(matchJob))?.title}</b>. Candidates with no parsed skills yet won't show a score.
                 </p>
-            )}
-            {!hasPackage && (
-                <p className="text-xs text-amber-600 -mt-4 mb-4">🔒 Select a package to enable AI match scoring against your job postings.</p>
             )}
 
             {/* Grid */}

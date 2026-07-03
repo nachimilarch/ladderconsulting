@@ -611,15 +611,15 @@ exports.getTalentPool = async (req, res) => {
         const limit = 24;
         const offset = (Math.max(1, parseInt(page)) - 1) * limit;
 
-        // Optional "match against this JD" — only the company's own active jobs,
-        // and only when they've selected a package (match % is a paid signal).
+        // Optional "match against this JD" — restricted to the company's own jobs.
+        // The AI match % is shown to every company regardless of package status.
         let matchJobId = null;
         if (jobId) {
             const [[ownJob]] = await db.query(
                 `SELECT id FROM job_postings WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
                 [parseInt(jobId), company.id]
             );
-            if (ownJob && companyHasPkg) matchJobId = ownJob.id;
+            if (ownJob) matchJobId = ownJob.id;
         }
 
         const params = [];
