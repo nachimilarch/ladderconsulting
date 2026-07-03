@@ -419,16 +419,37 @@ function titleCase(s) {
 
 const CONJUNCTIONS = new Set(['and', 'or', 'the', 'of', 'in', 'for', 'to', 'a', 'an', 'with', 'by']);
 
+// Words that never appear inside a real person's name but DO appear in the
+// 2–4 word phrases that leak through (section labels, addresses, boilerplate).
+const NON_NAME_WORDS = new Set([
+    'skills', 'skill', 'letter', 'covering', 'cover', 'organization', 'organizations',
+    'organisation', 'organisations', 'location', 'current', 'permanent', 'activities',
+    'activity', 'results', 'result', 'institute', 'institution', 'year', 'course',
+    'cource', 'soft', 'across', 'resources', 'resource', 'declaration', 'objective',
+    'objectives', 'summary', 'profile', 'synopsis', 'apercu', 'details', 'detail',
+    'reference', 'references', 'experience', 'education', 'qualification', 'qualifications',
+    'project', 'projects', 'company', 'designation', 'department', 'present', 'address',
+    'nationality', 'gender', 'marital', 'status', 'hobbies', 'interests', 'languages',
+    'strengths', 'achievements', 'certification', 'certifications', 'training',
+    // address / geography tokens
+    'nagar', 'district', 'road', 'street', 'colony', 'pradesh', 'telangana', 'andhra',
+    'karnataka', 'maharashtra', 'tamil', 'nadu', 'kerala', 'state', 'city', 'india',
+    'mandal', 'village', 'post', 'dist', 'pin', 'plot', 'flat', 'house',
+]);
+
 function looksLikeName(line) {
     if (!line || line.length > 50) return false;
     if (/[@\d]/.test(line)) return false;
     if (/https?:|www\./i.test(line)) return false;
     if (/contact via|profile via/i.test(line)) return false;
+    if (isNoiseName(line)) return false;
     const tokens = line.trim().split(/\s+/);
     if (tokens.length < 2 || tokens.length > 5) return false;
     for (const t of tokens) {
         if (!/^[A-Za-z][A-Za-z.'-]*$/.test(t)) return false;
-        if (SECTION_WORDS.has(t.toLowerCase())) return false;
+        const lower = t.toLowerCase().replace(/[.'-]/g, '');
+        if (SECTION_WORDS.has(lower)) return false;
+        if (NON_NAME_WORDS.has(lower)) return false;
         // Names don't contain conjunctions like "and", "or", "of"
         if (CONJUNCTIONS.has(t.toLowerCase())) return false;
     }
@@ -439,7 +460,78 @@ function isAllCaps(s) {
     return s === s.toUpperCase() && /[A-Z]{2,}/.test(s);
 }
 
+const TITLE_TOKEN = /\b(manager|executive|officer|engineer|developer|analyst|consultant|designer|specialist|architect|administrator|coordinator|accountant|recruiter|director|president|associate|assistant|expertise|professional|admin|synopsis|apercu)\b/i;
+
+// Reject a candidate name string that is really a section header, job title,
+// address fragment, or contains digits — used to gate the all-caps/camelCase
+// fallback passes that don't run through looksLikeName().
+function isNoiseName(str) {
+    if (!str || /\d/.test(str)) return true;
+    if (TITLE_TOKEN.test(str)) return true;
+    const toks = str.toLowerCase().replace(/[.'-]/g, '').split(/\s+/).filter(Boolean);
+    return toks.some(t => NON_NAME_WORDS.has(t) || SECTION_WORDS.has(t));
+}
+
+// A line that is nothing but a "Curriculum Vitae" / "Resume" / "Bio Data" banner.
+// Uses loose curric*/vit* matching to tolerate the common "Curriculam Vitea" typos.
+function isCvHeaderLine(line) {
+    const squashed = line.replace(/[\s._-]+/g, '').toLowerCase();
+    return /^(curric\w*vit\w*|cv|resume|biodata|bio|personalprofile|profile|myprofile)$/.test(squashed);
+}
+
+// A line that is a section header (not a name) — objective, summary, synopsis, etc.
+const HEADER_LINE_RE = /^\s*(career\s+(objective|apercu|summary|profile|synopsis)s?|professional\s+(work\s+)?(summary|synopsis|profile|experience|background)|work\s+experience|objective|summary|profile|synopsis|about\s*(me)?|introduction|personal\s+(details|information|profile)|experience|education)\s*[:\-]?\s*$/i;
+
+// Strip a leading "Curriculum Vitae" / "Resume" / "Bio Data" prefix that some
+// resumes fuse onto the same line as the actual name (typo-tolerant).
+function stripCvPrefix(line) {
+    return line
+        .replace(/^\s*(curric\w*\s+vit\w*|bio\s*-?\s*data|biodata|resume|c\.?\s*v\.?)\s*[:\-]?\s*/i, '')
+        .trim();
+}
+
+// When a name is fused with the first contact label ("D.SHRIDHAREMAIL:...",
+// "SAI DURGA PRASAD.PMobile: ..."), keep only the part before that label.
+function stripFusedContact(line) {
+    return line
+        .replace(/(e-?mail|email\s*id|mobile|phone|contact|mob\b|tel\b|cell\b|linkedin|address|d\.?o\.?b).*$/i, '')
+        .trim();
+}
+
+// Pull the name out of a "Name : Raghu Babu.k" style labelled line.
+function extractLabelledName(lines) {
+    for (const line of lines.slice(0, 12)) {
+        const m = line.match(/^\s*(?:candidate\s+)?name\s*[:\-]\s*(.+)$/i);
+        if (!m) continue;
+        let val = stripFusedContact(m[1]).replace(/[.,\s]+$/, '').trim();
+        // Reject if what follows the label is itself a section word or empty
+        const tokens = val.split(/\s+/).filter(Boolean);
+        if (tokens.length >= 1 && tokens.length <= 5
+            && /^[A-Za-z][A-Za-z.'-]*$/.test(tokens[0])
+            && !SECTION_WORDS.has(tokens[0].toLowerCase())) {
+            return /[a-z]/.test(val) && /[A-Z]/.test(val) ? val : titleCase(val);
+        }
+    }
+    return '';
+}
+
 function extractName(lines, email) {
+    const allLines = lines; // keep the full document for the contact-adjacency pass
+
+    // 0. Labelled "Name: X" — most reliable when present
+    const labelled = extractLabelledName(lines);
+    if (labelled) return labelled;
+
+    // Build a cleaned view of the top lines: drop pure CV/section-header banners,
+    // strip "Curriculum Vitae" prefixes and fused contact labels off the rest.
+    const cleaned = [];
+    for (const raw of lines.slice(0, 14)) {
+        if (isCvHeaderLine(raw) || HEADER_LINE_RE.test(raw)) continue;
+        let l = stripCvPrefix(raw);
+        if (isCvHeaderLine(l) || !l) continue;
+        cleaned.push(l);
+    }
+    lines = cleaned.length ? cleaned : lines;
     // 1. All-caps name split across TWO consecutive short lines — checked first
     //    to prevent headline phrases from being picked up (e.g. MALLIKA / CHANDRASEKHAR)
     for (let i = 0; i < Math.min(lines.length - 1, 8); i++) {
@@ -447,16 +539,30 @@ function extractName(lines, email) {
         const b = lines[i + 1].trim();
         if (isAllCaps(a) && isAllCaps(b) && a.length <= 25 && b.length <= 25
             && /^[A-Z][A-Z. ]+$/.test(a) && /^[A-Z][A-Z. ]+$/.test(b)
-            && !SECTION_WORDS.has(a.toLowerCase()) && !SECTION_WORDS.has(b.toLowerCase())) {
+            && !isNoiseName(a) && !isNoiseName(b)) {
             const combined = `${titleCase(a)} ${titleCase(b)}`.trim();
-            if (combined.split(/\s+/).length >= 2) return combined;
+            if (combined.split(/\s+/).length >= 2 && !isNoiseName(combined)) return combined;
         }
     }
 
-    // 2. Standard single-line name (2–5 tokens, no digits/@, no section words, no conjunctions)
+    // 2. Standard single-line name (2–5 tokens, no digits/@, no section words).
+    //    Strip a fused trailing contact label first ("... PRASAD.PMobile: +91").
     for (const line of lines.slice(0, 8)) {
-        if (looksLikeName(line)) {
-            return /[a-z]/.test(line) && /[A-Z]/.test(line) ? line : titleCase(line);
+        const cand = stripFusedContact(line).replace(/[.,\s]+$/, '').trim();
+        if (looksLikeName(cand)) {
+            return /[a-z]/.test(cand) && /[A-Z]/.test(cand) ? cand : titleCase(cand);
+        }
+    }
+
+    // 2b. "Name Title" on one line — e.g. "T RAMANUJA CHARY HR professional".
+    //     Take the leading 2–4 capitalised tokens before a job-title word.
+    for (const line of lines.slice(0, 6)) {
+        const tm = line.match(/^((?:[A-Z][A-Za-z.'-]*\s+){1,3}[A-Z][A-Za-z.'-]*)\s+(?=[A-Za-z])/);
+        if (!tm) continue;
+        const head = tm[1].trim();
+        const rest = line.slice(tm[0].length);
+        if (TITLE_WORDS.test(rest) && looksLikeName(head)) {
+            return /[a-z]/.test(head) && /[A-Z]/.test(head) ? head : titleCase(head);
         }
     }
 
@@ -471,7 +577,9 @@ function extractName(lines, email) {
         if (!m) continue;
         const firstWord = m[0].match(/^[A-Z][a-z]+/)?.[0]?.toLowerCase();
         if (firstWord && FUSED_SECTION_STARTS.has(firstWord)) continue;
-        return m[0].replace(/([A-Z])/g, ' $1').trim();
+        const split = m[0].replace(/([A-Z])/g, ' $1').trim();
+        if (isNoiseName(split)) continue;
+        return split;
     }
 
     // 4. Fallback: first short ALL-CAPS line; strip "RESUME" prefix if fused
@@ -479,8 +587,23 @@ function extractName(lines, email) {
         let candidate = line.trim();
         if (/^RESUME[A-Z]{3,}/.test(candidate)) candidate = candidate.slice(6);
         if (isAllCaps(candidate) && candidate.length >= 4 && candidate.length <= 30
-            && !SECTION_WORDS.has(candidate.toLowerCase())) {
+            && !isNoiseName(candidate)) {
             return titleCase(candidate);
+        }
+    }
+
+    // 4.5. Name buried near contact info — scan the FULL document for a name-like
+    //      line sitting within one line of a phone/email/"contact" line. Handles
+    //      resumes that lead with an objective and put the name beside contacts.
+    const CONTACT_LINE = /(\+?\d[\d\s().-]{8,}|@|e-?mail|mobile|phone|contact\s*[:#])/i;
+    for (let i = 0; i < allLines.length; i++) {
+        if (!CONTACT_LINE.test(allLines[i])) continue;
+        for (const j of [i - 1, i + 1, i - 2, i + 2]) {
+            if (j < 0 || j >= allLines.length) continue;
+            const cand = stripFusedContact(allLines[j]).replace(/[.,\s]+$/, '').trim();
+            if (looksLikeName(cand) && !TITLE_WORDS.test(cand)) {
+                return /[a-z]/.test(cand) && /[A-Z]/.test(cand) ? cand : titleCase(cand);
+            }
         }
     }
 
@@ -561,8 +684,13 @@ function extractLocation(text) {
 }
 
 // ── Experience (years) ────────────────────────────────────────────────────────
-const EXP_HEADER = /^(work\s+experience|professional\s+experience|professional\s+synopsis|employment(\s+history)?|experience|work\s+history|career\s+history|career\s+highlights?|job\s+experience|professional\s+background|relevant\s+experience|key\s+responsibilities|work\s+summary)\b/i;
-const EXP_STOP = /^(education|academic(s)?|qualifications?|skills|technical\s+skills|core\s+skills|key\s+skills|projects?|certifications?|achievements|awards|publications|languages|interests|hobbies|references|summary|profile|objective|personal\s+details|personal\s+information|about(\s+me)?)\b/i;
+const EXP_HEADER = /^(work\s+experience|professional\s+experience|professional\s+synopsis|employment(\s+history)?|experience|work\s+history|career\s+history|career\s+highlights?|job\s+experience|professional\s+background|relevant\s+experience|work\s+summary|organizational\s+experience|professional\s+work\s+experience)\b/i;
+const EXP_STOP = /^(education|academic(s)?|qualifications?|educational\s+qualif|skills|technical\s+skills|core\s+skills|key\s+skills|projects?|certifications?|achievements|awards|publications|languages|interests|hobbies|references|personal\s+details|personal\s+information|declaration|about(\s+me)?)\b/i;
+
+// Month names (full + abbreviated) and "present/current" cues, for date-range parsing
+const MONTHS_RE = 'jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:t)?(?:ember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?';
+const PRESENT_RE = 'present|current(?:ly)?|till\\s*date|to\\s*date|till\\s*now|ongoing|now|date';
+const DOB_LINE = /date\s*of\s*birth|d\.?\s*o\.?\s*b\b|\bdob\b|\bborn\b|birth\s*date|birthday/i;
 
 function experienceSection(lines) {
     let start = -1;
@@ -576,6 +704,48 @@ function experienceSection(lines) {
         buf.push(lines[j]);
     }
     return buf.join('\n');
+}
+
+// Career span from employment dates — robust to month-year formats, ranges split
+// across lines, "till date"/"present", and date-of-birth contamination.
+function spanFromDates(haystack, nowYear) {
+    const starts = [], ends = [];
+    let sawPresent = false;
+
+    // Complete ranges: (Month? YYYY) sep (Month? YYYY | present)
+    const rangeRe = new RegExp(
+        `(?:${MONTHS_RE})?[\\s,.'’-]*((?:19|20)\\d{2})\\s*(?:[-–—]|to|till|until|through)\\s*` +
+        `(?:(?:${MONTHS_RE})?[\\s,.'’-]*)?((?:19|20)\\d{2}|${PRESENT_RE})`,
+        'gi'
+    );
+    let m;
+    while ((m = rangeRe.exec(haystack)) !== null) {
+        const s = parseInt(m[1], 10);
+        if (s < 1970 || s > nowYear) continue;
+        starts.push(s);
+        if (/^(?:19|20)\d{2}$/.test(m[2])) {
+            const e = parseInt(m[2], 10);
+            if (e >= s && e <= nowYear + 1) ends.push(Math.min(e, nowYear));
+        } else {
+            sawPresent = true;
+        }
+    }
+
+    // Standalone month-anchored years (e.g. "Jan 2024", "April 2016") — these are
+    // almost always employment start/end dates; education uses bare years.
+    const monthYearRe = new RegExp(`(?:${MONTHS_RE})[\\s,.'’-]+((?:19|20)\\d{2})`, 'gi');
+    while ((m = monthYearRe.exec(haystack)) !== null) {
+        const y = parseInt(m[1], 10);
+        if (y >= 1970 && y <= nowYear) { starts.push(y); ends.push(y); }
+    }
+    if (new RegExp(`\\b(?:${PRESENT_RE})\\b`, 'i').test(haystack)) sawPresent = true;
+
+    if (!starts.length) return 0;
+    const minStart = Math.min(...starts);
+    let maxEnd = ends.length ? Math.max(...ends) : minStart;
+    if (sawPresent) maxEnd = Math.max(maxEnd, nowYear);
+    const span = maxEnd - minStart;
+    return (span > 0 && span <= 45) ? span : 0;
 }
 
 function extractExperienceYears(rawText) {
@@ -597,26 +767,32 @@ function extractExperienceYears(rawText) {
     while ((m = re.exec(t)) !== null) {
         const val = parseFloat(m[1]);
         if (val <= 0 || val > 50) continue;
-        const around = t.slice(Math.max(0, m.index - 40), m.index + 40);
+        const around = t.slice(Math.max(0, m.index - 45), m.index + 45);
         if (/experien|exp\b|work|industry|professional|career|relevant|overall|total/.test(around)) {
             explicit = Math.max(explicit, val);
         }
     }
     if (explicit > 0) return explicit;
 
-    // 2. Sum date ranges in experience section
-    //    Handle approximate prefix ~, en-dash –, em-dash —
+    // 2. Career span from employment date ranges, computed ONLY within the
+    //    isolated experience section. Scanning the whole document catches stray
+    //    project/certification/graduation dates and wildly over-counts, so a
+    //    missing section header means we skip this step rather than guess high.
+    //    Strip DOB lines first so a birth year can't drag the earliest start back.
     const nowYear = new Date().getFullYear();
-    const section = experienceSection(rawText.split('\n').map(l => l.trim()));
-    const haystack = section || rawText;
-    const ranges = [...haystack.matchAll(/~?\s*((?:19|20)\d{2})\s*[-–—to]+\s*~?\s*((?:19|20)\d{2}|present|current|now|till\s+date|ongoing|date)/gi)];
-    let total = 0;
-    for (const r of ranges) {
-        const start = parseInt(r[1], 10);
-        const end = /^(?:19|20)\d{2}$/.test(r[2].trim()) ? parseInt(r[2].trim(), 10) : nowYear;
-        if (end >= start && end - start <= 40) total += (end - start);
+    const cleanLines = rawText.split('\n').filter(l => !DOB_LINE.test(l)).map(l => l.trim());
+    const section = experienceSection(cleanLines);
+    if (section) {
+        const span = spanFromDates(section.toLowerCase(), nowYear);
+        if (span > 0) return span;
     }
-    if (total > 0) return Math.min(total, 50);
+
+    // 3. Last resort: a single open-ended "since/from <Month?> YYYY"
+    const since = t.match(new RegExp(`(?:since|from|w\\.e\\.f\\.?)\\s+(?:${MONTHS_RE})?[\\s,.'’-]*((?:19|20)\\d{2})`, 'i'));
+    if (since) {
+        const s = parseInt(since[1], 10);
+        if (s >= 1970 && s <= nowYear) return Math.min(nowYear - s, 45);
+    }
 
     return 0;
 }
@@ -624,8 +800,8 @@ function extractExperienceYears(rawText) {
 // ── Education ─────────────────────────────────────────────────────────────────
 const DEGREES = [
     [/\bph\.?\s?d\b|doctorate/i, 'PhD'],
-    [/\bm\.?\s?tech\b|master\s+of\s+technology/i, 'M.Tech'],
-    [/\bb\.?\s?tech\b|bachelor\s+of\s+technology/i, 'B.Tech'],
+    [/\bm\.?[-\s]*tech\b|master\s+of\s+technology/i, 'M.Tech'],
+    [/\bb\.?[-\s]*tech\b|bachelor\s+of\s+technology/i, 'B.Tech'],
     [/\bmba\b|\bm\.b\.a\.?\b|master\s+of\s+business\s+administration/i, 'MBA'],
     [/\bbba\b|\bb\.b\.a\.?\b|bachelor\s+of\s+business/i, 'BBA'],
     [/\bmca\b|\bm\.c\.a\.?\b|master\s+of\s+computer\s+applications/i, 'MCA'],
@@ -638,10 +814,14 @@ const DEGREES = [
     [/\bb\.e\b|bachelor\s+of\s+engineering/i, 'B.E'],
     [/\bm\.a\b|master\s+of\s+arts/i, 'M.A'],
     [/\bb\.a\b|bachelor\s+of\s+arts/i, 'B.A'],
-    [/\bpgd\b|post\s*graduate\s+diploma/i, 'PGD'],
+    [/\bpgd(m|ba)?\b|post\s*graduate\s+diploma/i, 'PGD'],
     [/\bdiploma\b/i, 'Diploma'],
     [/10\+2|\bintermediate\b|\bhsc\b|higher\s+secondary/i, 'HSC'],
     [/\b10th\b|\bssc\b|matriculation\b|secondary\s+school/i, 'SSC'],
+    // Generic written-out degrees — kept LAST so specific ones above win first.
+    // Handles "Master's Degree in Business Administration", "Bachelor's Degree in Commerce".
+    [/master(?:['’]s)?\s+degree|post[\s-]*graduat(?:e|ion)|\bpost\s*grad\b/i, "Master's Degree"],
+    [/bachelor(?:['’]s)?\s+degree|under[\s-]*graduat(?:e|ion)|\bgraduation\b/i, "Bachelor's Degree"],
 ];
 
 const INSTITUTION_RE = /(university|institution|institute|college|school|academy|polytechnic|iit|iim|nit|iiit|bits|management|business\s+school)/i;
@@ -803,6 +983,41 @@ function extractSummary(text) {
     return '';
 }
 
+// ── Recruiter filename parser ─────────────────────────────────────────────────
+// Executive-sourced resumes follow the convention
+//   "NN_-_First_last_-_Designation_-_X_Yrs_Y_Month.pdf"
+// where the recruiter has hand-verified both the candidate's name and their total
+// years of experience. That is a far more reliable signal than anything we can
+// scrape out of wildly-formatted resume bodies, so we trust it when present.
+function parseRecruiterFilename(fileName = '') {
+    const out = { name: '', experienceYears: null };
+    if (!fileName) return out;
+    const base = String(fileName)
+        .replace(/\.(pdf|docx?|doc)$/i, '')
+        .replace(/\s*\(\d+\)\s*$/, '')     // drop " (1)" dedupe suffixes
+        .trim();
+
+    // Experience: "17 Yrs 0 Month" / "11 Yrs 6 Months" (underscores or spaces)
+    const em = base.match(/(\d{1,2})[\s_]*Yrs?[\s_]*(\d{1,2})?[\s_]*Month/i);
+    if (em) {
+        const yrs = parseInt(em[1], 10);
+        const mos = em[2] ? parseInt(em[2], 10) : 0;
+        if (yrs >= 0 && yrs <= 50) out.experienceYears = Math.round((yrs + mos / 12) * 100) / 100;
+    }
+
+    // Name: the segment between the leading serial number and the designation,
+    // delimited by "_-_" / " - ". Falls back gracefully for non-convention names.
+    const parts = base.split(/_-_|\s+-\s+|_-|-_/).map(s => s.replace(/_/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+    if (parts.length >= 2) {
+        // parts[0] is usually the serial ("93"); the name is the first non-numeric segment
+        let seg = /^\d+$/.test(parts[0]) ? parts[1] : parts[0].replace(/^\d+\s*/, '').trim();
+        if (seg && seg.length >= 3 && seg.length <= 45 && !/\d|@/.test(seg) && !isNoiseName(seg)) {
+            out.name = titleCase(seg);
+        }
+    }
+    return out;
+}
+
 // ── Public composite parsers ──────────────────────────────────────────────────
 function parseFullProfile(text) {
     const raw = normalizeText(String(text || ''));
@@ -842,4 +1057,6 @@ module.exports = {
     parseResumeText,
     extractSkills,
     extractJobSkills,
+    parseRecruiterFilename,
+    isNoiseName,
 };

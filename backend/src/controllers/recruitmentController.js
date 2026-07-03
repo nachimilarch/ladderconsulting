@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const { parseFullProfile } = require('../utils/aiParser');
+const { parseRecruiterFilename, isNoiseName } = require('../utils/resumeParser');
 const { maskResumeText } = require('../utils/maskPII');
 const matchingService = require('../services/matchingService');
 const { isCandidateHired } = require('../utils/candidateStatus');
@@ -130,7 +131,27 @@ const processResumeItem = async (item, job, uploadedBy) => {
     }
 
     const email = (profile.email || '').trim().toLowerCase();
-    const name = (profile.full_name || '').trim();
+
+    // The recruiter-verified filename ("NN_-_Name_-_Designation_-_X_Yrs_Y_Month")
+    // is the most reliable source of the candidate's name and total experience for
+    // executive-sourced uploads. Prefer it over the noisier text-scraped values:
+    //   • name — use the filename name when the body parse is empty or looks like a
+    //     section header / job title / address fragment (isNoiseName).
+    //   • experience — use the filename figure whenever it is a real (>0) number.
+    const fromFile = parseRecruiterFilename(item.file_name);
+    let name = (profile.full_name || '').trim();
+    if (fromFile.name) {
+        // Keep the body-parsed name only when it clearly agrees with the recruiter's
+        // filename (shares at least one token — the parse just formats it better).
+        // Otherwise the parse is empty/noise/fused garbage → trust the filename.
+        const ftok = new Set(fromFile.name.toLowerCase().split(/\s+/).filter(Boolean));
+        const shares = name && name.toLowerCase().split(/\s+/).some(t => ftok.has(t));
+        if (!name || isNoiseName(name) || !shares) name = fromFile.name;
+    }
+    const experienceYears = (fromFile.experienceYears != null && fromFile.experienceYears > 0)
+        ? fromFile.experienceYears
+        : (profile.experience_years || 0);
+
     if (!EMAIL_RE.test(email)) {
         await mark('failed', { name, error: 'No valid email address found in the resume.' });
         return 'failed';
@@ -215,7 +236,7 @@ const processResumeItem = async (item, job, uploadedBy) => {
              portfolio_url    = COALESCE(NULLIF(portfolio_url, ''), VALUES(portfolio_url)),
              education        = COALESCE(education, VALUES(education))`,
         [candidateId, profile.headline || null, profile.summary || null,
-         profile.experience_years || 0, profile.location || null,
+         experienceYears || 0, profile.location || null,
          profile.linkedin_url || null, profile.portfolio_url || null,
          profile.education?.length ? JSON.stringify(profile.education) : null]
     );
