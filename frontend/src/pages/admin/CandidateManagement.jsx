@@ -44,7 +44,7 @@ export default function CandidateManagement() {
     const openDetail = async (id) => {
         try {
             const r = await adminCandidateAPI.getDetail(id);
-            setSelected(r.data);
+            setSelected(r.data?.data ?? r.data);
         } catch {
             toast.error('Failed to load candidate details');
         }

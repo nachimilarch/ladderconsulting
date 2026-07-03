@@ -56,6 +56,7 @@ const sendGraphMail = async ({
     const senderAddr = fromParsed?.address || process.env.SMTP_USER || process.env.GODADDY_SMTP_USER;
 
     const toList = (Array.isArray(to) ? to : [to]).filter(Boolean);
+    if (toList.length === 0) throw new Error('sendGraphMail: no recipients provided');
     const toRecipients = toList.map(addr => {
         const p = parseAddr(addr);
         return { emailAddress: p || { address: addr } };

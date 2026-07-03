@@ -332,9 +332,9 @@ exports.listCandidates = async (req, res) => {
         }
 
         const [candidates] = await db.query(
-            `SELECT u.id, u.name, u.email, u.status, u.created_at,
+            `SELECT u.id, u.name AS full_name, u.email, u.status, u.created_at,
                     c.id AS candidate_id,
-                    cp.current_location, cp.total_experience, cp.headline,
+                    cp.current_location AS location, cp.total_experience AS experience_years, cp.headline,
                     COUNT(DISTINCT a.id) AS application_count,
                     COUNT(DISTINCT cert.id) AS certificate_count
              FROM users u
@@ -372,8 +372,10 @@ exports.listCandidates = async (req, res) => {
 exports.getCandidateDetail = async (req, res) => {
     try {
         const [[user]] = await db.query(
-            `SELECT u.id, u.name, u.email, u.phone, u.status, u.created_at,
-                    cp.headline, cp.summary, cp.total_experience, cp.current_location,
+            `SELECT u.id, u.name AS full_name, u.email, u.phone, u.status, u.created_at,
+                    cp.headline, cp.summary,
+                    cp.total_experience AS experience_years,
+                    cp.current_location AS location,
                     cp.expected_salary, cp.notice_period_days
              FROM users u
              JOIN roles ro ON ro.id = u.role_id
@@ -422,7 +424,7 @@ exports.getCandidateDetail = async (req, res) => {
             [cand.id]
         ) : [[]];
 
-        res.json({ success: true, data: { ...user, applications, skills: skills.map(s => s.name), training, certificates: certs, application_count: applications.length, training_count: training.length, certificate_count: certs.length } });
+        res.json({ success: true, data: { ...user, candidate_id: cand?.id ?? null, applications, skills: skills.map(s => s.name), training, certificates: certs, application_count: applications.length, training_count: training.length, certificate_count: certs.length } });
     } catch (err) {
         console.error('getCandidateDetail:', err);
         res.status(500).json({ success: false, message: 'Failed to fetch candidate detail.' });
