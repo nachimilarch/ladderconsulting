@@ -21,6 +21,7 @@ export const resumeAPI = {
 
 export const jobAPI = {
     getJobs: (params) => api.get('/candidates/jobs', { params }),
+    getJob:  (id)     => api.get(`/candidates/jobs/${id}`),
     getMatched: (params) => api.get('/jobs/matched', { params }),
 };
 

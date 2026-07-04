@@ -240,6 +240,49 @@ router.get('/jobs', authenticateToken, authorizeRole('candidate'), async (req, r
     }
 });
 
+// ── GET /api/candidates/jobs/:id ──────────────────────────────────────────────
+// Full job requirement for the candidate: complete description + requirements +
+// required/preferred skills + this candidate's application status.
+router.get('/jobs/:id', authenticateToken, authorizeRole('candidate'), async (req, res) => {
+    try {
+        const candidateId = await getCandidateId(req.user.id);
+
+        const [[job]] = await db.query(
+            `SELECT jp.id, jp.title, jp.description, jp.requirements, jp.location,
+                    jp.job_type, jp.work_mode, jp.salary_min, jp.salary_max,
+                    jp.experience_min, jp.experience_max, jp.openings, jp.deadline,
+                    jp.created_at,
+                    co.company_name, co.industry, co.headquarters, co.website,
+                    CASE WHEN a.id IS NOT NULL THEN 1 ELSE 0 END AS already_applied,
+                    a.status AS application_status
+             FROM job_postings jp
+             JOIN companies co ON co.id = jp.company_id AND co.deleted_at IS NULL
+             LEFT JOIN applications a
+               ON a.job_id = jp.id AND a.candidate_id = ? AND a.deleted_at IS NULL
+             WHERE jp.id = ? AND jp.status = 'active' AND jp.deleted_at IS NULL`,
+            [candidateId, req.params.id]
+        );
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found or no longer active.' });
+
+        const [skills] = await db.query(
+            `SELECT st.name, jsv.is_mandatory
+             FROM job_skill_vectors jsv
+             JOIN skill_tags st ON st.id = jsv.skill_tag_id
+             WHERE jsv.job_id = ?
+             ORDER BY jsv.is_mandatory DESC, st.name`,
+            [job.id]
+        );
+        job.required_skills  = skills.filter(s => s.is_mandatory).map(s => s.name);
+        job.preferred_skills = skills.filter(s => !s.is_mandatory).map(s => s.name);
+        job.is_hired = await isCandidateHired(candidateId);
+
+        res.json({ success: true, data: job });
+    } catch (err) {
+        console.error('[job detail]', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch job detail.' });
+    }
+});
+
 // ── POST /api/candidates/resume ──────────────────────────────────────────────
 router.post('/resume', authenticateToken, authorizeRole('candidate'), (req, res, next) => {
     uploadResume.single('resume')(req, res, (err) => {
