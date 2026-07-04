@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { profileAPI, jobAPI, aiAPI } from '../../api/candidate';
+import JobDetailModal from '../../components/candidate/JobDetailModal';
 
 export default function CandidateDashboard() {
     const { user } = useAuth();
@@ -10,6 +11,7 @@ export default function CandidateDashboard() {
     const [loading, setLoading] = useState(true);
     const [topJobs, setTopJobs] = useState([]);
     const [rematching, setRematching] = useState(false);
+    const [detailJobId, setDetailJobId] = useState(null);
 
     const fetchProfile = () => {
         profileAPI.get()
@@ -172,12 +174,17 @@ export default function CandidateDashboard() {
                 {topJobs.length > 0 ? (
                     <div className="flex flex-col gap-3">
                         {topJobs.map(job => (
-                            <div key={job.id} className="card-p flex items-center justify-between gap-4">
+                            <div
+                                key={job.id}
+                                onClick={() => setDetailJobId(job.id)}
+                                className="card-p flex items-center justify-between gap-4 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
+                            >
                                 <div className="flex-1 min-w-0">
                                     <p className="font-semibold text-gray-900 truncate">{job.title}</p>
                                     <p className="text-xs text-gray-500 truncate">
                                         {job.company_name}{job.location ? ` • ${job.location}` : ''}
                                     </p>
+                                    <span className="text-[11px] text-indigo-600 font-medium">View full details →</span>
                                 </div>
                                 <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
                                     job.match_score >= 80 ? 'bg-green-100 text-green-700' :
@@ -206,6 +213,10 @@ export default function CandidateDashboard() {
                     </div>
                 )}
             </div>
+
+            {detailJobId && (
+                <JobDetailModal jobId={detailJobId} onClose={() => setDetailJobId(null)} />
+            )}
         </div>
     );
 }
