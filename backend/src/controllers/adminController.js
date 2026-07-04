@@ -47,6 +47,7 @@ exports.listCompanies = async (req, res) => {
             `SELECT co.id, co.company_name, co.industry, co.size, co.is_approved, co.created_at,
                     co.headquarters, co.website,
                     u.id AS user_id, u.name AS contact_name, u.email, u.status,
+                    (u.last_login_at IS NULL) AS never_logged_in,
                     COUNT(DISTINCT jp.id) AS job_count,
                     COUNT(DISTINCT he.id) AS hire_count,
                     CASE
@@ -60,7 +61,7 @@ exports.listCompanies = async (req, res) => {
              LEFT JOIN hired_employees he ON he.company_id = co.id AND he.deleted_at IS NULL
              WHERE co.deleted_at IS NULL ${statusWhere}
              GROUP BY co.id, co.company_name, co.industry, co.size, co.is_approved, co.created_at,
-                      co.headquarters, co.website, u.id, u.name, u.email, u.status
+                      co.headquarters, co.website, u.id, u.name, u.email, u.status, u.last_login_at
              ORDER BY co.created_at DESC`
         );
         res.json({ success: true, data: companies });
@@ -77,7 +78,7 @@ exports.getCompanyDetail = async (req, res) => {
         // First try: by companies.id (approved/existing companies)
         let [[company]] = await db.query(
             `SELECT co.*, u.name AS contact_name, u.email, u.phone AS contact_phone, u.status,
-                    u.id AS user_id,
+                    u.id AS user_id, (u.last_login_at IS NULL) AS never_logged_in,
                     CASE WHEN u.status = 'suspended' THEN 'suspended'
                          WHEN co.is_approved = 1 THEN 'approved' ELSE 'pending'
                     END AS company_status
@@ -154,6 +155,16 @@ exports.approveCompany = async (req, res) => {
 
         if (company.company_id) {
             await db.query('UPDATE companies SET is_approved = 1 WHERE id = ?', [company.company_id]);
+        } else {
+            // Approved before the company ever logged in → no companies row exists yet.
+            // Create it now so the company is immediately visible and manageable in the
+            // admin Companies section (assign executive, set fee, etc.). getOrCreateCompany
+            // on the company's first login is idempotent and reuses this row.
+            const [ins] = await db.query(
+                'INSERT INTO companies (user_id, company_name, is_approved) VALUES (?, ?, 1)',
+                [company.user_id, company.company_name]
+            );
+            company.company_id = ins.insertId;
         }
         await db.query(`UPDATE users SET status = 'active' WHERE id = ?`, [company.user_id]);
         await db.query(

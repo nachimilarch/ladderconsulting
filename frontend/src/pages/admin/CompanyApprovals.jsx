@@ -4,7 +4,16 @@ import toast from 'react-hot-toast';
 
 const STATUS_TABS = ['pending', 'approved', 'suspended', 'all'];
 
-const statusBadge = (s) => {
+const statusBadge = (s, neverLoggedIn = false) => {
+    // Approved companies that have never logged in get a distinct colour + label
+    // so admins can tell they're onboarded but haven't signed in yet.
+    if (s === 'approved' && neverLoggedIn) {
+        return (
+            <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 whitespace-nowrap">
+                Approved · Not logged in
+            </span>
+        );
+    }
     const map = {
         pending:   'bg-yellow-100 text-yellow-700',
         approved:  'bg-green-100 text-green-700',
@@ -197,7 +206,7 @@ export default function CompanyApprovals() {
                                         <td className="px-4 py-3 text-gray-500">{c.email}</td>
                                         <td className="px-4 py-3 text-gray-500">{c.industry || '—'}</td>
                                         <td className="px-4 py-3 text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
-                                        <td className="px-4 py-3">{statusBadge(c.company_status)}</td>
+                                        <td className="px-4 py-3">{statusBadge(c.company_status, c.never_logged_in)}</td>
                                         <td className="px-4 py-3">
                                             <button
                                                 onClick={() => openDetail(c.id)}
@@ -232,13 +241,13 @@ export default function CompanyApprovals() {
                                 ['Size', detail.company_size || detail.size],
                                 ['Location', detail.location || detail.headquarters],
                                 ['Website', detail.website],
-                                ['Status', detail.company_status],
+                                ['Status', statusBadge(detail.company_status, detail.never_logged_in)],
                                 ['Job Postings', detail.job_count],
                                 ['Applications', detail.application_count],
                             ].map(([k, v]) => v != null && (
-                                <div key={k} className="flex justify-between">
-                                    <dt className="text-gray-500">{k}</dt>
-                                    <dd className="font-medium text-gray-700 truncate max-w-[140px]">{v}</dd>
+                                <div key={k} className="flex justify-between gap-3">
+                                    <dt className="text-gray-500 shrink-0">{k}</dt>
+                                    <dd className="font-medium text-gray-700 text-right truncate max-w-[190px]">{v}</dd>
                                 </div>
                             ))}
                         </dl>
