@@ -82,6 +82,15 @@
   .toc{ font-size:10pt; } .toc li{ margin:4px 0; } .toc b{ color:var(--violet); }
   .small{ font-size:8.8pt; color:var(--muted); }
 
+  /* step-by-step playbooks */
+  .pb-group{ font-size:11pt; font-weight:700; color:var(--violet-d); margin:14pt 0 4pt; text-transform:uppercase; letter-spacing:.4px; }
+  .pb{ border:1px solid var(--line); border-left:4px solid var(--violet); border-radius:8px; padding:9px 14px; margin:7pt 0; page-break-inside:avoid; background:#fcfbfe; }
+  .pb h4{ margin:0 0 2px; color:#241a4a; font-size:10.6pt; }
+  .pb .goal{ font-size:8.7pt; color:var(--muted); margin:0 0 5px; font-style:italic; }
+  .pb ol{ margin:2pt 0; padding-left:20px; counter-reset:step; }
+  .pb ol li{ margin:3pt 0; font-size:9.6pt; }
+  .pb .where{ display:inline-block; font-size:7.8pt; font-weight:700; background:var(--violet-l); color:var(--violet); padding:1.5px 7px; border-radius:20px; margin-bottom:5px; }
+
   .cover .logo-panel{ background:#fff; border-radius:18px; padding:24px 40px; margin-bottom:30px; box-shadow:0 14px 40px rgba(0,0,0,.28); }
   .cover .logo-panel img{ width:320px; height:auto; display:block; }
   .footer-logo{ height:22px; vertical-align:middle; margin-right:7px; }
@@ -96,8 +105,8 @@
   <h1>Standard Operating Procedure</h1>
   <div class="sub">HR Executives &amp; Support Team — Operations Handbook</div>
   <div class="tag">LadderStep Human Consulting · Recruitment &amp; Outreach Platform</div>
-  <div class="meta">Version 2.0 (Detailed &amp; Illustrated) · Last updated 3 July 2026<br>
-  Covers: all login types · complete application flow · every executive workflow</div>
+  <div class="meta">Version 2.1 (Detailed &amp; Illustrated) · Last updated 5 July 2026<br>
+  Covers: all login types · complete application flow · every executive workflow · step-by-step playbooks</div>
 </div>
 
 <!-- ============ CONTENTS ============ -->
@@ -108,6 +117,7 @@
   <li><b>Part C — The Complete Application Flow:</b> the 10-stage placement lifecycle</li>
   <li><b>Part D — Executive Workflows in Detail:</b> outreach, leads, sourcing, interviews, offers, invoicing</li>
   <li><b>Part E — Rules, Locks, Money &amp; Reference:</b> business rules, do's/don'ts, FAQ, glossary</li>
+  <li><b>Part F — Step-by-Step Playbooks:</b> click-by-click instructions for every task you do</li>
 </ol>
 <div class="legend">
   <span><i class="sw" style="background:var(--violet)"></i> HR Executive</span>
@@ -462,9 +472,11 @@
 <div class="cards">
   <div class="card t-exec"><h4>1 · Upload Résumés</h4><p>Two modes: <b>🎯 Target a Job</b> (adds applicants + fit scores) or <b>🗂️ Free Pool</b> (no JD). Up to 20 files, PDF/DOC/DOCX, 5&nbsp;MB each.</p></div>
   <div class="card t-exec"><h4>2 · Free Pool</h4><p>Every available candidate, independent of any job. Search by skill/experience. Click a name → full profile. Hired candidates excluded.</p></div>
-  <div class="card t-exec"><h4>3 · Assign from Pool</h4><p>Pick a JD → assign pool candidates to it. Assigned ones show a <b>fit-score badge</b> + matched/missing skills.</p></div>
+  <div class="card t-exec"><h4>3 · Assign from Pool</h4><p>Pick a JD → <b>every</b> candidate shows a live <b>% fit</b> against it. Assign the good ones with one click.</p></div>
   <div class="card t-exec"><h4>4 · Company Interests</h4><p>Company "Express Interest" requests land here. Review → assign to their JD → <b>Assign &amp; Notify</b>. Blocked if candidate is hired.</p></div>
 </div>
+<div class="callout c-info"><b>🔎 Click any candidate to open their full profile.</b> From any tab (or the upload history), clicking a candidate opens a side panel with their <b>real name, email, phone, LinkedIn, skills (with proficiency), education, experience, and résumés on file</b>. When you opened it from a job context, the panel also shows the <b>fit score</b> for that JD plus the exact <b>matched</b> and <b>missing</b> skills — so you can judge suitability before assigning.</div>
+<div class="callout c-tip"><b>💯 Live match scoring.</b> In <b>Assign from Pool</b>, once you pick a JD every pool candidate gets a colour-coded <b>% fit</b> badge (green ≥70, amber ≥40, red below) — computed on the spot from their skills vs the JD, even for candidates who haven't applied. Use it to shortlist the strongest matches fast.</div>
 <h4>What happens automatically to each uploaded résumé</h4>
 <div class="fig no-break">
 <svg viewBox="0 0 760 96" role="img">
@@ -538,6 +550,7 @@
   <div class="card t-company"><span class="pill p-company">₹3,999</span><h4>4-Pack</h4><p>4 credits, no expiry. Same reveal as Single. No placement fee later (prepaid).</p></div>
   <div class="card t-company" style="border-top-color:var(--green)"><span class="pill p-cand">CONTRACTED %</span><h4>Platinum</h4><p>Free, unlimited unlocks — but résumé stays <b>masked</b>; reach the candidate <b>through you</b>; <b>placement fee applies at hire</b>.</p></div>
 </div>
+<div class="callout c-info"><b>Companies see AI match % too.</b> In their Talent Pool a company can pick one of their own jobs from a <b>"🎯 Match against job"</b> selector and every candidate shows a live <b>% match</b> — available to <b>all</b> companies regardless of package. This mirrors what you see in <b>Assign from Pool</b>, so you and the client are looking at the same scores.</div>
 
 <h3>D8. The "off the market" locks</h3>
 <div class="fig no-break">
@@ -619,8 +632,156 @@
 <tr><td>GATE 1 / GATE 2</td><td>Your mandatory interview-approval and offer-approval steps</td></tr>
 </table>
 
+<!-- ============ PART F ============ -->
+<h2 class="page-break">Part F · Step-by-Step Playbooks</h2>
+<p>Click-by-click instructions for everything you do. Each playbook names the screen it starts on (the violet chip) and lists the exact steps in order.</p>
+
+<h3>F0. First time in — logging in</h3>
+<div class="pb">
+    <span class="where">Login page</span>
+    <h4>Log in as an HR Executive</h4>
+    <p class="goal">You must have been added by an admin first (with your exact work email).</p>
+    <ol>
+        <li>Open the app's <b>Login</b> page.</li>
+        <li>Click <b>“Sign in with Microsoft.”</b></li>
+        <li>Choose/enter the Microsoft 365 account whose email <b>matches the one an admin registered</b> for you.</li>
+        <li>You land on the <b>HR Dashboard</b> (<code>/hr</code>). If you see “account not found,” ask an admin to add you in <b>HR Staff Management</b>.</li>
+    </ol>
+</div>
+
+<div class="pb-group">A · Outreach &amp; Leads</div>
+
+<div class="pb">
+    <span class="where">Outreach → Contact Lists</span>
+    <h4>1 · Upload a contact list</h4>
+    <ol>
+        <li>Go to <b>Outreach → Contact Lists → Upload.</b></li>
+        <li>Select your Excel/CSV file (columns like Name, Email, Phone, Company, Designation, City are auto-mapped).</li>
+        <li>Wait for the import to finish — rows with no email <i>and</i> no phone are skipped and listed in the import report; duplicates are removed.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">Outreach → Email Campaigns</span>
+    <h4>2 · Send a cold email campaign</h4>
+    <ol>
+        <li><b>Outreach → Email Campaigns → New.</b></li>
+        <li>Pick a contact list, write the <b>subject</b> and <b>body</b>. Personalise with tags: <code>{{first_name}}</code>, <code>{{company_name}}</code>, <code>{{designation}}</code>, <code>{{city}}</code>, <code>{{executive_name}}</code>.</li>
+        <li>Click <b>Save</b> (draft), review, then <b>Send</b>. It sends in batches of 20; use <b>Pause</b> to stop mid-send.</li>
+        <li>Track opens/replies under the campaign and in <b>Replies</b>.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">Outreach → Replies</span>
+    <h4>3 · Turn a reply into a lead</h4>
+    <ol>
+        <li>Open <b>Outreach → Replies</b> and click a reply (it auto-marks as read).</li>
+        <li>Choose an action: <b>Reply</b> (threaded), <b>Convert to Lead</b>, or <b>Ignore</b>.</li>
+        <li><b>Convert to Lead</b> creates the lead in your pipeline and links the contact — now nurture it in <b>Lead Pipeline</b>.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">HR → Lead Pipeline</span>
+    <h4>4 · Move a lead through the pipeline</h4>
+    <ol>
+        <li>Open <b>HR → Lead Pipeline</b> and click a lead.</li>
+        <li>Log calls, add notes, and change the <b>stage</b>: <code>new → contacted → interested → proposal → converted</code> (or <code>lost</code>).</li>
+        <li>When the client agrees to onboard, they sign up with Google and an <b>admin approves</b> them.</li>
+    </ol>
+</div>
+
+<div class="pb-group">B · Sourcing candidates</div>
+
+<div class="pb">
+    <span class="where">HR → Resume Sourcing → Upload Résumés</span>
+    <h4>5 · Source résumés against a job</h4>
+    <ol>
+        <li><b>HR → Resume Sourcing → Upload Résumés</b> → choose <b>🎯 Target a Job.</b></li>
+        <li>Select the client's active job from the list.</li>
+        <li>Drag &amp; drop up to <b>20 résumés</b> (PDF/DOC/DOCX, 5&nbsp;MB each). Name them <code>Serial - Name - Designation - X Yrs Y Month.pdf</code> for accurate parsing.</li>
+        <li>Click <b>Upload.</b> Each résumé is parsed, a candidate is created, and a <b>fit score</b> is computed. Watch progress in <b>Upload History.</b></li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">HR → Resume Sourcing → Upload Résumés</span>
+    <h4>6 · Add résumés to the free pool (no job yet)</h4>
+    <ol>
+        <li>Same screen → choose <b>🗂️ Free Talent Pool.</b></li>
+        <li>Drag &amp; drop the résumés and click <b>Upload.</b></li>
+        <li>Candidates are parsed and land in the <b>Free Pool</b> / <b>Assign from Pool</b> tabs, ready to match to a JD later.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">HR → Resume Sourcing (any tab)</span>
+    <h4>7 · Review a candidate's full profile &amp; fit</h4>
+    <ol>
+        <li>In any tab (Free Pool, Assign from Pool, Company Interests) or the upload history, <b>click the candidate's name / “View Profile.”</b></li>
+        <li>A side panel opens with <b>name, email, phone, LinkedIn, skills, education, experience, and résumés.</b></li>
+        <li>If you opened it against a job, you'll also see the <b>fit score</b> and the exact <b>matched</b> vs <b>missing</b> skills — use this to decide before assigning.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">HR → Resume Sourcing → Assign from Pool</span>
+    <h4>8 · Assign a pool candidate to a job</h4>
+    <ol>
+        <li>Open <b>Assign from Pool</b> and pick the client <b>job</b> on the left.</li>
+        <li>Every candidate now shows a live <b>% fit</b> badge (green/amber/red). Filter by skill/experience if needed.</li>
+        <li>Click <b>Assign to JD</b> on a strong match — the candidate becomes an applicant on that job.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">HR → Resume Sourcing → Company Interests</span>
+    <h4>9 · Action a company's “Express Interest”</h4>
+    <ol>
+        <li>Open the <b>Company Interests</b> tab (the count shows unread requests).</li>
+        <li>Click <b>View Profile</b> to check the candidate.</li>
+        <li>Select one of that company's open jobs → <b>Assign &amp; Notify.</b> (Blocked with a red flag if the candidate was hired elsewhere — propose an alternative.)</li>
+    </ol>
+</div>
+
+<div class="pb-group">C · Approvals (your revenue gates)</div>
+
+<div class="pb">
+    <span class="where">HR → Interview Requests</span>
+    <h4>10 · Approve (or reject) an interview request — GATE 1</h4>
+    <ol>
+        <li>Open <b>HR → Interview Requests</b> (your pending queue).</li>
+        <li>Click a request to see the proposed date/time, mode, and notes.</li>
+        <li>Choose <b>Approve</b>, <b>Reject</b>, or <b>Reschedule.</b> On <b>Approve</b>, the interview slot is created and the company + candidate are notified.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">HR → Scheduled Interviews</span>
+    <h4>11 · Confirm an interview for a sourced candidate</h4>
+    <ol>
+        <li>Open <b>HR → Scheduled Interviews.</b> Sourced candidates are flagged <b>“never logged in.”</b></li>
+        <li>Use their real contact details shown there to reach out and confirm the time.</li>
+        <li>Click <b>Confirm on behalf</b> to confirm the slot for the candidate.</li>
+    </ol>
+</div>
+<div class="pb">
+    <span class="where">HR → Offer Requests</span>
+    <h4>12 · Approve an offer &amp; raise the placement fee — GATE 2</h4>
+    <ol>
+        <li>Open <b>HR → Offer Requests</b> and click the offer-letter-release request (it shows the offered <b>annual CTC</b>).</li>
+        <li>Review, then <b>Approve.</b> This unlocks the offer letter for the company <b>and</b> raises the placement-fee invoice (due in 14 days).</li>
+        <li>If the candidate was <b>prepaid</b> (unlocked via Single/4-Pack), the fee is auto-waived and no invoice is raised — nothing more to do.</li>
+    </ol>
+</div>
+
+<div class="pb-group">D · Billing</div>
+
+<div class="pb">
+    <span class="where">HR → Invoices</span>
+    <h4>13 · Raise &amp; track an invoice</h4>
+    <ol>
+        <li>Open <b>HR → Invoices.</b> Placement-fee invoices from approved offers appear automatically.</li>
+        <li>To raise a service invoice, create one and pick the company (only companies <b>assigned to you</b> appear).</li>
+        <li>Track <b>amount paid / status / due date</b> — the company pays via Cashfree on their Payments page; the bar updates as they pay (partial or full).</li>
+    </ol>
+</div>
+
 <hr style="margin-top:20pt;border:none;border-top:1px solid var(--line)">
-<p class="small" style="text-align:center">This SOP reflects the platform as configured for LadderStep Human Consulting. For access changes (new staff, company approvals, fee rates), contact an Admin. · v2.0 · 3 July 2026</p>
+<p class="small" style="text-align:center">This SOP reflects the platform as configured for LadderStep Human Consulting. For access changes (new staff, company approvals, fee rates), contact an Admin. · v2.1 · 5 July 2026</p>
 
 </body>
 </html>
