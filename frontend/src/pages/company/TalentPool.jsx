@@ -116,13 +116,13 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                             </button>
                         </>
                     ) : isPlatinumInPipeline ? (
-                        // Platinum — added to pipeline, awaiting exec approval
+                        // Platinum — shortlisted & unlock request submitted, awaiting exec approval
                         <>
                             <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
                                 Preview
                             </button>
-                            <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1.5 rounded-lg">
-                                ✓ In Pipeline
+                            <span className="text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-200 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
+                                ⏳ Pending Approval
                             </span>
                         </>
                     ) : isPaidUnlock ? (
@@ -139,16 +139,13 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                             </button>
                         </>
                     ) : isPlatinum ? (
-                        // Platinum company — not yet in pipeline
+                        // Platinum company — not yet shortlisted; one button does both
                         <>
                             <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
                                 Preview
                             </button>
-                            <button onClick={() => onInterest(cand)} className="text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
-                                Interest
-                            </button>
                             <button onClick={() => onMoveToPipeline(cand)} className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 transition font-medium whitespace-nowrap">
-                                → Pipeline
+                                Shortlist &amp; Unlock
                             </button>
                         </>
                     ) : (
@@ -550,14 +547,27 @@ export default function TalentPool() {
         setApplyingToPipeline(true);
         try {
             const { data } = await talentPoolAPI.applyToPipeline(pipelineModal.candidate_id, pipelineJob);
-            toast.success(data?.message || 'Candidate added to your pipeline. Shortlist them in Applications to request full profile access.');
-            // For Platinum: mark as "in pipeline" so card shows ✓ In Pipeline state
-            if (platinum) {
+            const applicationId = data?.application_id;
+
+            if (platinum && applicationId) {
+                // Immediately submit profile unlock request — exec will approve to reveal full contact info
+                try {
+                    await talentPoolAPI.requestProfileUnlock(pipelineModal.candidate_id, { application_id: applicationId });
+                } catch (unlockErr) {
+                    // If duplicate request, that's fine — still show pending state
+                    if (!unlockErr.response?.data?.message?.toLowerCase().includes('already')) {
+                        console.warn('[requestProfileUnlock]', unlockErr.response?.data?.message);
+                    }
+                }
                 setUnlockMap(prev => ({
                     ...prev,
                     [pipelineModal.candidate_id]: { unlocked: true, via: 'platinum' },
                 }));
+                toast.success('Candidate shortlisted — profile access request sent to your executive for approval.');
+            } else {
+                toast.success(data?.message || 'Candidate added to your pipeline.');
             }
+
             setPipelineModal(null);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to add candidate to pipeline.');
@@ -794,12 +804,14 @@ export default function TalentPool() {
             {pipelineModal && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <h2 className="font-semibold text-gray-900 mb-1">Add to Hiring Pipeline</h2>
+                        <h2 className="font-semibold text-gray-900 mb-1">
+                            {platinum ? 'Shortlist & Request Profile Access' : 'Add to Hiring Pipeline'}
+                        </h2>
                         <p className="text-sm text-gray-500 mb-4">
-                            Add <strong>{pipelineModal.candidate_name}</strong> as an applicant to one of your job openings.
                             {platinum
-                                ? ' After shortlisting, you can request full profile access from your LadderStep executive.'
-                                : ' Interview scheduling and offer release still go through your LadderStep executive.'}
+                                ? <>Select a job to shortlist <strong>{pipelineModal.candidate_name}</strong>. A profile access request will be sent to your LadderStep executive automatically. Once approved, full contact details will be revealed.</>
+                                : <>Add <strong>{pipelineModal.candidate_name}</strong> as an applicant to one of your job openings. Interview scheduling and offer release go through your LadderStep executive.</>
+                            }
                         </p>
                         <form onSubmit={handleApplyToPipeline} className="flex flex-col gap-4">
                             <div>
@@ -825,7 +837,7 @@ export default function TalentPool() {
                                     disabled={applyingToPipeline || !pipelineJob}
                                     className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 transition"
                                 >
-                                    {applyingToPipeline ? 'Adding…' : 'Add to Pipeline'}
+                                    {applyingToPipeline ? 'Submitting…' : platinum ? 'Shortlist & Send for Approval' : 'Add to Pipeline'}
                                 </button>
                                 <button
                                     type="button"

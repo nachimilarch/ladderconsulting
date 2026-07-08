@@ -688,10 +688,10 @@ exports.requestProfileUnlock = async (req, res) => {
             [application_id, company.id, candidateId]
         );
         if (!app) return res.status(404).json({ success: false, message: 'Application not found in your pipeline.' });
-        if (!['shortlisted','interview_scheduled','interviewed'].includes(app.status)) {
+        if (!['applied','shortlisted','interview_scheduled','interviewed'].includes(app.status)) {
             return res.status(400).json({
                 success: false,
-                message: 'Profile unlock can only be requested after shortlisting the candidate.',
+                message: 'Candidate must be in your pipeline to request profile access.',
             });
         }
 
