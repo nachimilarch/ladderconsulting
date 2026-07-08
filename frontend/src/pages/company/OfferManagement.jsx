@@ -100,17 +100,17 @@ export default function OfferManagement() {
                                                 <span>💰 CTC: {formatCTC(slot.ctc_amount, slot.ctc_currency)}</span>
                                             )}
                                             {slot.joining_date && (
-                                                <span>📅 Join: {new Date(slot.joining_date).toLocaleDateString('en-IN', {
+                                                <span>📅 Join: {new Date(slot.joining_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata',
                                                     day: 'numeric', month: 'short', year: 'numeric',
                                                 })}</span>
                                             )}
                                             {slot.offer_sent_at && (
-                                                <span>Sent {new Date(slot.offer_sent_at).toLocaleDateString('en-IN', {
+                                                <span>Sent {new Date(slot.offer_sent_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata',
                                                     day: 'numeric', month: 'short',
                                                 })}</span>
                                             )}
                                             {slot.candidate_response_at && (
-                                                <span>Responded {new Date(slot.candidate_response_at).toLocaleDateString('en-IN', {
+                                                <span>Responded {new Date(slot.candidate_response_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata',
                                                     day: 'numeric', month: 'short',
                                                 })}</span>
                                             )}

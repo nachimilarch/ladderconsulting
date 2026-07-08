@@ -25,12 +25,15 @@ function SkillChip({ label }) {
 
 const SCORE_COLOR_CLS = (s) => s >= 70 ? 'text-green-700 bg-green-50 border-green-200' : s >= 40 ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-600 bg-red-50 border-red-200';
 
-function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, onPreview, onDownload, downloading, onMoveToPipeline }) {
+function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, onPreview, onDownload, downloading, onMoveToPipeline, isPlatinum }) {
     const skills = Array.isArray(cand.skills) ? cand.skills.filter(Boolean) : [];
     const shown = skills.slice(0, 5);
     const extra = skills.length - shown.length;
     const unlocked = !!unlockInfo?.unlocked;
-    const isPaidUnlock = unlocked && unlockInfo.via !== 'platinum';
+    const via = unlockInfo?.via;
+    const isPlatinumApproved = unlocked && via === 'platinum_approved';
+    const isPlatinumInPipeline = unlocked && via === 'platinum';
+    const isPaidUnlock = unlocked && (via === 'single' || via === 'pack' || via === 'platinum_approved');
 
     return (
         <div className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow ${unlocked ? 'border-green-200' : 'border-gray-100'}`}>
@@ -99,49 +102,65 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                     )}
                 </div>
                 <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-                    {unlocked ? (
+                    {isPlatinumApproved ? (
+                        // Exec approved full access
                         <>
-                            <button
-                                onClick={() => onViewProfile(cand)}
-                                className="text-xs border border-indigo-200 text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium"
-                            >
+                            <button onClick={() => onViewProfile(cand)} className="text-xs border border-indigo-200 text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
                                 Full Profile
                             </button>
-                            <button
-                                onClick={() => onDownload(cand)}
-                                disabled={downloading === cand.candidate_id}
-                                title={isPaidUnlock ? 'Original resume file' : 'AI-parsed resume (contact info redacted)'}
-                                className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium"
-                            >
+                            <button onClick={() => onDownload(cand)} disabled={downloading === cand.candidate_id} className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium">
                                 {downloading === cand.candidate_id ? '…' : 'Resume'}
                             </button>
-                            {isPaidUnlock && (
-                                <button
-                                    onClick={() => onMoveToPipeline(cand)}
-                                    className="text-xs border border-green-200 text-green-700 px-2.5 py-1.5 rounded-lg hover:bg-green-50 transition font-medium whitespace-nowrap"
-                                >
-                                    → Pipeline
-                                </button>
-                            )}
+                            <button onClick={() => onMoveToPipeline(cand)} className="text-xs border border-green-200 text-green-700 px-2.5 py-1.5 rounded-lg hover:bg-green-50 transition font-medium whitespace-nowrap">
+                                → Pipeline
+                            </button>
                         </>
-                    ) : (
+                    ) : isPlatinumInPipeline ? (
+                        // Platinum — added to pipeline, awaiting exec approval
                         <>
-                            <button
-                                onClick={() => onPreview(cand)}
-                                className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium"
-                            >
+                            <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
                                 Preview
                             </button>
-                            <button
-                                onClick={() => onInterest(cand)}
-                                className="text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium"
-                            >
+                            <span className="text-xs font-medium text-green-700 bg-green-50 border border-green-200 px-2.5 py-1.5 rounded-lg">
+                                ✓ In Pipeline
+                            </span>
+                        </>
+                    ) : isPaidUnlock ? (
+                        // Single / 4-Pack paid unlock
+                        <>
+                            <button onClick={() => onViewProfile(cand)} className="text-xs border border-indigo-200 text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
+                                Full Profile
+                            </button>
+                            <button onClick={() => onDownload(cand)} disabled={downloading === cand.candidate_id} title="Original resume file" className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium">
+                                {downloading === cand.candidate_id ? '…' : 'Resume'}
+                            </button>
+                            <button onClick={() => onMoveToPipeline(cand)} className="text-xs border border-green-200 text-green-700 px-2.5 py-1.5 rounded-lg hover:bg-green-50 transition font-medium whitespace-nowrap">
+                                → Pipeline
+                            </button>
+                        </>
+                    ) : isPlatinum ? (
+                        // Platinum company — not yet in pipeline
+                        <>
+                            <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
+                                Preview
+                            </button>
+                            <button onClick={() => onInterest(cand)} className="text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
                                 Interest
                             </button>
-                            <button
-                                onClick={() => onUnlock(cand)}
-                                className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 transition font-medium whitespace-nowrap"
-                            >
+                            <button onClick={() => onMoveToPipeline(cand)} className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 transition font-medium whitespace-nowrap">
+                                → Pipeline
+                            </button>
+                        </>
+                    ) : (
+                        // Non-platinum, not unlocked
+                        <>
+                            <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
+                                Preview
+                            </button>
+                            <button onClick={() => onInterest(cand)} className="text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
+                                Interest
+                            </button>
+                            <button onClick={() => onUnlock(cand)} className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 transition font-medium whitespace-nowrap">
                                 🔓 Unlock
                             </button>
                         </>
@@ -531,7 +550,14 @@ export default function TalentPool() {
         setApplyingToPipeline(true);
         try {
             const { data } = await talentPoolAPI.applyToPipeline(pipelineModal.candidate_id, pipelineJob);
-            toast.success(data?.message || 'Candidate added to your pipeline.');
+            toast.success(data?.message || 'Candidate added to your pipeline. Shortlist them in Applications to request full profile access.');
+            // For Platinum: mark as "in pipeline" so card shows ✓ In Pipeline state
+            if (platinum) {
+                setUnlockMap(prev => ({
+                    ...prev,
+                    [pipelineModal.candidate_id]: { unlocked: true, via: 'platinum' },
+                }));
+            }
             setPipelineModal(null);
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to add candidate to pipeline.');
@@ -650,6 +676,7 @@ export default function TalentPool() {
                                 onDownload={handleDownloadResume}
                                 downloading={downloading}
                                 onMoveToPipeline={openPipelineModal}
+                                isPlatinum={platinum}
                             />
                         ))}
                     </div>
@@ -767,10 +794,12 @@ export default function TalentPool() {
             {pipelineModal && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <h2 className="font-semibold text-gray-900 mb-1">Move to Hiring Pipeline</h2>
+                        <h2 className="font-semibold text-gray-900 mb-1">Add to Hiring Pipeline</h2>
                         <p className="text-sm text-gray-500 mb-4">
                             Add <strong>{pipelineModal.candidate_name}</strong> as an applicant to one of your job openings.
-                            Interview scheduling and offer release still go through your LadderStep Human Consulting executive, same as any applicant.
+                            {platinum
+                                ? ' After shortlisting, you can request full profile access from your LadderStep executive.'
+                                : ' Interview scheduling and offer release still go through your LadderStep executive.'}
                         </p>
                         <form onSubmit={handleApplyToPipeline} className="flex flex-col gap-4">
                             <div>

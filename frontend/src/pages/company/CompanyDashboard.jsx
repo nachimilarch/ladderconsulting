@@ -2,6 +2,48 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { companyAPI } from '../../api/company';
 
+// Phone-gate: on every dashboard load, if the company has no phone, show a
+// one-field modal before anything else.  Same component as in CompanyProfile.
+function PhoneModal({ onSave }) {
+    const [phone, setPhone] = useState('');
+    const [saving, setSaving] = useState(false);
+    const [err, setErr]     = useState('');
+
+    const submit = async (e) => {
+        e.preventDefault();
+        const cleaned = phone.replace(/\s/g, '');
+        if (!/^\+?[0-9]{7,15}$/.test(cleaned)) { setErr('Enter a valid phone number.'); return; }
+        setSaving(true);
+        try { await companyAPI.updateProfile({ contact_phone: cleaned }); onSave(); }
+        catch { setErr('Could not save. Please try again.'); setSaving(false); }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/40" />
+            <div className="relative bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                <h2 className="text-lg font-bold text-gray-900 mb-1">Phone number required</h2>
+                <p className="text-sm text-gray-500 mb-5">
+                    A contact phone number is required to use your account. Please add one to continue.
+                </p>
+                <form onSubmit={submit} className="flex flex-col gap-4">
+                    <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Phone Number *</label>
+                        <input type="tel" value={phone} onChange={e => { setPhone(e.target.value); setErr(''); }}
+                            placeholder="+91 98765 43210" required
+                            className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                        {err && <p className="text-xs text-red-600 mt-1">{err}</p>}
+                    </div>
+                    <button type="submit" disabled={saving || !phone.trim()}
+                        className="w-full bg-indigo-600 text-white rounded-xl py-2.5 text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 transition">
+                        {saving ? 'Saving…' : 'Save & Continue'}
+                    </button>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 const STATUS_CONFIG = {
     applied:             { label: 'Applied',             cls: 'bg-blue-100 text-blue-700' },
     under_review:        { label: 'Under Review',        cls: 'bg-yellow-100 text-yellow-700' },
@@ -32,6 +74,7 @@ const KPI = ({ title, value, icon, color }) => {
 export default function CompanyDashboard() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [needsPhone, setNeedsPhone] = useState(false);
 
     const fetchDashboard = () => {
         companyAPI.getDashboard()
@@ -42,6 +85,10 @@ export default function CompanyDashboard() {
 
     useEffect(() => {
         fetchDashboard();
+        // Check if phone is missing and show modal
+        companyAPI.getProfile()
+            .then(({ data }) => { if (!data.company?.contact_phone) setNeedsPhone(true); })
+            .catch(() => {});
 
         const onVisible = () => { if (document.visibilityState === 'visible') fetchDashboard(); };
         document.addEventListener('visibilitychange', onVisible);
@@ -60,6 +107,7 @@ export default function CompanyDashboard() {
 
     return (
         <div className="max-w-5xl mx-auto">
+            {needsPhone && <PhoneModal onSave={() => setNeedsPhone(false)} />}
             <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">

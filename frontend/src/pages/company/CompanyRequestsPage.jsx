@@ -23,7 +23,7 @@ const fmtType = (t) => ({
     interview_scheduling: 'Interview Scheduling',
     offer_letter_release: 'Offer Letter Release',
 }[t] || t);
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 export default function CompanyRequestsPage() {
     const [requests, setRequests] = useState([]);

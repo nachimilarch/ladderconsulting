@@ -33,8 +33,8 @@ const TYPE_LABELS = {
     training_fee:    'Training Fee',
 };
 
-const fmtINR = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+const fmtINR = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', maximumFractionDigits: 0 })}`;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
 const CASHFREE_JS_TEST = 'https://sdk.cashfree.com/js/v3/cashfree.js';
 const CASHFREE_JS_PROD = 'https://sdk.cashfree.com/js/v3/cashfree.js'; // same URL; mode controlled by session

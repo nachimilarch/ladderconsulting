@@ -128,7 +128,7 @@ export default function CandidateInterviews() {
                                         <p className="text-sm text-gray-600 mb-3">{iv.company_name}</p>
 
                                         <div className="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
-                                            <span>📅 {new Date(iv.slot_datetime).toLocaleString('en-IN', {
+                                            <span>📅 {new Date(iv.slot_datetime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata',
                                                 weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
                                                 hour: '2-digit', minute: '2-digit',
                                             })}</span>

@@ -43,9 +43,11 @@ router.get('/package-status',                 unlockCtrl.getPackageStatus);
 router.post('/platinum-request',              unlockCtrl.requestPlatinum);
 router.post('/package-request',               unlockCtrl.requestPackage);
 
-// Move an already-unlocked (single/pack) Talent Pool candidate into the company's
-// own hiring pipeline — creates the application that feeds the existing
-// shortlist → interview-request → offer-request flow.
-router.post('/talent/:candidateId/apply',     unlockCtrl.applyToPipeline);
+// Move an already-unlocked or Platinum candidate into the company's own pipeline.
+router.post('/talent/:candidateId/apply',                      unlockCtrl.applyToPipeline);
+
+// Platinum profile-unlock request: company submits after shortlisting.
+// Exec/admin approves → grants 'platinum_approved' → full profile access.
+router.post('/talent/:candidateId/profile-unlock-request',     unlockCtrl.requestProfileUnlock);
 
 module.exports = router;

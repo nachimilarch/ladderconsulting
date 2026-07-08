@@ -50,6 +50,7 @@ import CompanyTraining from './pages/company/CompanyTraining';
 // HR offer request pages
 import OfferRequests from './pages/hr/OfferRequests';
 import OfferRequestDetail from './pages/hr/OfferRequestDetail';
+import ProfileUnlockRequests from './pages/hr/ProfileUnlockRequests';
 
 // HR interview request pages
 import InterviewRequestDetail from './pages/hr/InterviewRequestDetail';
@@ -174,6 +175,7 @@ export default function App() {
           <Route path="sourcing" element={<ResumeSourcing />} />
           <Route path="companies" element={<AssignedCompanies />} />
           <Route path="candidates/:candidateId/documents" element={<CandidateDocumentsView />} />
+          <Route path="profile-unlock-requests" element={<ProfileUnlockRequests />} />
         </Route>
 
         {/* ── Candidate Module ───────────────────────── */}

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
-import { companyJobAPI, candidateResumeAPI, talentPoolAPI } from '../../api/company';
+import { companyJobAPI, candidateResumeAPI, talentPoolAPI, companyAPI } from '../../api/company';
 
 // ── Candidate profile drawer (masked unless contact_unlocked) ─────────────────
 function CandidateProfileDrawer({ candidateId, contactUnlocked, onClose }) {
@@ -142,6 +142,9 @@ export default function ShortlistView() {
     const [actionLoading, setActionLoading] = useState(null);
     const [downloadingResume, setDownloadingResume] = useState(null);
     const [profileDrawer, setProfileDrawer] = useState(null); // { candidateId, contactUnlocked }
+    const [isPlatinum, setIsPlatinum] = useState(false);
+    const [unlockRequested, setUnlockRequested] = useState({}); // candidateId -> true (pending/submitted)
+    const [requestingUnlock, setRequestingUnlock] = useState(null); // candidateId
 
     useEffect(() => {
         companyJobAPI.list()
@@ -151,6 +154,10 @@ export default function ShortlistView() {
             })
             .catch(console.error)
             .finally(() => setLoadingJobs(false));
+        // Detect Platinum status for profile-unlock button
+        talentPoolAPI.packageStatus()
+            .then(r => setIsPlatinum(!!r.data?.platinum))
+            .catch(() => {});
     }, []);
 
     useEffect(() => {
@@ -220,6 +227,25 @@ export default function ShortlistView() {
             loadApps();
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to update status.');
+        }
+    };
+
+    const handleRequestProfileUnlock = async (app) => {
+        setRequestingUnlock(app.candidate_id);
+        try {
+            await talentPoolAPI.requestProfileUnlock(app.candidate_id, { application_id: app.id });
+            toast.success('Full profile access request sent to your LadderStep executive.');
+            setUnlockRequested(prev => ({ ...prev, [app.candidate_id]: true }));
+        } catch (err) {
+            const msg = err.response?.data?.message || '';
+            if (msg.toLowerCase().includes('already')) {
+                toast('Request already submitted — awaiting executive review.', { icon: 'ℹ️' });
+                setUnlockRequested(prev => ({ ...prev, [app.candidate_id]: true }));
+            } else {
+                toast.error(msg || 'Failed to send request.');
+            }
+        } finally {
+            setRequestingUnlock(null);
         }
     };
 
@@ -362,7 +388,7 @@ export default function ShortlistView() {
                                             {app.total_experience != null && <span>💼 {formatExp(app.total_experience)}</span>}
                                             {app.expected_salary && <span>💰 {formatSalary(app.expected_salary)} expected</span>}
                                             {app.notice_period && <span>⏱ {app.notice_period}d notice</span>}
-                                            <span>Applied {new Date(app.applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                                            <span>Applied {new Date(app.applied_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short' })}</span>
                                         </div>
 
                                         {/* Extracted skills from resume */}
@@ -452,7 +478,24 @@ export default function ShortlistView() {
                                             </button>
                                         )}
 
-                                        {/* Masked resume download */}
+                                        {/* Platinum: Request Full Profile for shortlisted candidates */}
+                                        {isPlatinum && isShortlisted && !app.contact_unlocked && !isLocked && (
+                                            unlockRequested[app.candidate_id] ? (
+                                                <span className="text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-200 px-3 py-1.5 rounded-lg">
+                                                    ⏳ Unlock Requested
+                                                </span>
+                                            ) : (
+                                                <button
+                                                    onClick={() => handleRequestProfileUnlock(app)}
+                                                    disabled={requestingUnlock === app.candidate_id}
+                                                    className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-lg px-3 py-1.5 hover:bg-amber-100 disabled:opacity-50 transition whitespace-nowrap"
+                                                >
+                                                    {requestingUnlock === app.candidate_id ? '…' : '🔓 Request Full Profile'}
+                                                </button>
+                                            )
+                                        )}
+
+                                        {/* Resume download */}
                                         <div className="flex flex-col items-end gap-0.5">
                                             <button
                                                 onClick={() => handleResumeDownload(app.candidate_id)}
@@ -461,9 +504,11 @@ export default function ShortlistView() {
                                             >
                                                 {downloadingResume === app.candidate_id ? 'Generating...' : 'Download Resume'}
                                             </button>
-                                            <span className="text-[10px] text-gray-400 italic">
-                                                Contact info redacted
-                                            </span>
+                                            {!app.contact_unlocked && (
+                                                <span className="text-[10px] text-gray-400 italic">
+                                                    Contact info redacted
+                                                </span>
+                                            )}
                                         </div>
 
                                     </div>

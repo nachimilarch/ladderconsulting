@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { interviewRequestAPI } from '../../api/payments';
 import toast from 'react-hot-toast';
 
-const fmtDT = (d) => d ? new Date(d).toLocaleString('en-IN', {
+const fmtDT = (d) => d ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata',
     day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit'
 }) + ' IST' : '—';
 

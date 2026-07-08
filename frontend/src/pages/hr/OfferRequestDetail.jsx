@@ -19,10 +19,10 @@ const PAY_STATUS = {
 };
 
 const fmtDate = (d) => d
-    ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })
+    ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' })
     : '—';
 const fmtINR = (n) => n != null
-    ? `₹${parseFloat(n).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+    ? `₹${parseFloat(n).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', maximumFractionDigits: 0 })}`
     : '—';
 
 export default function OfferRequestDetail() {

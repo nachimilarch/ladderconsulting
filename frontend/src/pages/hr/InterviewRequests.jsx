@@ -15,7 +15,7 @@ const TYPE_LABELS = {
     interview_reschedule: 'Reschedule',
 };
 
-const fmtDT = (d) => d ? new Date(d).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
+const fmtDT = (d) => d ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—';
 
 export default function InterviewRequests({ embedded = false }) {
     const [requests, setRequests] = useState([]);

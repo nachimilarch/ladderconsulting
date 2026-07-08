@@ -194,7 +194,7 @@ export default function CandidateApplications() {
                                         <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
                                             {app.job_type && <span className="capitalize">{app.job_type.replace('_', ' ')}</span>}
                                             {salary && <span>💰 {salary}</span>}
-                                            <span>Applied {new Date(app.applied_at).toLocaleDateString('en-IN', {
+                                            <span>Applied {new Date(app.applied_at).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata',
                                                 day: 'numeric', month: 'short', year: 'numeric',
                                             })}</span>
                                         </div>
@@ -205,7 +205,7 @@ export default function CandidateApplications() {
                                                 <p className="text-xs font-semibold text-teal-700 mb-1">You have a pending offer!</p>
                                                 <div className="flex flex-wrap gap-3 text-xs text-teal-600">
                                                     {offer.ctc_amount && <span>💰 CTC: {formatCTC(offer.ctc_amount, offer.ctc_currency)}</span>}
-                                                    {offer.joining_date && <span>📅 Join: {new Date(offer.joining_date).toLocaleDateString('en-IN', {
+                                                    {offer.joining_date && <span>📅 Join: {new Date(offer.joining_date).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata',
                                                         day: 'numeric', month: 'short', year: 'numeric',
                                                     })}</span>}
                                                 </div>

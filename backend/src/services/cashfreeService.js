@@ -21,9 +21,14 @@ exports.createOrder = async ({
     customerName, customerEmail, customerPhone,
     orderNote, returnUrl,
 }) => {
+    // CASHFREE_TEST_AMOUNT (in ₹) overrides the real amount for live payment testing.
+    // Set to 1 in .env while verifying prod credentials, then remove.
+    const testOverride = process.env.CASHFREE_TEST_AMOUNT ? parseFloat(process.env.CASHFREE_TEST_AMOUNT) : null;
+    const finalAmount  = testOverride != null ? testOverride : parseFloat(amount);
+
     const payload = {
         order_id: orderId,
-        order_amount: parseFloat(amount),
+        order_amount: finalAmount,
         order_currency: currency,
         customer_details: {
             customer_id: `cust_${Date.now()}`,

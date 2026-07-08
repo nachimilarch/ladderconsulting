@@ -20,7 +20,7 @@ const SCOPES = [
 ];
 
 const fmtDateTime = (d) => d
-    ? new Date(d).toLocaleString('en-IN', {
+    ? new Date(d).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata',
         day: 'numeric', month: 'short', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
     })

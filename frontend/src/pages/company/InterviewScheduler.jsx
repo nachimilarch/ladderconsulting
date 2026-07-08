@@ -550,7 +550,7 @@ export default function InterviewScheduler() {
                 // gs.offered_ctc is the annual figure entered at request time.
                 const annualCTC = gs?.offered_ctc ? parseFloat(gs.offered_ctc) : null;
                 const monthlyCTC = annualCTC ? annualCTC / 12 : null;
-                const fmtINR = (n) => n ? `₹${n.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : '—';
+                const fmtINR = (n) => n ? `₹${n.toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', maximumFractionDigits: 0 })}` : '—';
                 return (
                     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
                         <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md">
@@ -634,7 +634,7 @@ export default function InterviewScheduler() {
                                         </div>
                                         <p className="text-xs text-gray-500 mb-2">{slot.job_title}</p>
                                         <div className="flex flex-wrap gap-3 text-xs text-gray-500">
-                                            <span>{new Date(slot.slot_datetime).toLocaleString('en-IN', {
+                                            <span>{new Date(slot.slot_datetime).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata',
                                                 day: 'numeric', month: 'short', year: 'numeric',
                                                 hour: '2-digit', minute: '2-digit',
                                             })}</span>

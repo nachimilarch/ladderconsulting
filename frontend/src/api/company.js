@@ -60,6 +60,7 @@ export const talentPoolAPI = {
     previewProfile: (candidateId)         => api.get(`/companies/talent/${candidateId}/preview`),
     downloadResume: (candidateId)         => api.get(`/companies/talent/${candidateId}/resume`, { responseType: 'blob' }),
     applyToPipeline: (candidateId, jobId) => api.post(`/companies/talent/${candidateId}/apply`, { job_id: jobId }),
+    requestProfileUnlock: (candidateId, data) => api.post(`/companies/talent/${candidateId}/profile-unlock-request`, data),
 
     packageStatus:   ()                 => api.get('/companies/package-status'),
     buyPack:         (tier = 'pack_4')   => api.post('/companies/talent/buy-pack', { tier }),
