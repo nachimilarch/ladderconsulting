@@ -11,7 +11,7 @@ const matchingService = require('../services/matchingService');
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket.remoteAddress;
 
 const PRICING = {
-    single: { amount: 999,  credits: 1 },
+    single: { amount: 999, credits: 1 },
     pack_4: { amount: 3999, credits: 5 },
 };
 
@@ -64,14 +64,17 @@ const grantUnlock = async (companyId, candidateId, orderId, grantedVia, unlocked
 
 // true if this company can already see candidateId's full resume/profile —
 // either Platinum (contracted rate set) or an existing unlock grant.
-const isUnlocked = async (companyId, candidateId, placementFeePercent) => {
-    if (placementFeePercent != null) return 'platinum';
+const isUnlocked = async (companyId, candidateId) => {
     const [[row]] = await db.query(
-        `SELECT granted_via FROM resume_unlocks WHERE company_id = ? AND candidate_id = ?`,
+        `SELECT granted_via
+         FROM resume_unlocks
+         WHERE company_id = ? AND candidate_id = ?
+         LIMIT 1`,
         [companyId, candidateId]
     );
     return row?.granted_via || null;
 };
+
 
 // ── GET /api/companies/talent/unlock-status?candidateIds=1,2,3 ───────────────
 exports.getUnlockStatus = async (req, res) => {
@@ -79,38 +82,70 @@ exports.getUnlockStatus = async (req, res) => {
         const company = await getCompany(req.user.id);
         if (!company) return res.status(404).json({ success: false, message: 'Company not found.' });
 
-        const ids = (req.query.candidateIds || '').split(',').map(s => parseInt(s.trim())).filter(Boolean);
-        const platinum = company.placement_fee_percent != null;
+        const ids = (req.query.candidateIds || '')
+            .split(',')
+            .map(s => parseInt(s.trim(), 10))
+            .filter(Boolean);
 
+        const platinum = company.placement_fee_percent != null;
         let statuses = {};
+
         if (ids.length) {
-            // For Platinum companies, check actual resume_unlocks rows so we can
-            // distinguish 'platinum' (masked) vs 'platinum_approved' (full access).
+            const [unlockRows] = await db.query(
+                `SELECT candidate_id, granted_via
+                 FROM resume_unlocks
+                 WHERE company_id = ? AND candidate_id IN (?)`,
+                [company.id, ids]
+            );
+
+            const unlockById = Object.fromEntries(unlockRows.map(r => [r.candidate_id, r.granted_via]));
+
+            let requestById = {};
             if (platinum) {
-                const [rows] = await db.query(
-                    `SELECT candidate_id, granted_via FROM resume_unlocks WHERE company_id = ? AND candidate_id IN (?)`,
+                const [requestRows] = await db.query(
+                    `SELECT candidate_id, status
+                     FROM company_requests
+                     WHERE company_id = ?
+                       AND candidate_id IN (?)
+                       AND request_type = 'profile_unlock'
+                       AND status IN ('pending', 'in_progress')
+                       AND deleted_at IS NULL`,
                     [company.id, ids]
                 );
-                const byId = Object.fromEntries(rows.map(r => [r.candidate_id, r.granted_via]));
-                statuses = Object.fromEntries(ids.map(id => [
-                    id,
-                    byId[id]
-                        ? { unlocked: true, via: byId[id] }
-                        : { unlocked: false, via: null }  // No row = not yet shortlisted; company must click "Shortlist & Unlock" first
-                ]));
-            } else {
-                const [rows] = await db.query(
-                    `SELECT candidate_id, granted_via FROM resume_unlocks WHERE company_id = ? AND candidate_id IN (?)`,
-                    [company.id, ids]
-                );
-                const byId = Object.fromEntries(rows.map(r => [r.candidate_id, r.granted_via]));
-                statuses = Object.fromEntries(ids.map(id => [id, byId[id] ? { unlocked: true, via: byId[id] } : { unlocked: false, via: null }]));
+                requestById = Object.fromEntries(requestRows.map(r => [r.candidate_id, r.status]));
             }
+
+            statuses = Object.fromEntries(ids.map(id => {
+                if (unlockById[id]) {
+                    return [id, {
+                        unlocked: true,
+                        via: unlockById[id],
+                        approval_status: unlockById[id] === 'platinum_approved' ? 'approved' : null
+                    }];
+                }
+
+                if (platinum && requestById[id]) {
+                    return [id, {
+                        unlocked: false,
+                        via: null,
+                        requires_approval: true,
+                        approval_status: requestById[id]
+                    }];
+                }
+
+                return [id, {
+                    unlocked: false,
+                    via: null,
+                    requires_approval: platinum,
+                    approval_status: null
+                }];
+            }));
         }
 
         const [[packRow]] = await db.query(
             `SELECT COALESCE(SUM(ruo.credits_total - ruo.credits_used), 0) AS remaining
-             FROM resume_unlock_orders ruo JOIN invoices i ON i.id = ruo.invoice_id
+             FROM resume_unlock_orders ruo
+             JOIN invoices i ON i.id = ruo.invoice_id
              WHERE ruo.company_id = ? AND ruo.deleted_at IS NULL AND i.status = 'paid'`,
             [company.id]
         );
@@ -118,7 +153,7 @@ exports.getUnlockStatus = async (req, res) => {
         res.json({
             success: true,
             platinum,
-            pack_credits_remaining: parseInt(packRow?.remaining || 0),
+            pack_credits_remaining: parseInt(packRow?.remaining || 0, 10),
             statuses,
         });
     } catch (err) {
@@ -222,8 +257,36 @@ exports.purchaseUnlock = async (req, res) => {
 
         // Platinum — free, instant
         if (company.placement_fee_percent != null) {
-            await grantUnlock(company.id, candidateId, null, 'platinum', req.user.id);
-            return res.json({ success: true, unlocked: true, via: 'platinum' });
+            const [[existingRequest]] = await db.query(
+                `SELECT id, status
+         FROM company_requests
+         WHERE company_id = ? AND candidate_id = ? AND request_type = 'profile_unlock'
+           AND status IN ('pending', 'in_progress')
+           AND deleted_at IS NULL
+         ORDER BY created_at DESC
+         LIMIT 1`,
+                [company.id, candidateId]
+            );
+
+            if (existingRequest) {
+                return res.json({
+                    success: true,
+                    unlocked: false,
+                    via: null,
+                    requires_approval: true,
+                    approval_status: existingRequest.status,
+                    message: 'Resume unlock request is already pending executive approval.'
+                });
+            }
+
+            return res.json({
+                success: true,
+                unlocked: false,
+                via: null,
+                requires_approval: true,
+                action: 'request_profile_unlock',
+                message: 'Platinum candidate must be sent for executive approval before resume unlock.'
+            });
         }
 
         // Already unlocked — idempotent no-op
@@ -304,9 +367,9 @@ exports.requestPlatinum = async (req, res) => {
                 `INSERT INTO notifications (user_id, type, title, body, metadata)
                  VALUES (?, 'platinum_interest', ?, ?, ?)`,
                 [notifyUserId,
-                 `Platinum Interest — ${company.company_name}`,
-                 `${company.company_name} would like to discuss a Platinum (unlimited resume unlock) package.` + (note ? ` Notes: ${note}` : ''),
-                 JSON.stringify({ company_id: company.id })]
+                    `Platinum Interest — ${company.company_name}`,
+                    `${company.company_name} would like to discuss a Platinum (unlimited resume unlock) package.` + (note ? ` Notes: ${note}` : ''),
+                    JSON.stringify({ company_id: company.id })]
             );
         }
 
@@ -348,9 +411,9 @@ exports.requestPackage = async (req, res) => {
                 `INSERT INTO notifications (user_id, type, title, body, metadata)
                  VALUES (?, 'package_request', ?, ?, ?)`,
                 [notifyUserId,
-                 `Package Request — ${company.company_name}`,
-                 `${company.company_name} has requested the ${TIER_LABELS[tier]} package (offline payment).` + (note ? ` Note: ${note}` : '') + ` Please activate from Admin → Company Approvals.`,
-                 JSON.stringify({ company_id: company.id, tier })]
+                    `Package Request — ${company.company_name}`,
+                    `${company.company_name} has requested the ${TIER_LABELS[tier]} package (offline payment).` + (note ? ` Note: ${note}` : '') + ` Please activate from Admin → Company Approvals.`,
+                    JSON.stringify({ company_id: company.id, tier })]
             );
         }
 
@@ -425,11 +488,11 @@ exports.getPreviewProfile = async (req, res) => {
         };
 
         if (isPaidUnlock) {
-            profile.candidate_name  = row.candidate_name;
+            profile.candidate_name = row.candidate_name;
             profile.candidate_email = row.candidate_email;
             profile.candidate_phone = row.candidate_phone;
-            profile.linkedin_url    = row.linkedin_url;
-            profile.portfolio_url   = row.portfolio_url;
+            profile.linkedin_url = row.linkedin_url;
+            profile.portfolio_url = row.portfolio_url;
         } else {
             // Show initials only
             const parts = (row.candidate_name || '').split(/\s+/).filter(Boolean);
@@ -478,11 +541,11 @@ exports.getFullProfile = async (req, res) => {
         const out = { ...profile, skills, unlocked_via: via, contact_unlocked: fullAccess };
         if (!fullAccess) {
             const parts = (out.candidate_name || '').split(/\s+/).filter(Boolean);
-            out.candidate_name  = parts.map(p => p[0] + '.').join(' ');
+            out.candidate_name = parts.map(p => p[0] + '.').join(' ');
             out.candidate_email = 'contact@theladderconsulting.com';
             out.candidate_phone = null;
-            out.linkedin_url    = 'Available via LadderStep Human Consulting';
-            out.portfolio_url   = null;
+            out.linkedin_url = 'Available via LadderStep Human Consulting';
+            out.portfolio_url = null;
         }
         res.json({ success: true, data: out });
     } catch (err) {
@@ -521,8 +584,10 @@ exports.downloadUnlockedResume = async (req, res) => {
         }
 
         logAction(req.user.id, 'company_unlocked_resume_download', 'candidate', candidateId,
-            { company_id: company.id, company_name: company.company_name, via,
-              actual_file: via !== 'platinum' }, ip(req));
+            {
+                company_id: company.id, company_name: company.company_name, via,
+                actual_file: via !== 'platinum'
+            }, ip(req));
 
         // 'platinum_approved' = exec approved full profile access → serve original file
         // 'platinum'          = standard Platinum (masked until exec approves)
@@ -571,7 +636,7 @@ exports.applyToPipeline = async (req, res) => {
         // For Platinum with no explicit unlock row, create one so the candidate
         // is tracked as "in this company's scope" (still masked until approved).
         if (isPlatinum && !grant) {
-            try { await grantUnlock(company.id, candidateId, null, 'platinum', req.user.id); } catch (_) {}
+            try { await grantUnlock(company.id, candidateId, null, 'platinum', req.user.id); } catch (_) { }
         }
 
         const [[job]] = await db.query(
@@ -635,7 +700,7 @@ exports.listProfileUnlockRequests = async (req, res) => {
     try {
         let where = `cr.request_type = 'profile_unlock' AND cr.deleted_at IS NULL`;
         const params = [];
-        if (req.user.role === 'hr_staff') {
+        if (req.user.role === 'hrstaff') {
             // Only show requests for companies this exec is assigned to
             where += ` AND co.assigned_executive_id = ?`;
             params.push(req.user.id);
@@ -688,7 +753,7 @@ exports.requestProfileUnlock = async (req, res) => {
             [application_id, company.id, candidateId]
         );
         if (!app) return res.status(404).json({ success: false, message: 'Application not found in your pipeline.' });
-        if (!['applied','shortlisted','interview_scheduled','interviewed'].includes(app.status)) {
+        if (!['applied', 'shortlisted', 'interview_scheduled', 'interviewed'].includes(app.status)) {
             return res.status(400).json({
                 success: false,
                 message: 'Candidate must be in your pipeline to request profile access.',
@@ -719,7 +784,7 @@ exports.requestProfileUnlock = async (req, res) => {
                 (company_id, requested_by, assigned_executive_id, request_type, candidate_id, status, metadata)
              VALUES (?, ?, ?, 'profile_unlock', ?, 'pending', ?)`,
             [company.id, req.user.id, execId, candidateId,
-             JSON.stringify({ application_id: app.id, job_id: app.job_id, notes: notes || '' })]
+            JSON.stringify({ application_id: app.id, job_id: app.job_id, notes: notes || '' })]
         );
 
         // Notify the assigned executive
@@ -727,8 +792,8 @@ exports.requestProfileUnlock = async (req, res) => {
             await db.query(
                 `INSERT INTO notifications (user_id, type, title, body, metadata) VALUES (?, 'profile_unlock_request', ?, ?, ?)`,
                 [execId, 'Profile Unlock Request',
-                 `${company.company_name} has requested full profile access for a shortlisted candidate.`,
-                 JSON.stringify({ request_id: result.insertId, company_id: company.id, candidate_id: candidateId })]
+                    `${company.company_name} has requested full profile access for a shortlisted candidate.`,
+                    JSON.stringify({ request_id: result.insertId, company_id: company.id, candidate_id: candidateId })]
             ).catch(e => console.error('[notify]', e.message));
         }
 
@@ -779,8 +844,8 @@ exports.approveProfileUnlock = async (req, res) => {
         await db.query(
             `INSERT INTO notifications (user_id, type, title, body, metadata) VALUES (?, 'profile_unlock_approved', ?, ?, ?)`,
             [req_.requested_by, 'Profile Access Approved',
-             `Your request to access the full profile has been approved by your LadderStep executive.`,
-             JSON.stringify({ request_id: parseInt(requestId), company_id: req_.company_id, candidate_id: req_.candidate_id })]
+                `Your request to access the full profile has been approved by your LadderStep executive.`,
+            JSON.stringify({ request_id: parseInt(requestId), company_id: req_.company_id, candidate_id: req_.candidate_id })]
         ).catch(e => console.error('[notify]', e.message));
 
         logAction(req.user.id, 'exec_approved_profile_unlock', 'company_request', parseInt(requestId),
@@ -816,8 +881,8 @@ exports.rejectProfileUnlock = async (req, res) => {
         await db.query(
             `INSERT INTO notifications (user_id, type, title, body, metadata) VALUES (?, 'profile_unlock_rejected', ?, ?, ?)`,
             [req_.requested_by, 'Profile Access Request Rejected',
-             `Your profile unlock request has been reviewed. ${reason ? 'Reason: ' + reason : ''}`,
-             JSON.stringify({ request_id: parseInt(requestId) })]
+            `Your profile unlock request has been reviewed. ${reason ? 'Reason: ' + reason : ''}`,
+            JSON.stringify({ request_id: parseInt(requestId) })]
         ).catch(e => console.error('[notify]', e.message));
 
         res.json({ success: true, message: 'Profile unlock request rejected.' });

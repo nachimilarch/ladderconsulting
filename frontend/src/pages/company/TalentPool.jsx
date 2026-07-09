@@ -31,12 +31,16 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
     const extra = skills.length - shown.length;
     const unlocked = !!unlockInfo?.unlocked;
     const via = unlockInfo?.via;
+    const approvalStatus = unlockInfo?.approval_status;
+    // platinum_approved: exec approved full access
     const isPlatinumApproved = unlocked && via === 'platinum_approved';
-    const isPlatinumInPipeline = unlocked && via === 'platinum';
-    const isPaidUnlock = unlocked && (via === 'single' || via === 'pack' || via === 'platinum_approved');
+    // In pipeline, awaiting exec approval of profile unlock request
+    const isPlatinumInPipeline = !isPlatinumApproved && (approvalStatus === 'pending' || approvalStatus === 'in_progress');
+    // Prepaid (single or pack) unlock — full contact info revealed
+    const isPaidUnlock = unlocked && (via === 'single' || via === 'pack');
 
     return (
-        <div className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow ${unlocked ? 'border-green-200' : 'border-gray-100'}`}>
+        <div className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow ${isPlatinumApproved || isPaidUnlock ? 'border-green-200' : isPlatinumInPipeline ? 'border-yellow-200' : 'border-gray-100'}`}>
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -561,7 +565,7 @@ export default function TalentPool() {
                 }
                 setUnlockMap(prev => ({
                     ...prev,
-                    [pipelineModal.candidate_id]: { unlocked: true, via: 'platinum' },
+                    [pipelineModal.candidate_id]: { unlocked: false, via: null, requires_approval: true, approval_status: 'pending' },
                 }));
                 toast.success('Candidate shortlisted — profile access request sent to your executive for approval.');
             } else {
