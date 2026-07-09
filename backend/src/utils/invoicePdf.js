@@ -3,6 +3,7 @@
  * Returns a Buffer containing the A4 PDF.
  */
 const PDFDocument = require('pdfkit');
+const path = require('path');
 
 const BRAND   = [106, 71, 212];   // #6a47d4 — Ladder Violet
 const DARK    = [17,  24,  39];   // gray-900
@@ -72,15 +73,21 @@ function generateInvoicePDF(inv) {
         // ── Header bar ──────────────────────────────────────────────────────────
         doc.rect(50, 50, W, 70).fill(BRAND);
 
-        doc.font('Helvetica-Bold').fontSize(20).fillColor('white')
-           .text('LADDER CONSULTING', 65, 65, { width: 280 });
+        // Logo — resolved relative to the monorepo root so it works in both dev and prod
+        const logoPath = path.resolve(__dirname, '../../../frontend/public/logo-icon.png');
+        try {
+            doc.image(logoPath, 62, 60, { height: 48, fit: [48, 48] });
+        } catch (_) { /* skip if logo missing */ }
+
+        doc.font('Helvetica-Bold').fontSize(16).fillColor('white')
+           .text('LadderStep Human Consulting', 118, 65, { width: 250 });
 
         doc.font('Helvetica').fontSize(8).fillColor([200, 190, 240])
-           .text('Professional Recruitment & HR Services', 65, 88);
+           .text('Professional Recruitment & HR Services', 118, 86);
 
         doc.font('Helvetica').fontSize(8).fillColor('white')
-           .text('contact@ladder-consulting.in', 380, 72, { align: 'right', width: 150 })
-           .text('www.ladderconsulting.in',       380, 85, { align: 'right', width: 150 });
+           .text('crm@theladderconsulting.com', 380, 72, { align: 'right', width: 155 })
+           .text('www.theladderconsulting.com',  380, 85, { align: 'right', width: 155 });
 
         // ── Invoice label + number ──────────────────────────────────────────────
         doc.font('Helvetica-Bold').fontSize(24).fillColor(DARK)
@@ -233,7 +240,7 @@ function generateInvoicePDF(inv) {
         hRule(doc, footerY - 8, BRAND);
         doc.font('Helvetica').fontSize(7.5).fillColor(LIGHT)
            .text(
-               'LadderStep Human Consulting · contact@ladder-consulting.in · This is a computer-generated invoice.',
+               'LadderStep Human Consulting · crm@theladderconsulting.com · www.theladderconsulting.com · This is a computer-generated invoice.',
                50, footerY, { width: W, align: 'center' }
            );
 
