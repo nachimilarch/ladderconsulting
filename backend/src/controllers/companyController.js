@@ -380,24 +380,24 @@ exports.downloadCandidateResume = async (req, res) => {
             return res.status(404).json({ message: 'Resume file not found on server.' });
         }
 
-        const { getMaskedResumePath } = require('../services/maskedResumeGenerator');
-        const maskedPath = await getMaskedResumePath(absolutePath, resume.candidate_name, candidateId);
-
-        // Audit the download before serving
-        logAction(
-            req.user.id,
-            'company_resume_download',
-            'candidate',
-            candidateId,
-            {
-                company_id:     company.id,
-                company_name:   company.company_name,
-                application_id: application.application_id,
-                masked:         true,
-            },
-            ip(req)
+        // Check if this company has a paid unlock for this candidate — if so, serve original.
+        const [[unlockRow]] = await db.query(
+            `SELECT granted_via FROM resume_unlocks
+             WHERE company_id = ? AND candidate_id = ? AND granted_via IN ('single','pack','platinum_approved')
+             LIMIT 1`,
+            [company.id, candidateId]
         );
 
+        logAction(req.user.id, 'company_resume_download', 'candidate', candidateId,
+            { company_id: company.id, company_name: company.company_name,
+              application_id: application.application_id, masked: !unlockRow }, ip(req));
+
+        if (unlockRow) {
+            return res.download(absolutePath, resume.file_name || 'candidate_resume.pdf');
+        }
+
+        const { getMaskedResumePath } = require('../services/maskedResumeGenerator');
+        const maskedPath = await getMaskedResumePath(absolutePath, resume.candidate_name, candidateId);
         res.setHeader('X-Resume-Note', 'Contact information has been redacted by LadderStep Human Consulting');
         res.download(maskedPath, 'candidate_resume_masked.pdf');
     } catch (err) {
