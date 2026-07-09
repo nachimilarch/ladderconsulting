@@ -197,7 +197,7 @@ const createUnlockOrder = async (company, userId, tier, candidateId = null) => {
     }
 
     const orderId = `LC-TXN-${Date.now()}-${invoiceId}`;
-    const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/^http:\/\//, 'https://');
+    const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/^http:\/\//, 'https://');
     const returnUrl = `${frontendBase}/company/talent/unlock-callback?invoiceId=${invoiceId}&txnOrderId=${orderId}`;
 
     await db.query(

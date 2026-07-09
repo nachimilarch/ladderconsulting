@@ -103,8 +103,9 @@ exports.initiatePayment = async (req, res) => {
         }
 
         const orderId = `LC-TXN-${Date.now()}-${inv.id}`;
-        // Cashfree requires https:// on return_url even in sandbox mode
-        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/^http:\/\//, 'https://');
+        // FRONTEND_URL may be comma-separated (CORS list) — take only the first value.
+        // Cashfree requires https:// on return_url even in sandbox mode.
+        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/^http:\/\//, 'https://');
         const returnUrl = `${frontendBase}/company/payments/${inv.id}/callback?txnOrderId=${orderId}`;
 
         // Create transaction record
