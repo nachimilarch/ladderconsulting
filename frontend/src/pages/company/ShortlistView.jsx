@@ -201,10 +201,14 @@ export default function ShortlistView() {
         }
     };
 
-    const handleResumeDownload = async (candidateId) => {
+    const handleResumeDownload = async (candidateId, contactUnlocked = false) => {
         setDownloadingResume(candidateId);
         try {
-            const res = await candidateResumeAPI.download(candidateId);
+            // Unlocked candidates (single/pack/platinum_approved) get the original unmasked file.
+            // Standard applicants (not unlocked) get the masked resume.
+            const res = contactUnlocked
+                ? await talentPoolAPI.downloadResume(candidateId)
+                : await candidateResumeAPI.download(candidateId);
             const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
             const link = document.createElement('a');
             link.href = url;
@@ -215,7 +219,7 @@ export default function ShortlistView() {
             window.URL.revokeObjectURL(url);
         } catch (err) {
             console.error('Resume download failed:', err);
-            alert('Failed to download resume. Please try again.');
+            toast.error('Failed to download resume. Please try again.');
         } finally {
             setDownloadingResume(null);
         }
@@ -364,7 +368,7 @@ export default function ShortlistView() {
                                                 </span>
                                             )}
                                             {app.contact_unlocked && (
-                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200" title="Resume unlocked via Single/5-Pack — contact info shown directly, no executive needed">
+                                                <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-green-50 text-green-700 border border-green-200">
                                                     🔓 Contact Unlocked
                                                 </span>
                                             )}
@@ -498,7 +502,7 @@ export default function ShortlistView() {
                                         {/* Resume download */}
                                         <div className="flex flex-col items-end gap-0.5">
                                             <button
-                                                onClick={() => handleResumeDownload(app.candidate_id)}
+                                                onClick={() => handleResumeDownload(app.candidate_id, !!app.contact_unlocked)}
                                                 disabled={downloadingResume === app.candidate_id}
                                                 className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg px-3 py-1.5 hover:bg-indigo-100 disabled:opacity-50 transition"
                                             >

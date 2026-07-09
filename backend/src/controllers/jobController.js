@@ -238,9 +238,10 @@ exports.getJobApplications = async (req, res) => {
         // Candidates this company unlocked via a prepaid per-resume tier (Single/4-Pack)
         // see their real name + contact info in the shortlist — they already paid Ladder
         // directly for that candidate, so there's no fee-collection reason to redact it.
-        // Platinum unlocks (granted_via='platinum') stay masked, same as un-unlocked rows.
+        // 'platinum_approved' (exec-approved Platinum unlock) also gets full contact info.
+        // Plain 'platinum' (shortlisted but pending exec approval) stays masked.
         const [unlockedRows] = await db.query(
-            `SELECT candidate_id FROM resume_unlocks WHERE company_id = ? AND granted_via IN ('single', 'pack')`,
+            `SELECT candidate_id FROM resume_unlocks WHERE company_id = ? AND granted_via IN ('single', 'pack', 'platinum_approved')`,
             [companyId]
         );
         const unlockedCandidateIds = new Set(unlockedRows.map(r => r.candidate_id));
