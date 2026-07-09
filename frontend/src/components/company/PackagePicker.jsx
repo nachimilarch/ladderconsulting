@@ -108,8 +108,8 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
 
                         <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
                             <div>
-                                <p className="text-sm font-semibold text-gray-900">4-Resume Pack <span className="text-gray-400 font-normal">— ₹3,999 (incl. GST)</span></p>
-                                <p className="text-xs text-gray-400">4 credits — use anytime, no expiry. No placement fee on any hire.</p>
+                                <p className="text-sm font-semibold text-gray-900">5-Resume Pack <span className="text-gray-400 font-normal">— ₹3,999 (incl. GST)</span></p>
+                                <p className="text-xs text-gray-400">5 credits — use anytime, no expiry. No placement fee on any hire.</p>
                             </div>
                             <button
                                 onClick={() => handleBuyPackage('pack_4')}
