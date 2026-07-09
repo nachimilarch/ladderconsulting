@@ -96,7 +96,7 @@ exports.getUnlockStatus = async (req, res) => {
                     id,
                     byId[id]
                         ? { unlocked: true, via: byId[id] }
-                        : { unlocked: true, via: 'platinum' }  // Platinum companies implicitly have access but still masked
+                        : { unlocked: false, via: null }  // No row = not yet shortlisted; company must click "Shortlist & Unlock" first
                 ]));
             } else {
                 const [rows] = await db.query(
