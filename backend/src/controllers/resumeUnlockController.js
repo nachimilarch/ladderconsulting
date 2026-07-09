@@ -781,10 +781,10 @@ exports.requestProfileUnlock = async (req, res) => {
 
         const [result] = await db.query(
             `INSERT INTO company_requests
-                (company_id, requested_by, assigned_executive_id, request_type, candidate_id, status, metadata)
-             VALUES (?, ?, ?, 'profile_unlock', ?, 'pending', ?)`,
-            [company.id, req.user.id, execId, candidateId,
-            JSON.stringify({ application_id: app.id, job_id: app.job_id, notes: notes || '' })]
+                (company_id, requested_by, assigned_executive_id, request_type, candidate_id, application_id, status, metadata)
+             VALUES (?, ?, ?, 'profile_unlock', ?, ?, 'pending', ?)`,
+            [company.id, req.user.id, execId, candidateId, app.id,
+            JSON.stringify({ job_id: app.job_id, notes: notes || '' })]
         );
 
         // Notify the assigned executive
