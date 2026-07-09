@@ -2,6 +2,17 @@ import { useEffect, useState } from 'react';
 import { talentPoolAPI } from '../../api/company';
 import toast from 'react-hot-toast';
 
+const CASHFREE_SDK_URL = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+
+const loadCashfreeSDK = () => new Promise((resolve, reject) => {
+    if (window.Cashfree) return resolve();
+    const s = document.createElement('script');
+    s.src = CASHFREE_SDK_URL;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+});
+
 // Self-contained resume-unlock package picker. Shows current status (Platinum
 // badge / credits remaining) if already selected; otherwise the 3-tier picker.
 // Used both as the mandatory gate on TalentPool.jsx and standalone on
@@ -14,7 +25,6 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
     const [note, setNote] = useState('');
     const [requesting, setRequesting] = useState(false);
     const [requested, setRequested] = useState(false);
-    const [requestedTier, setRequestedTier] = useState(null); // 'single' | 'pack_4' | 'platinum'
 
     const load = () => {
         setLoading(true);
@@ -32,15 +42,17 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
 
     useEffect(() => { load(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-    const handleRequestPackage = async (tier) => {
+    const handleBuyPackage = async (tier) => {
         setBuying(tier);
         try {
-            const { data } = await talentPoolAPI.requestPackage(tier, note.trim() || undefined);
-            toast.success(data?.message || 'Request sent. Our team will activate it shortly.');
-            setRequestedTier(tier);
+            const { data } = await talentPoolAPI.buyPack(tier);
+            const { payment_session_id, cashfree_env } = data;
+            await loadCashfreeSDK();
+            const mode = cashfree_env === 'PROD' ? 'production' : 'sandbox';
+            const cashfree = window.Cashfree({ mode });
+            cashfree.checkout({ paymentSessionId: payment_session_id, redirectTarget: '_self' });
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to send request.');
-        } finally {
+            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
             setBuying(null);
         }
     };
@@ -51,7 +63,6 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
             const { data } = await talentPoolAPI.requestPlatinum(note.trim() || undefined);
             toast.success(data?.message || 'Request sent.');
             setRequested(true);
-            setRequestedTier('platinum');
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to send request.');
         } finally {
@@ -86,40 +97,32 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
                                 <p className="text-sm font-semibold text-gray-900">Single Resume Unlock <span className="text-gray-400 font-normal">— ₹999 (incl. GST)</span></p>
                                 <p className="text-xs text-gray-400">1 credit — pick a candidate anytime, no expiry. No placement fee on hire.</p>
                             </div>
-                            {requestedTier === 'single' ? (
-                                <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Requested</span>
-                            ) : (
-                                <button
-                                    onClick={() => handleRequestPackage('single')}
-                                    disabled={!!buying}
-                                    className="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
-                                >
-                                    {buying === 'single' ? '…' : 'Request'}
-                                </button>
-                            )}
+                            <button
+                                onClick={() => handleBuyPackage('single')}
+                                disabled={!!buying}
+                                className="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
+                            >
+                                {buying === 'single' ? '…' : 'Buy Now'}
+                            </button>
                         </div>
 
                         <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
                             <div>
-                                <p className="text-sm font-semibold text-gray-900">5-Resume Pack <span className="text-gray-400 font-normal">— ₹3,999 (incl. GST)</span></p>
-                                <p className="text-xs text-gray-400">5 credits — use anytime, no expiry. No placement fee on any hire.</p>
+                                <p className="text-sm font-semibold text-gray-900">4-Resume Pack <span className="text-gray-400 font-normal">— ₹3,999 (incl. GST)</span></p>
+                                <p className="text-xs text-gray-400">4 credits — use anytime, no expiry. No placement fee on any hire.</p>
                             </div>
-                            {requestedTier === 'pack_4' ? (
-                                <span className="text-xs text-green-600 font-medium whitespace-nowrap">✓ Requested</span>
-                            ) : (
-                                <button
-                                    onClick={() => handleRequestPackage('pack_4')}
-                                    disabled={!!buying}
-                                    className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium whitespace-nowrap"
-                                >
-                                    {buying === 'pack_4' ? '…' : packCredits > 0 ? 'Request more' : 'Request'}
-                                </button>
-                            )}
+                            <button
+                                onClick={() => handleBuyPackage('pack_4')}
+                                disabled={!!buying}
+                                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium whitespace-nowrap"
+                            >
+                                {buying === 'pack_4' ? '…' : packCredits > 0 ? 'Buy More' : 'Buy Now'}
+                            </button>
                         </div>
 
                         <div className="border border-gray-200 rounded-xl px-4 py-3">
                             <p className="text-sm font-semibold text-gray-900 mb-1">Platinum</p>
-                            <p className="text-xs text-gray-400 mb-2">Unlimited free unlocks. You pay a placement fee — at your contracted rate — only when you hire, same as before. Reviewed and set up by your account executive.</p>
+                            <p className="text-xs text-gray-400 mb-2">Unlimited free unlocks. You pay a placement fee — at your contracted rate — only when you hire. Reviewed and set up by your account executive.</p>
                             {requested ? (
                                 <p className="text-xs text-green-600 font-medium">✓ Request sent — your executive will follow up.</p>
                             ) : (
