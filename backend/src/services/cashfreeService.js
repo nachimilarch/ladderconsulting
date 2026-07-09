@@ -1,6 +1,17 @@
 const axios = require('axios');
 const crypto = require('crypto');
 
+// Strip non-digits, drop leading country code (+91/0), pad/truncate to 10 digits.
+// Falls back to a known-valid test number if the result isn't 10 digits.
+const sanitizePhone = (raw) => {
+    if (!raw) return '9000000000';
+    const digits = String(raw).replace(/\D/g, '');
+    const trimmed = digits.startsWith('91') && digits.length === 12 ? digits.slice(2)
+                  : digits.startsWith('0')  && digits.length === 11 ? digits.slice(1)
+                  : digits;
+    return trimmed.length === 10 ? trimmed : '9000000000';
+};
+
 const getBaseUrl = () => {
     const env = process.env.CASHFREE_ENV || 'TEST';
     return env === 'PROD'
@@ -34,7 +45,7 @@ exports.createOrder = async ({
             customer_id: `cust_${Date.now()}`,
             customer_name: customerName || 'Company User',
             customer_email: customerEmail,
-            customer_phone: customerPhone || '9999999999',
+            customer_phone: sanitizePhone(customerPhone),
         },
         order_meta: {
             return_url: returnUrl,
