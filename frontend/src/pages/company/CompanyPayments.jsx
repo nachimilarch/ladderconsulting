@@ -36,8 +36,7 @@ const TYPE_LABELS = {
 const fmtINR = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata', maximumFractionDigits: 0 })}`;
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-const CASHFREE_JS_TEST = 'https://sdk.cashfree.com/js/v3/cashfree.js';
-const CASHFREE_JS_PROD = 'https://sdk.cashfree.com/js/v3/cashfree.js'; // same URL; mode controlled by session
+const CASHFREE_SDK_URL = 'https://sdk.cashfree.com/js/v3/cashfree.js';
 
 export default function CompanyPayments() {
     const navigate = useNavigate();
@@ -75,11 +74,20 @@ export default function CompanyPayments() {
         setPaying(true);
         try {
             const { data } = await companyInvoiceAPI.pay(payModal.id, { amount: amt });
-            const { payment_session_id, order_id, cashfree_env } = data;
+            const { payment_session_id, cashfree_env } = data;
 
-            // Redirect to Cashfree checkout
-            const returnUrl = `${window.location.origin}/company/payments/${payModal.id}/callback?txnOrderId=${order_id}`;
-            window.location.href = `https://payments.cashfree.com/forms/${payment_session_id}`;
+            // Load Cashfree JS SDK and redirect via SDK (not raw URL — avoids "Invalid form" error)
+            await new Promise((resolve, reject) => {
+                if (window.Cashfree) return resolve();
+                const s = document.createElement('script');
+                s.src = CASHFREE_SDK_URL;
+                s.onload = resolve;
+                s.onerror = reject;
+                document.head.appendChild(s);
+            });
+            const mode = cashfree_env === 'PROD' ? 'production' : 'sandbox';
+            const cashfree = window.Cashfree({ mode });
+            cashfree.checkout({ paymentSessionId: payment_session_id, redirectTarget: '_self' });
         } catch (err) {
             toast.error(err.response?.data?.message || 'Failed to initiate payment.');
             setPaying(false);
