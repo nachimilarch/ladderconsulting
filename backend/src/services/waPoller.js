@@ -40,10 +40,14 @@ async function getAdminUserId() {
 }
 
 async function processInboundMessage(msg) {
-    const fromPhone  = String(msg.from || '');
+    const fromPhone   = String(msg.from || msg.phone || '');
     const waMessageId = String(msg.message_id || msg.messageId || msg.id || '');
-    const bodyText   = msg.text || msg.body || msg.message || '';
-    const receivedAt = msg.received_at ? new Date(msg.received_at) : new Date();
+    // Coerce to plain string — the API might return a nested object for rich messages
+    const rawText    = msg.text || msg.body || msg.message || '';
+    const bodyText   = typeof rawText === 'object' ? JSON.stringify(rawText) : String(rawText || '');
+    const tsRaw      = msg.received_at || msg.timestamp || msg.created_at;
+    const receivedAt = tsRaw ? new Date(tsRaw) : new Date();
+    const safeDate   = isNaN(receivedAt.getTime()) ? new Date() : receivedAt;
 
     if (!fromPhone) return;
 
@@ -82,7 +86,16 @@ async function processInboundMessage(msg) {
            (campaign_id, campaign_log_id, contact_id, assigned_to, channel,
             from_phone, body_text, received_at, message_id, reply_status)
          VALUES (?, ?, ?, ?, 'whatsapp', ?, ?, ?, ?, 'unread')`,
-        [campaignId, logId, contactId, assignedTo, fromPhone, bodyText, receivedAt, waMessageId || null]
+        [
+            campaignId  || null,
+            logId       || null,
+            contactId   || null,
+            assignedTo  || null,
+            fromPhone,
+            bodyText,
+            safeDate,
+            waMessageId || null,
+        ]
     );
     const replyId = result.insertId;
 
@@ -123,7 +136,10 @@ async function runPollCycle() {
 
     try {
         const response = await axios.get(`${VB_BASE}/messages/inbox`, { headers: vbHeaders() });
-        const messages = response.data?.data || response.data?.messages || [];
+        const raw = response.data;
+        const messages = Array.isArray(raw?.data) ? raw.data
+            : Array.isArray(raw?.messages) ? raw.messages
+            : Array.isArray(raw) ? raw : [];
 
         if (!Array.isArray(messages) || messages.length === 0) return;
 
