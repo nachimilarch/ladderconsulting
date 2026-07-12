@@ -135,11 +135,20 @@ async function runPollCycle() {
     if (!apiKey) return;
 
     try {
-        const response = await axios.get(`${VB_BASE}/messages/inbox`, { headers: vbHeaders() });
+        // /messages/inbox has a server-side bug on Vaartabot; use /messages/logs instead
+        // and filter to inbound only (type = 'inbound' or direction = 'received')
+        const response = await axios.get(`${VB_BASE}/messages/logs`, { headers: vbHeaders() });
         const raw = response.data;
-        const messages = Array.isArray(raw?.data) ? raw.data
+        const allMessages = Array.isArray(raw?.data) ? raw.data
             : Array.isArray(raw?.messages) ? raw.messages
+            : Array.isArray(raw?.logs) ? raw.logs
             : Array.isArray(raw) ? raw : [];
+        // Only process inbound/received messages
+        const messages = allMessages.filter(m =>
+            m.direction === 'inbound' || m.direction === 'received' ||
+            m.type === 'inbound' || m.type === 'received' ||
+            m.from !== undefined   // heuristic: outbound messages usually have 'to', inbound have 'from'
+        );
 
         if (!Array.isArray(messages) || messages.length === 0) return;
 
