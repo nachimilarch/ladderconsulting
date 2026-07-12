@@ -240,19 +240,26 @@ exports.sendWACampaign = async (req, res) => {
     }
 };
 
+// Resolve a template variable value from the contact record
+const resolveVar = (contact, field) => {
+    if (field === 'first_name') return (contact.full_name || '').split(' ')[0];
+    return String(contact[field] || '');
+};
+
 async function sendWABatch(campaign, template, contacts) {
-    const apiUrl       = process.env.WHATSAPP_API_URL || 'https://graph.facebook.com/v19.0';
-    const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID;
-    const accessToken  = process.env.WHATSAPP_ACCESS_TOKEN;
-    const varMapping   = campaign.variable_mapping
+    const apiKey    = process.env.VAARTABOT_API_KEY;
+    const baseUrl   = 'https://api.vaartabot.com/api/v1';
+    const varMapping = campaign.variable_mapping
         ? (typeof campaign.variable_mapping === 'string' ? JSON.parse(campaign.variable_mapping) : campaign.variable_mapping)
         : {};
 
-    const BATCH_DELAY = 100; // ~10 msg/sec well below 80/sec limit
+    // Vaartabot: 300ms between recipients, max 60/min via single send
+    const SEND_DELAY = 350;
     let sent = 0, failed = 0;
 
     for (const contact of contacts) {
-        const phone = toE164(contact.whatsapp_number || contact.phone);
+        const rawPhone = contact.whatsapp_number || contact.phone;
+        const phone = toE164(rawPhone);
         if (!phone) {
             failed++;
             await db.query(
@@ -262,34 +269,23 @@ async function sendWABatch(campaign, template, contacts) {
             continue;
         }
 
-        // Build component parameters from variable mapping
-        const parameters = Object.keys(varMapping).map(placeholder => {
-            const field = varMapping[placeholder];
-            let value = contact[field] || '';
-            if (field === 'first_name') value = (contact.full_name || '').split(' ')[0];
-            return { type: 'text', text: String(value) };
-        });
+        // Vaartabot variables: positional string array, ordered by placeholder key
+        const variables = Object.keys(varMapping).sort().map(ph => resolveVar(contact, varMapping[ph]));
 
         const payload = {
-            messaging_product: 'whatsapp',
-            to: phone,
-            type: 'template',
-            template: {
-                name: template.template_name,
-                language: { code: template.language_code || 'en' },
-                components: parameters.length > 0
-                    ? [{ type: 'body', parameters }]
-                    : [],
-            },
+            to: phone.replace('+', ''), // Vaartabot accepts E.164 without leading +
+            templateName: template.template_name,
+            language: template.language_code || 'en',
+            ...(variables.length > 0 && { variables }),
         };
 
         try {
             const response = await axios.post(
-                `${apiUrl}/${phoneNumberId}/messages`,
+                `${baseUrl}/messages/send`,
                 payload,
-                { headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' } }
+                { headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' } }
             );
-            const waMessageId = response.data?.messages?.[0]?.id || null;
+            const waMessageId = response.data?.data?.messageId || null;
             sent++;
             await db.query(
                 "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, sent_at, whatsapp_message_id) VALUES (?, ?, 'whatsapp', 'sent', NOW(), ?)",
@@ -297,13 +293,14 @@ async function sendWABatch(campaign, template, contacts) {
             );
         } catch (err) {
             failed++;
+            const errMsg = err.response?.data?.message || err.response?.data?.error || err.message;
             await db.query(
                 "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, error_message) VALUES (?, ?, 'whatsapp', 'failed', ?)",
-                [campaign.id, contact.id, err.response?.data?.error?.message?.slice(0, 500) || err.message?.slice(0, 500)]
+                [campaign.id, contact.id, String(errMsg).slice(0, 500)]
             );
         }
 
-        await new Promise(r => setTimeout(r, BATCH_DELAY));
+        await new Promise(r => setTimeout(r, SEND_DELAY));
     }
 
     await db.query(
@@ -322,16 +319,17 @@ async function sendWABatch(campaign, template, contacts) {
 
 // ── Webhooks ──────────────────────────────────────────────────────────────────
 
-// GET /api/outreach/webhooks/whatsapp — Meta verification
+// GET /api/outreach/webhooks/whatsapp — kept for compatibility; Vaartabot
+// inbound webhook format is not yet documented in their public API reference.
 exports.verifyWebhook = (req, res) => {
+    // Support Meta-style hub.challenge verification if still needed
     const mode      = req.query['hub.mode'];
     const token     = req.query['hub.verify_token'];
     const challenge = req.query['hub.challenge'];
-
     if (mode === 'subscribe' && token === process.env.WHATSAPP_WEBHOOK_VERIFY_TOKEN) {
         return res.status(200).send(challenge);
     }
-    res.sendStatus(403);
+    res.sendStatus(200); // Vaartabot: just acknowledge
 };
 
 // POST /api/outreach/webhooks/whatsapp — incoming messages & delivery receipts
@@ -443,3 +441,17 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
         );
     }
 }
+
+// ── GET /api/outreach/whatsapp/credits ────────────────────────────────────────
+// Proxy Vaartabot credit balance to the frontend — avoids exposing the API key.
+exports.getCredits = async (req, res) => {
+    try {
+        const response = await axios.get('https://api.vaartabot.com/api/v1/credits/balance', {
+            headers: { 'X-API-Key': process.env.VAARTABOT_API_KEY },
+        });
+        res.json({ success: true, data: response.data?.data || response.data });
+    } catch (err) {
+        console.error('[vaartabot.credits]', err.response?.data || err.message);
+        res.status(502).json({ success: false, message: 'Could not fetch credit balance.' });
+    }
+};

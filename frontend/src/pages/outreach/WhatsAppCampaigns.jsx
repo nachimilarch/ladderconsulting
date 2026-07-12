@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { waCampaignAPI } from '../../api/outreach';
+import { waCampaignAPI, vaartabotAPI } from '../../api/outreach';
 
 const STATUS_COLORS = {
     draft:'bg-gray-100 text-gray-600', sending:'bg-blue-100 text-blue-700',
@@ -12,6 +12,7 @@ const STATUS_COLORS = {
 export default function WhatsAppCampaigns() {
     const [campaigns, setCampaigns] = useState([]);
     const [loading, setLoading]     = useState(true);
+    const [credits, setCredits]     = useState(null);
 
     const fetch = () => {
         setLoading(true);
@@ -21,7 +22,12 @@ export default function WhatsAppCampaigns() {
             .finally(() => setLoading(false));
     };
 
-    useEffect(() => { fetch(); }, []);
+    useEffect(() => {
+        fetch();
+        vaartabotAPI.getCredits()
+            .then(r => setCredits(r.data?.data?.balance ?? r.data?.data?.credits ?? null))
+            .catch(() => {});
+    }, []);
 
     useEffect(() => {
         const hasSending = campaigns.some(c => c.status === 'sending');
@@ -44,8 +50,15 @@ export default function WhatsAppCampaigns() {
         <div className="max-w-5xl mx-auto">
             <div className="flex items-center justify-between mb-6">
                 <div>
-                    <h2 className="text-xl font-bold text-gray-800">WhatsApp Campaigns</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">Bulk WhatsApp outreach using Meta templates</p>
+                    <div className="flex items-center gap-3">
+                        <h2 className="text-xl font-bold text-gray-800">WhatsApp Campaigns</h2>
+                        {credits !== null && (
+                            <span className="text-xs font-medium bg-green-50 text-green-700 border border-green-200 px-2 py-0.5 rounded-full">
+                                {credits} Vaartabot credit{credits !== 1 ? 's' : ''} remaining
+                            </span>
+                        )}
+                    </div>
+                    <p className="text-sm text-gray-500 mt-0.5">Bulk WhatsApp outreach via Vaartabot</p>
                 </div>
                 <div className="flex gap-2">
                     <Link to="/outreach/whatsapp/templates" className="border border-gray-200 text-sm px-3 py-2 rounded-xl hover:bg-gray-50 transition">

@@ -36,6 +36,10 @@ export const waCampaignAPI = {
     send:      (id)      => api.post(`/outreach/whatsapp-campaigns/${id}/send`),
 };
 
+export const vaartabotAPI = {
+    getCredits: () => api.get('/outreach/whatsapp/credits'),
+};
+
 export const waTemplateAPI = {
     getAll:   (params)   => api.get('/outreach/whatsapp/templates', { params }),
     create:   (data)     => api.post('/outreach/whatsapp/templates', data),

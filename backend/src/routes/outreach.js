@@ -55,7 +55,8 @@ router.patch('/replies/:id/convert',           replyCtrl.convertToLead);
 router.patch('/replies/:id/ignore',            replyCtrl.ignoreReply);
 router.patch('/replies/:id/assign',            authorizeRole('admin'), replyCtrl.assignReply);
 
-// ── WhatsApp Templates ───────────────────────────────────────────────────────
+// ── WhatsApp / Vaartabot ─────────────────────────────────────────────────────
+router.get('/whatsapp/credits',                whatsappCtrl.getCredits);
 router.get('/whatsapp/templates',              whatsappCtrl.listTemplates);
 router.post('/whatsapp/templates',             whatsappCtrl.createTemplate);
 router.put('/whatsapp/templates/:id',          whatsappCtrl.updateTemplate);
