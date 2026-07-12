@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { waTemplateAPI, vaartabotAPI } from '../../api/outreach';
 
+
 const EMPTY = { template_name:'', language_code:'en', category:'MARKETING', header_type:'none', header_content:'', body_text:'', footer_text:'', variable_count:0 };
 
 export default function WhatsAppTemplates() {
@@ -11,7 +12,6 @@ export default function WhatsAppTemplates() {
     const [editing, setEditing]     = useState(null);
     const [form, setForm]           = useState(EMPTY);
     const [saving, setSaving]       = useState(false);
-    const [syncing, setSyncing]     = useState(false);
     const [credits, setCredits]     = useState(null);
 
     const fetch = () => {
@@ -29,18 +29,6 @@ export default function WhatsAppTemplates() {
             .catch(() => {});
     }, []);
 
-    const handleSync = async () => {
-        setSyncing(true);
-        try {
-            const r = await waTemplateAPI.sync();
-            toast.success(r.data.message || `Synced ${r.data.synced} template(s)`);
-            fetch();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Sync failed');
-        } finally {
-            setSyncing(false);
-        }
-    };
 
     const openEdit = (t) => {
         setEditing(t.id);
@@ -94,16 +82,10 @@ export default function WhatsAppTemplates() {
                     </div>
                     <p className="text-sm text-gray-500 mt-0.5">Manage Vaartabot-approved message templates</p>
                 </div>
-                <div className="flex gap-2">
-                    <button onClick={handleSync} disabled={syncing}
-                        className="border border-gray-200 text-sm px-3 py-2 rounded-xl hover:bg-gray-50 transition disabled:opacity-50">
-                        {syncing ? 'Syncing…' : '↻ Sync from Vaartabot'}
-                    </button>
-                    <button onClick={() => { setShowForm(!showForm); setEditing(null); setForm(EMPTY); }}
-                        className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">
-                        + Add Template
-                    </button>
-                </div>
+                <button onClick={() => { setShowForm(!showForm); setEditing(null); setForm(EMPTY); }}
+                    className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">
+                    + Add Template
+                </button>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-700">

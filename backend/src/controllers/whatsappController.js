@@ -246,61 +246,104 @@ const resolveVar = (contact, field) => {
     return String(contact[field] || '');
 };
 
+// Chunk array into slices of size n
+const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, i) => arr.slice(i * n, i * n + n));
+
 async function sendWABatch(campaign, template, contacts) {
-    const apiKey    = process.env.VAARTABOT_API_KEY;
-    const baseUrl   = 'https://api.vaartabot.com/api/v1';
+    const apiKey     = process.env.VAARTABOT_API_KEY;
+    const baseUrl    = 'https://vaartabot.com/api/v1';
     const varMapping = campaign.variable_mapping
         ? (typeof campaign.variable_mapping === 'string' ? JSON.parse(campaign.variable_mapping) : campaign.variable_mapping)
         : {};
 
-    // Vaartabot: 300ms between recipients, max 60/min via single send
-    const SEND_DELAY = 350;
-    let sent = 0, failed = 0;
-
+    // Separate valid contacts from ones with no phone number
+    const valid = [], invalid = [];
     for (const contact of contacts) {
-        const rawPhone = contact.whatsapp_number || contact.phone;
-        const phone = toE164(rawPhone);
-        if (!phone) {
-            failed++;
-            await db.query(
-                "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, error_message) VALUES (?, ?, 'whatsapp', 'failed', ?)",
-                [campaign.id, contact.id, 'No valid phone number']
-            );
-            continue;
+        const phone = toE164(contact.whatsapp_number || contact.phone);
+        if (phone) {
+            valid.push({ contact, phone });
+        } else {
+            invalid.push(contact);
         }
+    }
 
-        // Vaartabot variables: positional string array, ordered by placeholder key
-        const variables = Object.keys(varMapping).sort().map(ph => resolveVar(contact, varMapping[ph]));
+    // Log invalid contacts immediately
+    for (const contact of invalid) {
+        await db.query(
+            "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, error_message) VALUES (?, ?, 'whatsapp', 'failed', ?)",
+            [campaign.id, contact.id, 'No valid phone number']
+        );
+    }
 
-        const payload = {
-            to: phone.replace('+', ''), // Vaartabot accepts E.164 without leading +
-            templateName: template.template_name,
-            language: template.language_code || 'en',
-            ...(variables.length > 0 && { variables }),
-        };
+    let sent = 0, failed = invalid.length;
+
+    // Vaartabot bulk-send: up to 500 recipients per request
+    for (const batch of chunk(valid, 500)) {
+        const recipients = batch.map(({ contact, phone }) => {
+            const variables = Object.keys(varMapping).sort().map(ph => resolveVar(contact, varMapping[ph]));
+            return { to: phone.replace('+', ''), ...(variables.length > 0 && { variables }) };
+        });
+
+        // Build a contact lookup by phone for logging results
+        const byPhone = {};
+        for (const { contact, phone } of batch) byPhone[phone.replace('+', '')] = contact;
 
         try {
             const response = await axios.post(
-                `${baseUrl}/messages/send`,
-                payload,
+                `${baseUrl}/messages/bulk-send`,
+                { templateName: template.template_name, recipients },
                 { headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' } }
             );
-            const waMessageId = response.data?.data?.messageId || null;
-            sent++;
-            await db.query(
-                "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, sent_at, whatsapp_message_id) VALUES (?, ?, 'whatsapp', 'sent', NOW(), ?)",
-                [campaign.id, contact.id, waMessageId]
-            );
-        } catch (err) {
-            failed++;
-            const errMsg = err.response?.data?.message || err.response?.data?.error || err.message;
-            await db.query(
-                "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, error_message) VALUES (?, ?, 'whatsapp', 'failed', ?)",
-                [campaign.id, contact.id, String(errMsg).slice(0, 500)]
-            );
-        }
 
-        await new Promise(r => setTimeout(r, SEND_DELAY));
+            const results = response.data?.data?.results || [];
+            for (const r of results) {
+                const contact = byPhone[r.to] || byPhone[r.to?.replace(/^\+/, '')];
+                if (!contact) continue;
+                if (r.status === 'sent' || r.status === 'queued') {
+                    sent++;
+                    await db.query(
+                        "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, sent_at, whatsapp_message_id) VALUES (?, ?, 'whatsapp', 'sent', NOW(), ?)",
+                        [campaign.id, contact.id, r.messageId || null]
+                    );
+                } else {
+                    failed++;
+                    await db.query(
+                        "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, error_message) VALUES (?, ?, 'whatsapp', 'failed', ?)",
+                        [campaign.id, contact.id, String(r.error || r.status).slice(0, 500)]
+                    );
+                }
+            }
+
+            // If API returns fewer results than recipients, log the remainder as sent
+            // (some providers only return failures)
+            if (results.length === 0 && response.data?.data?.sent > 0) {
+                const apiSent = response.data.data.sent;
+                for (const { contact } of batch.slice(0, apiSent)) {
+                    sent++;
+                    await db.query(
+                        "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, sent_at) VALUES (?, ?, 'whatsapp', 'sent', NOW())",
+                        [campaign.id, contact.id]
+                    );
+                }
+                for (const { contact } of batch.slice(apiSent)) {
+                    failed++;
+                    await db.query(
+                        "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, error_message) VALUES (?, ?, 'whatsapp', 'failed', 'Send failed')",
+                        [campaign.id, contact.id]
+                    );
+                }
+            }
+        } catch (err) {
+            const errMsg = err.response?.data?.message || err.response?.data?.error || err.message;
+            console.error('[whatsapp.bulkSend]', errMsg);
+            failed += batch.length;
+            for (const { contact } of batch) {
+                await db.query(
+                    "INSERT INTO outreach_campaign_logs (campaign_id, contact_id, channel, status, error_message) VALUES (?, ?, 'whatsapp', 'failed', ?)",
+                    [campaign.id, contact.id, String(errMsg).slice(0, 500)]
+                );
+            }
+        }
     }
 
     await db.query(
@@ -467,7 +510,7 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
 // Proxy Vaartabot credit balance to the frontend — avoids exposing the API key.
 exports.getCredits = async (req, res) => {
     try {
-        const response = await axios.get('https://api.vaartabot.com/api/v1/credits/balance', {
+        const response = await axios.get('https://vaartabot.com/api/v1/credits/balance', {
             headers: { 'X-API-Key': process.env.VAARTABOT_API_KEY },
         });
         res.json({ success: true, data: response.data?.data || response.data });
@@ -483,7 +526,7 @@ exports.getVaartabotGroups = async (req, res) => {
     const apiKey = process.env.VAARTABOT_API_KEY;
     if (!apiKey) return res.status(503).json({ success: false, message: 'Vaartabot API key not configured.' });
     try {
-        const response = await axios.get('https://api.vaartabot.com/api/v1/contacts/groups', {
+        const response = await axios.get('https://vaartabot.com/api/v1/contacts/groups', {
             headers: { 'X-API-Key': apiKey },
         });
         const payload = response.data?.data || response.data?.groups || response.data;
@@ -507,7 +550,7 @@ exports.syncVaartabotGroup = async (req, res) => {
     // Fetch contacts from the group
     let contacts;
     try {
-        const response = await axios.get(`https://api.vaartabot.com/api/v1/contacts`, {
+        const response = await axios.get(`https://vaartabot.com/api/v1/contacts`, {
             headers: { 'X-API-Key': apiKey },
             params: { group_id, limit: 10000 },
         });
@@ -698,12 +741,12 @@ async function fireAutoReply(fromPhone, messageText) {
         // Send the reply
         const phone = fromPhone.replace('+', '');
         if (flow.response_type === 'template' && flow.template_name) {
-            await axios.post('https://api.vaartabot.com/api/v1/messages/send',
+            await axios.post('https://vaartabot.com/api/v1/messages/send',
                 { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
                 { headers: { 'X-API-Key': apiKey } }
             ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
         } else if (flow.response_type === 'text' && flow.response_text) {
-            await axios.post('https://api.vaartabot.com/api/v1/messages/send-text',
+            await axios.post('https://vaartabot.com/api/v1/messages/send-text',
                 { to: phone, message: flow.response_text },
                 { headers: { 'X-API-Key': apiKey } }
             ).catch(e => console.error('[autoReply.sendText]', e.response?.data || e.message));
@@ -720,7 +763,7 @@ exports.syncTemplates = async (req, res) => {
 
     let vaartabotTemplates;
     try {
-        const response = await axios.get('https://api.vaartabot.com/api/v1/templates', {
+        const response = await axios.get('https://vaartabot.com/api/v1/templates', {
             headers: { 'X-API-Key': apiKey },
         });
         // Vaartabot returns { data: [...] } or { templates: [...] } — handle both shapes

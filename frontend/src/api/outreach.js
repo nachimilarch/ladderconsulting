@@ -37,9 +37,7 @@ export const waCampaignAPI = {
 };
 
 export const vaartabotAPI = {
-    getCredits:      () => api.get('/outreach/whatsapp/credits'),
-    getGroups:       () => api.get('/outreach/whatsapp/vaartabot-contacts/groups'),
-    syncGroup:       (data) => api.post('/outreach/whatsapp/vaartabot-contacts/sync', data),
+    getCredits: () => api.get('/outreach/whatsapp/credits'),
 };
 
 export const autoReplyAPI = {
@@ -51,7 +49,6 @@ export const autoReplyAPI = {
 
 export const waTemplateAPI = {
     getAll:   (params)   => api.get('/outreach/whatsapp/templates', { params }),
-    sync:     ()         => api.post('/outreach/whatsapp/templates/sync'),
     create:   (data)     => api.post('/outreach/whatsapp/templates', data),
     update:   (id, data) => api.put(`/outreach/whatsapp/templates/${id}`, data),
     remove:   (id)       => api.delete(`/outreach/whatsapp/templates/${id}`),
