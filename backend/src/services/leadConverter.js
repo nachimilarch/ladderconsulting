@@ -78,7 +78,7 @@ const createLeadFromContact = async ({ contactId, source, campaignId, executiveU
                 assigned_to, source_type, outreach_contact_id, outreach_campaign_id)
              VALUES (?, ?, ?, ?, ?, 'contacted', ?, ?, ?, ?)`,
             [
-                contact.company_name || null,
+                contact.company_name || '',
                 contact.full_name    || null,
                 contact.email        || null,
                 contact.phone        || null,

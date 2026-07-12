@@ -637,7 +637,7 @@ async function fireAutoReply(fromPhone, messageText) {
             // Only reply if this phone has never been seen before in campaign logs
             const digits = fromPhone.replace(/\D/g, '');
             const [[seen]] = await db.query(
-                `SELECT id FROM outreach_campaign_logs l
+                `SELECT l.id FROM outreach_campaign_logs l
                  JOIN outreach_contacts c ON c.id = l.contact_id
                  WHERE (REPLACE(c.phone,'+','') = ? OR REPLACE(c.whatsapp_number,'+','') = ?)
                    AND l.channel = 'whatsapp' LIMIT 1`,
