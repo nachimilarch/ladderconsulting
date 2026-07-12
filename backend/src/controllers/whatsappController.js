@@ -660,25 +660,17 @@ async function fireAutoReply(fromPhone, messageText) {
 
         // Send the reply
         const phone = fromPhone.replace('+', '');
-        if (flow.response_type === 'template' && flow.template_name) {
+        // Vaartabot only supports approved template messages — free text is not available.
+        // For text-type flows, a fallback template_id must be set to actually send.
+        const templateName = flow.template_name;
+        if (templateName) {
             await axios.post(`${VB_BASE}/messages/send`,
-                { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
+                { to: phone, templateName, language: flow.language_code || 'en', variables: [] },
                 { headers: vbHeaders() }
             ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
-        } else if (flow.response_type === 'text' && flow.response_text) {
-            // Within the 24-hour session window Vaartabot accepts free-text via /messages/send.
-            // If a fallback template is also set, prefer the template (more reliable delivery).
-            if (flow.template_name) {
-                await axios.post(`${VB_BASE}/messages/send`,
-                    { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
-                    { headers: vbHeaders() }
-                ).catch(e => console.error('[autoReply.template]', e.response?.data || e.message));
-            } else {
-                await axios.post(`${VB_BASE}/messages/send`,
-                    { to: phone, message: flow.response_text },
-                    { headers: vbHeaders() }
-                ).catch(e => console.error('[autoReply.text]', e.response?.data || e.message));
-            }
+            console.log(`[autoReply] Sent template "${templateName}" to ${phone} (flow: ${flow.flow_name})`);
+        } else {
+            console.log(`[autoReply] Flow "${flow.flow_name}" matched for ${phone} but no approved template linked — skipped.`);
         }
         break; // Only fire the first matching flow
     }
