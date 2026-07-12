@@ -152,14 +152,11 @@ const ENV_SECTIONS = [
     },
     {
         id: 'whatsapp',
-        title: 'WhatsApp Cloud API',
-        description: 'Meta WhatsApp Business API credentials for campaign messaging.',
+        title: 'WhatsApp — Vaartabot',
+        description: 'Vaartabot API credentials for WhatsApp campaign messaging. Get your API key from vaartabot.com/dashboard.',
         icon: '💬',
         fields: [
-            { key: 'whatsapp_phone_number_id',      label: 'Phone Number ID',     type: 'text',     placeholder: '1234567890' },
-            { key: 'whatsapp_access_token',         label: 'Access Token',        type: 'password', placeholder: 'EAAxxxxx…' },
-            { key: 'whatsapp_business_account_id',  label: 'Business Account ID', type: 'text',     placeholder: '98765…' },
-            { key: 'whatsapp_webhook_verify_token', label: 'Webhook Verify Token', type: 'text',    placeholder: 'my-secret-token' },
+            { key: 'vaartabot_api_key', label: 'Vaartabot API Key', type: 'password', placeholder: 'vb_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
         ],
     },
     {

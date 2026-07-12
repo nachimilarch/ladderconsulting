@@ -65,7 +65,7 @@ export default function WhatsAppTemplates() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-xl font-bold text-gray-800">WhatsApp Templates</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">Manage Meta-approved message templates</p>
+                    <p className="text-sm text-gray-500 mt-0.5">Manage Vaartabot-approved message templates</p>
                 </div>
                 <button onClick={() => { setShowForm(!showForm); setEditing(null); setForm(EMPTY); }}
                     className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">
@@ -74,7 +74,7 @@ export default function WhatsAppTemplates() {
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-700">
-                <strong>Note:</strong> Templates must be pre-approved by Meta before use. The <code>template_name</code> must exactly match the approved name in your WhatsApp Business Account.
+                <strong>Note:</strong> Templates must be pre-approved by Vaartabot before use. The <code>template_name</code> must exactly match the approved name in your Vaartabot dashboard.
             </div>
 
             {showForm && (
@@ -82,7 +82,7 @@ export default function WhatsAppTemplates() {
                     <h3 className="font-semibold text-gray-800">{editing ? 'Edit Template' : 'New Template'}</h3>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Template Name (Meta name) *</label>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Template Name (Vaartabot name) *</label>
                             <input type="text" value={form.template_name} onChange={set('template_name')}
                                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500"
                                 placeholder="e.g. ladder_intro_v1" />
