@@ -4,17 +4,18 @@ import { useAuth } from '../../context/AuthContext';
 import NotificationBell from '../NotificationBell';
 
 const navItems = [
-    { label: 'Dashboard',       to: '/hr',                icon: '📊', exact: true },
-    { label: 'Reports',         to: '/hr/reports',        icon: '📊' },
-    { label: 'Resume Sourcing', to: '/hr/sourcing',       icon: '📄' },
-    { label: 'Interviews',      to: '/hr/interviews',     icon: '🗓' },
-    { label: 'Offer Requests',       to: '/hr/offer-requests',        icon: '📋' },
-    { label: 'Profile Unlock',       to: '/hr/profile-unlock-requests', icon: '🔓' },
-    { label: 'My Companies',     to: '/hr/companies',         icon: '🏢' },
-    { label: 'Package Requests', to: '/hr/package-requests', icon: '📦' },
-    { label: 'Invoices',        to: '/hr/invoices',       icon: '🧾' },
-    { label: 'Tasks',           to: '/hr/tasks',          icon: '✅' },
-    { label: 'Outreach',        to: '/outreach',          icon: '📡' },
+    { label: 'Dashboard',       to: '/hr',                      icon: '📊', exact: true },
+    { label: 'Employees',       to: '/hr/employees',            icon: '👤' },
+    { label: 'Reports',         to: '/hr/reports',              icon: '📈' },
+    { label: 'Resume Sourcing', to: '/hr/sourcing',             icon: '📄' },
+    { label: 'Interviews',      to: '/hr/interviews',           icon: '🗓' },
+    { label: 'Offer Requests',  to: '/hr/offer-requests',       icon: '📋' },
+    { label: 'Profile Unlock',  to: '/hr/profile-unlock-requests', icon: '🔓' },
+    { label: 'My Companies',    to: '/hr/companies',            icon: '🏢' },
+    { label: 'Package Requests',to: '/hr/package-requests',     icon: '📦' },
+    { label: 'Invoices',        to: '/hr/invoices',             icon: '🧾' },
+    { label: 'Tasks',           to: '/hr/tasks',                icon: '✅' },
+    { label: 'Outreach',        to: '/outreach',                icon: '📡' },
 ];
 
 export default function HRLayout() {

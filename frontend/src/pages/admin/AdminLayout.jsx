@@ -3,16 +3,18 @@ import { useAuth } from '../../context/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
 
 const navItems = [
-    { label: 'Dashboard',   to: '/admin',              icon: '📊' },
-    { label: 'Companies',   to: '/admin/companies',    icon: '🏢' },
-    { label: 'HR Staff',    to: '/admin/staff',        icon: '👥' },
-    { label: 'Sourcing',    to: '/hr/sourcing',        icon: '📄' },
-    { label: 'Outreach',    to: '/outreach',           icon: '📡' },
-    { label: 'Analytics',   to: '/admin/analytics',    icon: '📈' },
-    { label: 'Payments',    to: '/admin/payments',     icon: '💳' },
-    { label: 'Audit Log',   to: '/admin/audit-log',    icon: '📋' },
-    { label: 'Training',    to: '/admin/training',     icon: '🎓' },
-    { label: 'Settings',    to: '/admin/settings',     icon: '⚙️' },
+    { label: 'Dashboard',   to: '/admin',               icon: '📊' },
+    { label: 'Companies',   to: '/admin/companies',     icon: '🏢' },
+    { label: 'Candidates',  to: '/admin/candidates',    icon: '👤' },
+    { label: 'HR Staff',    to: '/admin/staff',         icon: '👥' },
+    { label: 'Requests',    to: '/admin/requests',      icon: '📩' },
+    { label: 'Recruitment', to: '/admin/recruitment',   icon: '📄' },
+    { label: 'Outreach',    to: '/outreach',            icon: '📡' },
+    { label: 'Analytics',   to: '/admin/analytics',     icon: '📈' },
+    { label: 'Payments',    to: '/admin/payments',      icon: '💳' },
+    { label: 'Audit Log',   to: '/admin/audit-log',     icon: '📋' },
+    { label: 'Training',    to: '/admin/training',      icon: '🎓' },
+    { label: 'Settings',    to: '/admin/settings',      icon: '⚙️' },
 ];
 
 export default function AdminLayout() {
