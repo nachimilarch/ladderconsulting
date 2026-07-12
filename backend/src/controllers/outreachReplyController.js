@@ -1,6 +1,10 @@
 const db = require('../config/db');
+const axios = require('axios');
 const { getTransporter, getDefaultFrom } = require('../utils/outreachEmail');
 const { createLeadFromContact } = require('../services/leadConverter');
+
+const VB_BASE   = 'https://vaartabot.com/api/v1';
+const vbHeaders = () => ({ 'X-API-Key': process.env.VAARTABOT_API_KEY, 'Content-Type': 'application/json' });
 
 const notify = async (userId, type, title, body, metadata = null) => {
     if (!userId) return;
@@ -99,24 +103,48 @@ exports.sendReply = async (req, res) => {
             return res.status(403).json({ success: false, message: 'Access denied.' });
         }
 
-        // Resolve from address
-        const [[emp]] = await db.query(
-            'SELECT outreach_email, outreach_email_name FROM employees WHERE user_id = ? AND deleted_at IS NULL',
-            [req.user.id]
-        );
-        const fromEmail = emp?.outreach_email || getDefaultFrom();
-        const fromName  = emp?.outreach_email_name || 'LadderStep Human Consulting';
+        if (reply.channel === 'whatsapp') {
+            // WhatsApp free-text reply via Vaartabot — only valid within 24-hour service window
+            if (!process.env.VAARTABOT_API_KEY) {
+                return res.status(503).json({ success: false, message: 'Vaartabot API key not configured.' });
+            }
+            const phone = (reply.from_phone || '').replace(/\D/g, '');
+            if (!phone) return res.status(422).json({ success: false, message: 'No phone number on this reply.' });
 
-        const transporter = getTransporter();
-        await transporter.sendMail({
-            from:        `"${fromName}" <${fromEmail}>`,
-            to:          reply.from_email,
-            subject:     `Re: ${reply.subject || ''}`,
-            text:        body_text || '',
-            html:        body_html || body_text || '',
-            inReplyTo:   reply.message_id || undefined,
-            references:  reply.message_id ? [reply.message_id] : undefined,
-        });
+            const windowAge = reply.received_at
+                ? Date.now() - new Date(reply.received_at).getTime()
+                : Infinity;
+            if (windowAge > 23.5 * 60 * 60 * 1000) {
+                return res.status(422).json({
+                    success: false,
+                    message: 'WhatsApp 24-hour reply window has expired. Use a template campaign to re-engage this contact.'
+                });
+            }
+
+            await axios.post(`${VB_BASE}/messages/reply`,
+                { to: phone, message: body_text },
+                { headers: vbHeaders() }
+            );
+        } else {
+            // Email reply via outreach SMTP
+            const [[emp]] = await db.query(
+                'SELECT outreach_email, outreach_email_name FROM employees WHERE user_id = ? AND deleted_at IS NULL',
+                [req.user.id]
+            );
+            const fromEmail = emp?.outreach_email || getDefaultFrom();
+            const fromName  = emp?.outreach_email_name || 'LadderStep Human Consulting';
+
+            const transporter = getTransporter();
+            await transporter.sendMail({
+                from:        `"${fromName}" <${fromEmail}>`,
+                to:          reply.from_email,
+                subject:     `Re: ${reply.subject || ''}`,
+                text:        body_text || '',
+                html:        body_html || body_text || '',
+                inReplyTo:   reply.message_id || undefined,
+                references:  reply.message_id ? [reply.message_id] : undefined,
+            });
+        }
 
         await db.query(
             "UPDATE outreach_email_replies SET reply_status = 'replied', reply_note = ? WHERE id = ?",
@@ -126,7 +154,8 @@ exports.sendReply = async (req, res) => {
         res.json({ success: true, message: 'Reply sent.' });
     } catch (err) {
         console.error('[outreachReply.sendReply]', err);
-        res.status(500).json({ success: false, message: 'Failed to send reply: ' + err.message });
+        const msg = err.response?.data?.error || err.message;
+        res.status(500).json({ success: false, message: 'Failed to send reply: ' + msg });
     }
 };
 

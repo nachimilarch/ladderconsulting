@@ -517,7 +517,7 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
     }
 
     // Fire auto-reply flows in background (don't await — never block incoming handler)
-    fireAutoReply(e164Phone || fromPhone, bodyText).catch(e => console.error('[autoReply]', e.message));
+    fireAutoReply(e164Phone || fromPhone, bodyText, receivedAt).catch(e => console.error('[autoReply]', e.message));
 }
 
 // ── GET /api/outreach/whatsapp/credits ────────────────────────────────────────
@@ -615,7 +615,7 @@ exports.deleteAutoReplyFlow = async (req, res) => {
 };
 
 // Internal: check active flows and send auto-reply if a rule matches
-async function fireAutoReply(fromPhone, messageText) {
+async function fireAutoReply(fromPhone, messageText, receivedAt) {
     const apiKey = process.env.VAARTABOT_API_KEY;
     if (!apiKey) return;
 
@@ -627,6 +627,10 @@ async function fireAutoReply(fromPhone, messageText) {
     if (!flows.length) return;
 
     const msgLower = (messageText || '').toLowerCase().trim();
+
+    // WhatsApp enforces a 24-hour service window for free-text replies.
+    // receivedAt is the inbound message timestamp — check before attempting free text.
+    const withinWindow = receivedAt && (Date.now() - new Date(receivedAt).getTime()) < 23.5 * 60 * 60 * 1000;
 
     for (const flow of flows) {
         let matched = false;
@@ -658,19 +662,39 @@ async function fireAutoReply(fromPhone, messageText) {
 
         if (!matched) continue;
 
-        // Send the reply
         const phone = fromPhone.replace('+', '');
-        // Vaartabot only supports approved template messages — free text is not available.
-        // For text-type flows, a fallback template_id must be set to actually send.
-        const templateName = flow.template_name;
-        if (templateName) {
-            await axios.post(`${VB_BASE}/messages/send`,
-                { to: phone, templateName, language: flow.language_code || 'en', variables: [] },
+
+        if (flow.response_type === 'text' && flow.response_text && withinWindow) {
+            // Free-text reply via POST /messages/reply (user-initiated 24-hour window)
+            await axios.post(`${VB_BASE}/messages/reply`,
+                { to: phone, message: flow.response_text },
                 { headers: vbHeaders() }
-            ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
-            console.log(`[autoReply] Sent template "${templateName}" to ${phone} (flow: ${flow.flow_name})`);
+            ).catch(e => console.error('[autoReply.reply]', e.response?.data || e.message));
+            console.log(`[autoReply] Sent free-text reply to ${phone} (flow: ${flow.flow_name})`);
+        } else if (flow.response_type === 'text' && flow.response_text && !withinWindow) {
+            // Window expired — fall back to template if one is linked, else skip
+            const templateName = flow.template_name;
+            if (templateName) {
+                await axios.post(`${VB_BASE}/messages/send`,
+                    { to: phone, templateName, language: flow.language_code || 'en', variables: [] },
+                    { headers: vbHeaders() }
+                ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
+                console.log(`[autoReply] Window expired — sent fallback template "${templateName}" to ${phone} (flow: ${flow.flow_name})`);
+            } else {
+                console.log(`[autoReply] Flow "${flow.flow_name}" matched for ${phone} but 24-hour window expired and no fallback template — skipped.`);
+            }
         } else {
-            console.log(`[autoReply] Flow "${flow.flow_name}" matched for ${phone} but no approved template linked — skipped.`);
+            // response_type === 'template'
+            const templateName = flow.template_name;
+            if (templateName) {
+                await axios.post(`${VB_BASE}/messages/send`,
+                    { to: phone, templateName, language: flow.language_code || 'en', variables: [] },
+                    { headers: vbHeaders() }
+                ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
+                console.log(`[autoReply] Sent template "${templateName}" to ${phone} (flow: ${flow.flow_name})`);
+            } else {
+                console.log(`[autoReply] Flow "${flow.flow_name}" matched for ${phone} but no approved template linked — skipped.`);
+            }
         }
         break; // Only fire the first matching flow
     }
