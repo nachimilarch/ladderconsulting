@@ -44,6 +44,9 @@ router.post('/talent-interests/:notifId/assign',    ...exec, ctrl.actOnTalentInt
 // Optional ?jobId= returns fit_score + matched/missing skills for that JD
 router.get('/candidates/:candidateId/profile', ...exec, ctrl.getCandidateProfile);
 
+// Direct resume file download for HR/admin (original file, unmasked)
+router.get('/resumes/:resumeId/download', ...exec, ctrl.downloadResume);
+
 // DELETE a sourced candidate profile (soft-delete user + candidate + resumes, removes resume files)
 router.delete('/candidates/:candidateId', ...exec, ctrl.deleteCandidate);
 

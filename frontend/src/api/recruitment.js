@@ -28,6 +28,9 @@ export const recruitmentAPI = {
     getCandidateProfile: (candidateId, jobId) =>
         api.get(`/recruitment/candidates/${candidateId}/profile`, jobId ? { params: { jobId } } : {}),
 
+    downloadResume: (resumeId) =>
+        api.get(`/recruitment/resumes/${resumeId}/download`, { responseType: 'blob' }),
+
     listTalentInterests: () => api.get('/recruitment/talent-interests'),
     actOnTalentInterest: (notifId, jobId) =>
         api.post(`/recruitment/talent-interests/${notifId}/assign`, { job_id: jobId || undefined }),

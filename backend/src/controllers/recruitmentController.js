@@ -532,7 +532,7 @@ exports.getCandidateProfile = async (req, res) => {
         );
 
         const [resumes] = await db.query(
-            `SELECT id, file_name, is_primary, created_at
+            `SELECT id, file_name, file_key, is_primary, created_at
              FROM resumes
              WHERE candidate_id = ? AND deleted_at IS NULL
              ORDER BY is_primary DESC, created_at DESC`,
@@ -1030,5 +1030,30 @@ exports.actOnTalentInterest = async (req, res) => {
     } catch (err) {
         console.error('[recruitment.actOnInterest]', err.message);
         res.status(500).json({ success: false, message: 'Failed to action this interest.' });
+    }
+};
+
+// ── GET /api/recruitment/resumes/:resumeId/download ───────────────────────────
+// HR/admin direct download of a candidate's resume file (full PII, unmasked).
+exports.downloadResume = async (req, res) => {
+    const { resumeId } = req.params;
+    try {
+        const [[resume]] = await db.query(
+            `SELECT r.id, r.file_name, r.file_key
+             FROM resumes r
+             WHERE r.id = ? AND r.deleted_at IS NULL`,
+            [resumeId]
+        );
+        if (!resume) return res.status(404).json({ success: false, message: 'Resume not found.' });
+        if (!resume.file_key) return res.status(404).json({ success: false, message: 'File not available.' });
+
+        const absolutePath = path.join(process.cwd(), resume.file_key);
+        if (!fs.existsSync(absolutePath)) {
+            return res.status(404).json({ success: false, message: 'File not found on server.' });
+        }
+        res.download(absolutePath, resume.file_name || 'resume.pdf');
+    } catch (err) {
+        console.error('[recruitment.downloadResume]', err);
+        res.status(500).json({ success: false, message: 'Failed to download resume.' });
     }
 };

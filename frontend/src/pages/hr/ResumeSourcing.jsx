@@ -35,8 +35,9 @@ function BatchResultCell({ status, errorMessage }) {
 
 // ── HR Candidate Profile Drawer (full PII, no masking) ────────────────────────
 function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
-    const [data, setData]       = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [data, setData]           = useState(null);
+    const [loading, setLoading]     = useState(true);
+    const [downloading, setDownloading] = useState(null);
 
     useEffect(() => {
         setLoading(true);
@@ -45,6 +46,21 @@ function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
             .catch(() => toast.error('Failed to load candidate profile.'))
             .finally(() => setLoading(false));
     }, [candidateId, jobId]);
+
+    const handleDownloadResume = async (resumeId, fileName) => {
+        setDownloading(resumeId);
+        try {
+            const res = await recruitmentAPI.downloadResume(resumeId);
+            const url = URL.createObjectURL(new Blob([res.data]));
+            const a = document.createElement('a');
+            a.href = url; a.download = fileName || 'resume.pdf'; a.click();
+            URL.revokeObjectURL(url);
+        } catch {
+            toast.error('Failed to download resume.');
+        } finally {
+            setDownloading(null);
+        }
+    };
 
     const education = (() => {
         try { return Array.isArray(data?.education) ? data.education : JSON.parse(data?.education || '[]'); }
@@ -162,11 +178,16 @@ function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
                                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">Resumes on file</h3>
                                 <div className="flex flex-col gap-1">
                                     {data.resumes.map(r => (
-                                        <div key={r.id} className="flex items-center gap-2 text-xs text-gray-600">
-                                            <span className="text-gray-300">📄</span>
-                                            <span className="truncate flex-1">{r.file_name}</span>
-                                            {r.is_primary ? <span className="badge-blue text-[10px] shrink-0">Primary</span> : null}
-                                        </div>
+                                        <button
+                                            key={r.id}
+                                            onClick={() => handleDownloadResume(r.id, r.file_name)}
+                                            disabled={downloading === r.id}
+                                            className="flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded px-1 py-1 transition text-left w-full disabled:opacity-60"
+                                        >
+                                            <span>{downloading === r.id ? '⏳' : '📄'}</span>
+                                            <span className="truncate flex-1 underline underline-offset-2">{r.file_name}</span>
+                                            {r.is_primary ? <span className="badge-blue text-[10px] shrink-0 no-underline">Primary</span> : null}
+                                        </button>
                                     ))}
                                 </div>
                             </div>
