@@ -47,16 +47,14 @@ function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
             .finally(() => setLoading(false));
     }, [candidateId, jobId]);
 
-    const handleDownloadResume = async (resumeId, fileName) => {
+    const handleOpenResume = async (resumeId) => {
         setDownloading(resumeId);
         try {
             const res = await recruitmentAPI.downloadResume(resumeId);
-            const url = URL.createObjectURL(new Blob([res.data]));
-            const a = document.createElement('a');
-            a.href = url; a.download = fileName || 'resume.pdf'; a.click();
-            URL.revokeObjectURL(url);
+            const url = URL.createObjectURL(new Blob([res.data], { type: res.headers['content-type'] || 'application/pdf' }));
+            window.open(url, '_blank');
         } catch {
-            toast.error('Failed to download resume.');
+            toast.error('Failed to open resume.');
         } finally {
             setDownloading(null);
         }
@@ -180,7 +178,7 @@ function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
                                     {data.resumes.map(r => (
                                         <button
                                             key={r.id}
-                                            onClick={() => handleDownloadResume(r.id, r.file_name)}
+                                            onClick={() => handleOpenResume(r.id)}
                                             disabled={downloading === r.id}
                                             className="flex items-center gap-2 text-xs text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50 rounded px-1 py-1 transition text-left w-full disabled:opacity-60"
                                         >
