@@ -20,5 +20,15 @@ CREATE TABLE IF NOT EXISTS email_auto_reply_flows (
 
 -- Track whether mailPoller already fired an auto-reply for an inbound email
 -- (prevents duplicate auto-replies if the poller re-processes a message)
-ALTER TABLE outreach_email_replies
-    ADD COLUMN IF NOT EXISTS auto_reply_sent TINYINT(1) NOT NULL DEFAULT 0;
+-- Add auto_reply_sent only if it doesn't exist (MySQL 8 workaround)
+SET @col_exists = (
+    SELECT COUNT(*) FROM information_schema.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME   = 'outreach_email_replies'
+      AND COLUMN_NAME  = 'auto_reply_sent'
+);
+SET @sql = IF(@col_exists = 0,
+    'ALTER TABLE outreach_email_replies ADD COLUMN auto_reply_sent TINYINT(1) NOT NULL DEFAULT 0',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
