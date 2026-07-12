@@ -3,22 +3,16 @@ import { useAuth } from '../../context/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
 
 const navItems = [
-    { label: 'Dashboard',        to: '/admin',                         icon: '📊' },
-    { label: 'Companies',        to: '/admin/companies',               icon: '🏢' },
-    { label: 'HR Staff',         to: '/admin/staff',                   icon: '👥' },
-    { label: 'Resume Sourcing',  to: '/admin/sourcing',                icon: '📄' },
-    { label: 'Interviews',       to: '/admin/interviews',              icon: '🗓' },
-    { label: 'Offer Requests',   to: '/admin/offer-requests',          icon: '📋' },
-    { label: 'Profile Unlock',   to: '/admin/profile-unlock-requests', icon: '🔓' },
-    { label: 'My Companies',     to: '/admin/my-companies',            icon: '🏛' },
-    { label: 'Package Requests', to: '/admin/package-requests',        icon: '📦' },
-    { label: 'Invoices',         to: '/admin/invoices',                icon: '🧾' },
-    { label: 'Outreach',         to: '/outreach',                      icon: '📡' },
-    { label: 'Analytics',        to: '/admin/analytics',               icon: '📈' },
-    { label: 'Payments',         to: '/admin/payments',                icon: '💳' },
-    { label: 'Audit Log',        to: '/admin/audit-log',               icon: '📋' },
-    { label: 'Training',         to: '/admin/training',                icon: '🎓' },
-    { label: 'Settings',         to: '/admin/settings',                icon: '⚙️' },
+    { label: 'Dashboard',  to: '/admin',           icon: '📊' },
+    { label: 'Companies',  to: '/admin/companies', icon: '🏢' },
+    { label: 'HR Staff',   to: '/admin/staff',     icon: '👥' },
+    { label: 'Hiring',     to: '/hr',              icon: '🎯' },
+    { label: 'Outreach',   to: '/outreach',        icon: '📡' },
+    { label: 'Analytics',  to: '/admin/analytics', icon: '📈' },
+    { label: 'Payments',   to: '/admin/payments',  icon: '💳' },
+    { label: 'Audit Log',  to: '/admin/audit-log', icon: '📋' },
+    { label: 'Training',   to: '/admin/training',  icon: '🎓' },
+    { label: 'Settings',   to: '/admin/settings',  icon: '⚙️' },
 ];
 
 export default function AdminLayout() {

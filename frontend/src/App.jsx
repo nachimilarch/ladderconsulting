@@ -224,25 +224,12 @@ export default function App() {
           <Route index element={<AdminHome />} />
           <Route path="companies" element={<CompanyApprovals />} />
           <Route path="staff" element={<HRStaffManagement />} />
-          <Route path="sourcing" element={<ResumeSourcing />} />
-          <Route path="interviews" element={<Interviews />} />
-          <Route path="interviews/:id" element={<InterviewRequestDetail />} />
-          <Route path="offer-requests" element={<OfferRequests />} />
-          <Route path="offer-requests/:id" element={<OfferRequestDetail />} />
-          <Route path="profile-unlock-requests" element={<ProfileUnlockRequests />} />
-          <Route path="my-companies" element={<AssignedCompanies />} />
-          <Route path="package-requests" element={<PackageRequests />} />
-          <Route path="invoices" element={<HRInvoices />} />
           <Route path="analytics" element={<PlatformAnalytics />} />
           <Route path="audit-log" element={<AuditLog />} />
           <Route path="training" element={<TrainingManager />} />
           <Route path="settings" element={<PlatformSettings />} />
           <Route path="placement-fees" element={<Navigate to="/admin/payments" replace />} />
           <Route path="payments" element={<AdminPayments />} />
-          {/* Legacy redirects */}
-          <Route path="requests" element={<Navigate to="/admin/companies" replace />} />
-          <Route path="candidates" element={<Navigate to="/admin" replace />} />
-          <Route path="recruitment" element={<Navigate to="/admin/sourcing" replace />} />
         </Route>
 
         {/* ── Outreach Module ────────────────────────── */}
