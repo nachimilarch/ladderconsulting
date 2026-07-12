@@ -77,7 +77,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.use(express.json());
+app.use(express.json({ verify: (req, _res, buf) => { req.rawBody = buf; } }));
 app.use(cookieParser());
 // Uploads directory is NOT served statically — all file access goes through
 // authenticated API endpoints to enforce role/access-grant checks.
@@ -132,7 +132,7 @@ app.use('/api/admin', require('./routes/admin'));
 // Outreach module — webhooks must be mounted before auth middleware
 const whatsappCtrl = require('./controllers/whatsappController');
 app.get('/api/outreach/webhooks/whatsapp', whatsappCtrl.verifyWebhook);
-app.post('/api/outreach/webhooks/whatsapp', express.json(), whatsappCtrl.handleWebhook);
+app.post('/api/outreach/webhooks/whatsapp', whatsappCtrl.handleWebhook);
 app.use('/api/outreach', require('./routes/outreach'));
 
 // Admin outreach routes

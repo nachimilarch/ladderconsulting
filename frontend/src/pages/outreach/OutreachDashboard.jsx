@@ -33,7 +33,7 @@ export default function OutreachDashboard() {
             .catch(console.error)
             .finally(() => setLoading(false));
         vaartabotAPI.getCredits()
-            .then(r => setCredits(r.data?.data?.balance ?? r.data?.data?.credits ?? null))
+            .then(r => setCredits(r.data?.data?.creditsBalance ?? null))
             .catch(() => {});
     }, []);
 

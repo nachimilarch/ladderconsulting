@@ -26,7 +26,7 @@ export default function WhatsAppTemplates() {
     useEffect(() => {
         fetch();
         vaartabotAPI.getCredits()
-            .then(r => setCredits(r.data?.data?.balance ?? r.data?.data?.credits ?? null))
+            .then(r => setCredits(r.data?.data?.creditsBalance ?? null))
             .catch(() => {});
     }, []);
 

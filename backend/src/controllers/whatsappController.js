@@ -385,9 +385,14 @@ exports.handleWebhook = async (req, res) => {
     const sigHeader = req.headers['x-vaartabot-signature'];
     const secret    = process.env.VAARTABOT_WEBHOOK_SECRET;
     if (secret && sigHeader) {
-        const rawBody = req.rawBody || (Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body)));
+        // req.rawBody is set by express.json({ verify }) in server.js
+        const rawBody  = req.rawBody || Buffer.alloc(0);
         const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
-        if (sigHeader !== expected) {
+        const sigBuf   = Buffer.from(sigHeader);
+        const expBuf   = Buffer.from(expected);
+        const valid    = sigBuf.length === expBuf.length &&
+                         crypto.timingSafeEqual(sigBuf, expBuf);
+        if (!valid) {
             console.warn('[webhook] Invalid Vaartabot signature — rejected');
             return res.sendStatus(401);
         }
@@ -545,99 +550,6 @@ exports.getCredits = async (req, res) => {
         console.error('[vaartabot.credits]', err.response?.data || err.message);
         res.status(502).json({ success: false, message: 'Could not fetch credit balance.' });
     }
-};
-
-// ── GET /api/outreach/whatsapp/vaartabot-contacts/groups ─────────────────────
-// Fetch contact groups (phonebooks) from Vaartabot
-exports.getVaartabotGroups = async (req, res) => {
-    const apiKey = process.env.VAARTABOT_API_KEY;
-    if (!apiKey) return res.status(503).json({ success: false, message: 'Vaartabot API key not configured.' });
-    try {
-        const response = await axios.get('https://vaartabot.com/api/v1/contacts/groups', {
-            headers: { 'X-API-Key': apiKey },
-        });
-        const payload = response.data?.data || response.data?.groups || response.data;
-        const groups  = Array.isArray(payload) ? payload : [];
-        res.json({ success: true, data: groups });
-    } catch (err) {
-        console.error('[vaartabot.groups]', err.response?.data || err.message);
-        res.status(502).json({ success: false, message: 'Could not fetch groups from Vaartabot.' });
-    }
-};
-
-// ── POST /api/outreach/whatsapp/vaartabot-contacts/sync ───────────────────────
-// Import a Vaartabot contact group into a local outreach_contact_list
-exports.syncVaartabotGroup = async (req, res) => {
-    const apiKey = process.env.VAARTABOT_API_KEY;
-    if (!apiKey) return res.status(503).json({ success: false, message: 'Vaartabot API key not configured.' });
-
-    const { group_id, group_name, list_name } = req.body;
-    if (!group_id) return res.status(422).json({ success: false, message: 'group_id is required.' });
-
-    // Fetch contacts from the group
-    let contacts;
-    try {
-        const response = await axios.get(`https://vaartabot.com/api/v1/contacts`, {
-            headers: { 'X-API-Key': apiKey },
-            params: { group_id, limit: 10000 },
-        });
-        const payload = response.data?.data || response.data?.contacts || response.data;
-        contacts = Array.isArray(payload) ? payload : [];
-    } catch (err) {
-        console.error('[vaartabot.syncGroup]', err.response?.data || err.message);
-        return res.status(502).json({ success: false, message: 'Could not fetch contacts from Vaartabot.' });
-    }
-
-    if (contacts.length === 0) {
-        return res.json({ success: true, imported: 0, message: 'No contacts in this group.' });
-    }
-
-    const finalListName = list_name || group_name || `Vaartabot Group ${group_id}`;
-    const [listResult] = await db.query(
-        `INSERT INTO outreach_contact_lists
-           (uploaded_by, list_name, file_name, total_contacts, imported_contacts, import_status)
-         VALUES (?, ?, ?, ?, 0, 'processing')`,
-        [req.user.id, finalListName, `vaartabot_group_${group_id}`, contacts.length]
-    );
-    const listId = listResult.insertId;
-
-    // Background import
-    setImmediate(async () => {
-        let imported = 0;
-        const errors = [];
-        for (const c of contacts) {
-            // Vaartabot contact shape: { name, phone, email?, ... }
-            const fullName  = c.name || c.full_name || '';
-            const phone     = c.phone || c.whatsapp_number || c.mobile || '';
-            const email     = c.email || null;
-            const waNumber  = c.whatsapp_number || c.phone || '';
-            if (!phone && !email) { errors.push(`Skipped: no phone/email for "${fullName}"`); continue; }
-            try {
-                await db.query(
-                    `INSERT IGNORE INTO outreach_contacts
-                       (list_id, uploaded_by, full_name, email, phone, whatsapp_number, source, deleted_at)
-                     VALUES (?, ?, ?, ?, ?, ?, 'vaartabot', NULL)`,
-                    [listId, req.user.id, fullName, email, phone, waNumber]
-                );
-                imported++;
-            } catch (e) {
-                errors.push(e.message);
-            }
-        }
-        await db.query(
-            `UPDATE outreach_contact_lists SET import_status='done', imported_contacts=?, failed_rows=?, import_errors=? WHERE id=?`,
-            [imported, contacts.length - imported,
-             errors.length ? JSON.stringify(errors.slice(0, 50)) : null,
-             listId]
-        );
-    });
-
-    res.status(201).json({
-        success: true,
-        list_id: listId,
-        total: contacts.length,
-        message: `Importing ${contacts.length} contacts from Vaartabot group "${finalListName}" in background.`,
-    });
 };
 
 // ── Auto-Reply Flows ──────────────────────────────────────────────────────────
