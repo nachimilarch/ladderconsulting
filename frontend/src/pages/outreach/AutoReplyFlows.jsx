@@ -51,8 +51,7 @@ export default function AutoReplyFlows() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.flow_name) return toast.error('Flow name is required');
-        if (form.response_type === 'template' && !form.template_id) return toast.error('Select a template');
-        if (form.response_type === 'text' && !form.response_text) return toast.error('Enter reply text');
+        if (!form.template_id) return toast.error('Select a reply template');
 
         const keywords = form.trigger_keywords
             ? form.trigger_keywords.split(',').map(k => k.trim()).filter(Boolean)
@@ -63,9 +62,9 @@ export default function AutoReplyFlows() {
             trigger_type:     form.trigger_type,
             trigger_keywords: keywords,
             match_type:       form.match_type,
-            response_type:    form.response_type,
-            template_id:      form.response_type === 'template' ? Number(form.template_id) : null,
-            response_text:    form.response_type === 'text' ? form.response_text : null,
+            response_type:    'template',
+            template_id:      Number(form.template_id),
+            response_text:    null,
         };
 
         setSaving(true);
@@ -116,8 +115,9 @@ export default function AutoReplyFlows() {
                 </button>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 text-sm text-amber-700">
-                <strong>How it works:</strong> When a contact replies to a WhatsApp campaign, the system checks active flows in order. The first matching flow fires an automatic reply using the configured template or text.
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-700">
+                <strong>How it works:</strong> When a contact replies to a WhatsApp campaign, the system checks active flows in order and fires the first match.
+                Auto-replies use <strong>approved Vaartabot templates only</strong> — WhatsApp Cloud API does not allow free-text messages outside a 24-hour service window.
             </div>
 
             {showForm && (
@@ -165,43 +165,16 @@ export default function AutoReplyFlows() {
                     )}
 
                     <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-2">Reply Type</label>
-                        <div className="flex gap-3">
-                            {['template','text'].map(rt => (
-                                <button key={rt} type="button"
-                                    onClick={() => setForm(f => ({ ...f, response_type: rt }))}
-                                    className={`px-4 py-1.5 text-sm rounded-xl border transition ${
-                                        form.response_type === rt
-                                            ? 'bg-green-600 text-white border-green-600'
-                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                                    }`}>
-                                    {rt === 'template' ? '📋 Template' : '✏️ Free text'}
-                                </button>
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Reply Template *</label>
+                        <select value={form.template_id} onChange={set('template_id')}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                            <option value="">— Select approved template —</option>
+                            {templates.filter(t => t.is_active).map(t => (
+                                <option key={t.id} value={t.id}>{t.template_name}</option>
                             ))}
-                        </div>
+                        </select>
+                        <p className="text-xs text-gray-400 mt-1">Only approved templates can be used. Sync from Vaartabot on the Templates page if your template is missing.</p>
                     </div>
-
-                    {form.response_type === 'template' && (
-                        <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Reply Template *</label>
-                            <select value={form.template_id} onChange={set('template_id')}
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
-                                <option value="">— Select template —</option>
-                                {templates.filter(t => t.is_active).map(t => (
-                                    <option key={t.id} value={t.id}>{t.template_name}</option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
-
-                    {form.response_type === 'text' && (
-                        <div>
-                            <label className="text-xs font-medium text-gray-600 block mb-1">Reply Message *</label>
-                            <textarea value={form.response_text} onChange={set('response_text')} rows={3}
-                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-y"
-                                placeholder="Thanks for your interest! Our team will reach out shortly." />
-                        </div>
-                    )}
 
                     <div className="flex gap-3 pt-1">
                         <button type="submit" disabled={saving}

@@ -441,27 +441,6 @@ exports.handleWebhook = async (req, res) => {
             return;
         }
 
-        // ── Meta/WhatsApp Cloud API format (legacy compatibility) ─────────────
-        if (body.object !== 'whatsapp_business_account') return;
-        for (const entry of body.entry || []) {
-            for (const change of entry.changes || []) {
-                const value = change.value;
-                if (!value) continue;
-                for (const msg of value.messages || []) {
-                    if (msg.type === 'text') {
-                        await handleIncomingWAMessage(msg.from, msg.id, msg.text?.body || '', msg.timestamp);
-                    }
-                }
-                for (const status of value.statuses || []) {
-                    if (['delivered','read'].includes(status.status)) {
-                        await db.query(
-                            "UPDATE outreach_campaign_logs SET status='sent' WHERE whatsapp_message_id=? AND status='pending'",
-                            [status.id]
-                        ).catch(() => {});
-                    }
-                }
-            }
-        }
     } catch (err) {
         console.error('[whatsapp.webhook]', err.message);
     }
@@ -680,16 +659,16 @@ async function fireAutoReply(fromPhone, messageText) {
         // Send the reply
         const phone = fromPhone.replace('+', '');
         if (flow.response_type === 'template' && flow.template_name) {
+            // Build ordered variables array if template has any (varMapping not stored per-flow,
+            // so auto-replies send without variable substitution — use only 0-variable templates)
             await axios.post(`${VB_BASE}/messages/send`,
                 { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
                 { headers: vbHeaders() }
             ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
-        } else if (flow.response_type === 'text' && flow.response_text) {
-            // Use single-send with a plain text body if Vaartabot supports it
-            await axios.post(`${VB_BASE}/messages/send`,
-                { to: phone, message: flow.response_text },
-                { headers: vbHeaders() }
-            ).catch(e => console.error('[autoReply.sendText]', e.response?.data || e.message));
+        } else if (flow.response_type === 'text') {
+            // Vaartabot API only supports approved template messages — free-text replies are not
+            // supported by WhatsApp Cloud API outside of a 24-hour service window.
+            console.warn(`[autoReply] Flow ${flow.id} has response_type='text' which is not supported by Vaartabot. Use a template instead.`);
         }
         break; // Only fire the first matching flow
     }
