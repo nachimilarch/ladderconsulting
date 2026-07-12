@@ -36,7 +36,7 @@ const createLeadFromContact = async ({ contactId, source, campaignId, executiveU
     const [[contact]] = await db.query(
         'SELECT * FROM outreach_contacts WHERE id = ? AND deleted_at IS NULL', [contactId]
     );
-    if (!contact) throw new Error(`Contact ${contactId} not found`);
+    if (!contact) return null; // contact deleted — skip lead creation silently
 
     // Resolve executive's employee_id for leads.assigned_to.
     // If the user has no employee record (e.g., admin without employee), fall back

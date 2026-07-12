@@ -666,15 +666,18 @@ async function fireAutoReply(fromPhone, messageText) {
                 { headers: vbHeaders() }
             ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
         } else if (flow.response_type === 'text' && flow.response_text) {
-            // Vaartabot only supports approved templates — attempt to send via template if set,
-            // otherwise log the intended text response for manual follow-up.
+            // Within the 24-hour session window Vaartabot accepts free-text via /messages/send.
+            // If a fallback template is also set, prefer the template (more reliable delivery).
             if (flow.template_name) {
                 await axios.post(`${VB_BASE}/messages/send`,
                     { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
                     { headers: vbHeaders() }
-                ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
+                ).catch(e => console.error('[autoReply.template]', e.response?.data || e.message));
             } else {
-                console.log(`[autoReply] Text response for flow ${flow.id} to ${phone}: "${flow.response_text}" (no template set — not sent)`);
+                await axios.post(`${VB_BASE}/messages/send`,
+                    { to: phone, message: flow.response_text },
+                    { headers: vbHeaders() }
+                ).catch(e => console.error('[autoReply.text]', e.response?.data || e.message));
             }
         }
         break; // Only fire the first matching flow
