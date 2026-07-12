@@ -664,16 +664,21 @@ async function fireAutoReply(fromPhone, messageText) {
         // Send the reply
         const phone = fromPhone.replace('+', '');
         if (flow.response_type === 'template' && flow.template_name) {
-            // Build ordered variables array if template has any (varMapping not stored per-flow,
-            // so auto-replies send without variable substitution — use only 0-variable templates)
             await axios.post(`${VB_BASE}/messages/send`,
                 { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
                 { headers: vbHeaders() }
             ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
-        } else if (flow.response_type === 'text') {
-            // Vaartabot API only supports approved template messages — free-text replies are not
-            // supported by WhatsApp Cloud API outside of a 24-hour service window.
-            console.warn(`[autoReply] Flow ${flow.id} has response_type='text' which is not supported by Vaartabot. Use a template instead.`);
+        } else if (flow.response_type === 'text' && flow.response_text) {
+            // Vaartabot only supports approved templates — attempt to send via template if set,
+            // otherwise log the intended text response for manual follow-up.
+            if (flow.template_name) {
+                await axios.post(`${VB_BASE}/messages/send`,
+                    { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
+                    { headers: vbHeaders() }
+                ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
+            } else {
+                console.log(`[autoReply] Text response for flow ${flow.id} to ${phone}: "${flow.response_text}" (no template set — not sent)`);
+            }
         }
         break; // Only fire the first matching flow
     }

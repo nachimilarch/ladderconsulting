@@ -4,7 +4,7 @@ import { autoReplyAPI, waTemplateAPI } from '../../api/outreach';
 
 const EMPTY = {
     flow_name: '', trigger_type: 'keyword', trigger_keywords: '', match_type: 'contains',
-    response_type: 'template', template_id: '', response_text: '',
+    response_type: 'text', template_id: '', response_text: '',
 };
 
 const TRIGGER_LABELS = { keyword: 'Keyword match', any: 'Any message', first_contact: 'First contact' };
@@ -41,7 +41,7 @@ export default function AutoReplyFlows() {
                 ? f.trigger_keywords.join(', ')
                 : (typeof f.trigger_keywords === 'string' ? JSON.parse(f.trigger_keywords || '[]').join(', ') : ''),
             match_type: f.match_type,
-            response_type: f.response_type,
+            response_type: f.response_type || 'text',
             template_id: f.template_id ? String(f.template_id) : '',
             response_text: f.response_text || '',
         });
@@ -51,7 +51,10 @@ export default function AutoReplyFlows() {
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!form.flow_name) return toast.error('Flow name is required');
-        if (!form.template_id) return toast.error('Select a reply template');
+        if (form.response_type === 'text' && !form.response_text.trim())
+            return toast.error('Response text is required');
+        if (form.response_type === 'template' && !form.template_id)
+            return toast.error('Select a reply template');
 
         const keywords = form.trigger_keywords
             ? form.trigger_keywords.split(',').map(k => k.trim()).filter(Boolean)
@@ -62,9 +65,9 @@ export default function AutoReplyFlows() {
             trigger_type:     form.trigger_type,
             trigger_keywords: keywords,
             match_type:       form.match_type,
-            response_type:    'template',
-            template_id:      Number(form.template_id),
-            response_text:    null,
+            response_type:    form.response_type,
+            template_id:      form.template_id ? Number(form.template_id) : null,
+            response_text:    form.response_type === 'text' ? form.response_text.trim() : null,
         };
 
         setSaving(true);
@@ -117,7 +120,7 @@ export default function AutoReplyFlows() {
 
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-700">
                 <strong>How it works:</strong> When a contact replies to a WhatsApp campaign, the system checks active flows in order and fires the first match.
-                Auto-replies use <strong>approved Vaartabot templates only</strong> — WhatsApp Cloud API does not allow free-text messages outside a 24-hour service window.
+                Use <strong>Text response</strong> to write the reply you want sent — pair it with an approved template that matches the text, or use <strong>Template</strong> mode for rich messages.
             </div>
 
             {showForm && (
@@ -164,17 +167,57 @@ export default function AutoReplyFlows() {
                         </div>
                     )}
 
+                    {/* Response type toggle */}
                     <div>
-                        <label className="text-xs font-medium text-gray-600 block mb-1">Reply Template *</label>
-                        <select value={form.template_id} onChange={set('template_id')}
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
-                            <option value="">— Select approved template —</option>
-                            {templates.filter(t => t.is_active).map(t => (
-                                <option key={t.id} value={t.id}>{t.template_name}</option>
+                        <label className="text-xs font-medium text-gray-600 block mb-2">Response Type</label>
+                        <div className="flex gap-2">
+                            {['text', 'template'].map(t => (
+                                <button key={t} type="button"
+                                    onClick={() => setForm(p => ({ ...p, response_type: t }))}
+                                    className={`text-sm px-4 py-1.5 rounded-full border transition ${
+                                        form.response_type === t
+                                            ? 'bg-green-600 text-white border-green-600'
+                                            : 'border-gray-200 text-gray-600 hover:bg-gray-50'
+                                    }`}>
+                                    {t === 'text' ? 'Text message' : 'Template'}
+                                </button>
                             ))}
-                        </select>
-                        <p className="text-xs text-gray-400 mt-1">Only approved templates can be used. Sync from Vaartabot on the Templates page if your template is missing.</p>
+                        </div>
                     </div>
+
+                    {form.response_type === 'text' ? (
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Reply Text *</label>
+                            <textarea value={form.response_text} onChange={set('response_text')} rows={3}
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-y"
+                                placeholder="Thank you for your interest! Our team will get back to you shortly." />
+                            <p className="text-xs text-amber-600 mt-1">
+                                ⚠ WhatsApp requires pre-approved templates for outbound messages. Optionally select a matching approved template below to actually send it — otherwise the reply is logged for manual follow-up.
+                            </p>
+                            <div className="mt-2">
+                                <label className="text-xs font-medium text-gray-600 block mb-1">Fallback Template (optional)</label>
+                                <select value={form.template_id} onChange={set('template_id')}
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                                    <option value="">— None (log only, no auto-send) —</option>
+                                    {templates.filter(t => t.is_active).map(t => (
+                                        <option key={t.id} value={t.id}>{t.template_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Reply Template *</label>
+                            <select value={form.template_id} onChange={set('template_id')}
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                                <option value="">— Select approved template —</option>
+                                {templates.filter(t => t.is_active).map(t => (
+                                    <option key={t.id} value={t.id}>{t.template_name}</option>
+                                ))}
+                            </select>
+                            <p className="text-xs text-gray-400 mt-1">Only approved templates can be used. Sync from Vaartabot on the Templates page if yours is missing.</p>
+                        </div>
+                    )}
 
                     <div className="flex gap-3 pt-1">
                         <button type="submit" disabled={saving}
@@ -225,9 +268,9 @@ export default function AutoReplyFlows() {
                                         )}
 
                                         <p className="text-xs text-gray-400 mt-0.5">
-                                            Reply: {f.response_type === 'template'
-                                                ? `Template — ${f.template_name || `#${f.template_id}`}`
-                                                : `Text — "${(f.response_text || '').slice(0, 60)}${(f.response_text || '').length > 60 ? '…' : ''}"`
+                                            {f.response_type === 'template'
+                                                ? `Template → ${f.template_name || `#${f.template_id}`}`
+                                                : `Text → "${(f.response_text || '').slice(0, 80)}${(f.response_text || '').length > 80 ? '…' : ''}"${f.template_name ? ` (sends via ${f.template_name})` : ' (log only)'}`
                                             }
                                         </p>
                                     </div>

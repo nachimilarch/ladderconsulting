@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const { startMailPoller } = require('./services/mailPoller');
+const { startWAPoller }   = require('./services/waPoller');
 
 // Load DB-stored env overrides into process.env so UI-configured values are
 // picked up at startup without needing to edit .env files.
@@ -167,5 +168,6 @@ loadEnvOverrides().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
     startMailPoller();
+    startWAPoller();
   });
 });
