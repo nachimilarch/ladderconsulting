@@ -57,7 +57,14 @@ router.patch('/replies/:id/assign',            authorizeRole('admin'), replyCtrl
 
 // ── WhatsApp / Vaartabot ─────────────────────────────────────────────────────
 router.get('/whatsapp/credits',                    whatsappCtrl.getCredits);
+router.post('/whatsapp/templates/sync',            whatsappCtrl.syncTemplates);
 router.get('/whatsapp/templates',                  whatsappCtrl.listTemplates);
+// Webhook management (admin only — registers/manages Vaartabot webhook subscriptions)
+router.get('/whatsapp/webhooks',                   authorizeRole('admin'), whatsappCtrl.listWebhooks);
+router.post('/whatsapp/webhooks',                  authorizeRole('admin'), whatsappCtrl.registerWebhook);
+router.patch('/whatsapp/webhooks/:id',             authorizeRole('admin'), whatsappCtrl.updateWebhook);
+router.post('/whatsapp/webhooks/:id/test',         authorizeRole('admin'), whatsappCtrl.testWebhook);
+router.delete('/whatsapp/webhooks/:id',            authorizeRole('admin'), whatsappCtrl.deleteWebhook);
 router.post('/whatsapp/templates',                 whatsappCtrl.createTemplate);
 router.put('/whatsapp/templates/:id',              whatsappCtrl.updateTemplate);
 router.delete('/whatsapp/templates/:id',           whatsappCtrl.deleteTemplate);

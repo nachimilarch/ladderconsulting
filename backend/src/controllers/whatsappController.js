@@ -1,6 +1,10 @@
-const db   = require('../config/db');
-const axios = require('axios');
+const db     = require('../config/db');
+const axios  = require('axios');
+const crypto = require('crypto');
 const { createLeadFromContact } = require('../services/leadConverter');
+
+const VB_BASE = 'https://vaartabot.com/api/v1';
+const vbHeaders = () => ({ 'X-API-Key': process.env.VAARTABOT_API_KEY, 'Content-Type': 'application/json' });
 
 const notify = async (userId, type, title, body, metadata = null) => {
     if (!userId) return;
@@ -251,7 +255,7 @@ const chunk = (arr, n) => Array.from({ length: Math.ceil(arr.length / n) }, (_, 
 
 async function sendWABatch(campaign, template, contacts) {
     const apiKey     = process.env.VAARTABOT_API_KEY;
-    const baseUrl    = 'https://vaartabot.com/api/v1';
+    const baseUrl    = VB_BASE;
     const varMapping = campaign.variable_mapping
         ? (typeof campaign.variable_mapping === 'string' ? JSON.parse(campaign.variable_mapping) : campaign.variable_mapping)
         : {};
@@ -373,45 +377,68 @@ exports.verifyWebhook = (req, res) => {
     res.sendStatus(200);
 };
 
-// POST /api/outreach/webhooks/whatsapp — handles both Vaartabot and Meta formats
+// POST /api/outreach/webhooks/whatsapp — handles Vaartabot webhook events
 exports.handleWebhook = async (req, res) => {
-    res.sendStatus(200); // Always respond 200 immediately
+    // ── Signature verification ────────────────────────────────────────────────
+    // Vaartabot sends: X-Vaartabot-Signature: sha256=<hex>
+    // Secret is stored per-webhook; we store it in VAARTABOT_WEBHOOK_SECRET env
+    const sigHeader = req.headers['x-vaartabot-signature'];
+    const secret    = process.env.VAARTABOT_WEBHOOK_SECRET;
+    if (secret && sigHeader) {
+        const rawBody = req.rawBody || (Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body)));
+        const expected = 'sha256=' + crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+        if (sigHeader !== expected) {
+            console.warn('[webhook] Invalid Vaartabot signature — rejected');
+            return res.sendStatus(401);
+        }
+    }
+
+    res.sendStatus(200); // Respond within 8 seconds as required
 
     const body = req.body;
     if (!body) return;
 
     try {
-        // ── Vaartabot webhook format ────────────────────────────────────────
-        // { event: 'message.received', data: { from, messageId, message, timestamp } }
-        // { event: 'message.status',   data: { messageId, status } }
+        // ── Vaartabot webhook format ──────────────────────────────────────────
+        // { event, tenant_id, timestamp, data: { message_id, from, type, text, received_at } }
         if (body.event) {
             const event = body.event;
             const data  = body.data || {};
 
             if (event === 'message.received') {
-                const from      = data.from || data.phone || '';
-                const msgId     = data.messageId || data.message_id || '';
-                const text      = data.message || data.text || data.body || '';
-                const timestamp = data.timestamp || null;
+                const from      = data.from || '';
+                // Correct field names from Vaartabot docs: data.text, data.message_id, data.received_at
+                const msgId     = data.message_id || data.messageId || '';
+                const text      = data.text || data.message || data.body || '';
+                // received_at is ISO string; pass as-is — handleIncomingWAMessage accepts ISO or unix timestamp
+                const timestamp = data.received_at || body.timestamp || null;
                 if (from) await handleIncomingWAMessage(from, msgId, text, timestamp);
 
-            } else if (event === 'message.status') {
-                const msgId  = data.messageId || data.message_id;
-                const status = data.status;
-                if (msgId && ['delivered','read','sent'].includes(status)) {
+            } else if (event === 'message.delivered' || event === 'message.read') {
+                const msgId = data.message_id || data.messageId;
+                if (msgId) {
                     await db.query(
                         "UPDATE outreach_campaign_logs SET status='sent' WHERE whatsapp_message_id=? AND status='pending'",
                         [msgId]
+                    ).catch(() => {});
+                }
+
+            } else if (event === 'message.failed') {
+                const msgId  = data.message_id || data.messageId;
+                const reason = data.error || data.reason || 'Delivery failed';
+                if (msgId) {
+                    await db.query(
+                        "UPDATE outreach_campaign_logs SET status='failed', error_message=? WHERE whatsapp_message_id=?",
+                        [String(reason).slice(0, 500), msgId]
                     ).catch(() => {});
                 }
             }
             return;
         }
 
-        // ── Meta/WhatsApp Cloud API format (legacy compatibility) ───────────
+        // ── Meta/WhatsApp Cloud API format (legacy compatibility) ─────────────
         if (body.object !== 'whatsapp_business_account') return;
-        const entries = body.entry || [];
-        for (const entry of entries) {
+        for (const entry of body.entry || []) {
             for (const change of entry.changes || []) {
                 const value = change.value;
                 if (!value) continue;
@@ -435,8 +462,11 @@ exports.handleWebhook = async (req, res) => {
     }
 };
 
-async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timestampSec) {
-    const receivedAt = timestampSec ? new Date(parseInt(timestampSec) * 1000) : new Date();
+async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timestamp) {
+    // Accept ISO string (Vaartabot) or unix timestamp seconds (Meta)
+    const receivedAt = timestamp
+        ? (typeof timestamp === 'string' ? new Date(timestamp) : new Date(parseInt(timestamp) * 1000))
+        : new Date();
     const e164Phone  = toE164(fromPhone);
 
     // Find campaign log by phone number
@@ -507,12 +537,9 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
 }
 
 // ── GET /api/outreach/whatsapp/credits ────────────────────────────────────────
-// Proxy Vaartabot credit balance to the frontend — avoids exposing the API key.
 exports.getCredits = async (req, res) => {
     try {
-        const response = await axios.get('https://vaartabot.com/api/v1/credits/balance', {
-            headers: { 'X-API-Key': process.env.VAARTABOT_API_KEY },
-        });
+        const response = await axios.get(`${VB_BASE}/credits/balance`, { headers: vbHeaders() });
         res.json({ success: true, data: response.data?.data || response.data });
     } catch (err) {
         console.error('[vaartabot.credits]', err.response?.data || err.message);
@@ -741,32 +768,32 @@ async function fireAutoReply(fromPhone, messageText) {
         // Send the reply
         const phone = fromPhone.replace('+', '');
         if (flow.response_type === 'template' && flow.template_name) {
-            await axios.post('https://vaartabot.com/api/v1/messages/send',
+            await axios.post(`${VB_BASE}/messages/send`,
                 { to: phone, templateName: flow.template_name, language: flow.language_code || 'en' },
-                { headers: { 'X-API-Key': apiKey } }
+                { headers: vbHeaders() }
             ).catch(e => console.error('[autoReply.send]', e.response?.data || e.message));
         } else if (flow.response_type === 'text' && flow.response_text) {
-            await axios.post('https://vaartabot.com/api/v1/messages/send-text',
+            // Use single-send with a plain text body if Vaartabot supports it
+            await axios.post(`${VB_BASE}/messages/send`,
                 { to: phone, message: flow.response_text },
-                { headers: { 'X-API-Key': apiKey } }
+                { headers: vbHeaders() }
             ).catch(e => console.error('[autoReply.sendText]', e.response?.data || e.message));
         }
         break; // Only fire the first matching flow
     }
 }
 
-// ── POST /api/outreach/whatsapp/templates/sync ────────────────────────────────
-// Fetch approved templates from Vaartabot and upsert into local whatsapp_templates.
+// ── POST /api/outreach/whatsapp/templates/sync ───────────────────────────────
+// Calls GET /templates/sync (Vaartabot force-refetch from Meta) then upserts locally.
+// Only APPROVED templates are marked active; PENDING/REJECTED are stored but inactive.
 exports.syncTemplates = async (req, res) => {
-    const apiKey = process.env.VAARTABOT_API_KEY;
-    if (!apiKey) return res.status(503).json({ success: false, message: 'Vaartabot API key not configured.' });
+    if (!process.env.VAARTABOT_API_KEY) return res.status(503).json({ success: false, message: 'Vaartabot API key not configured.' });
 
     let vaartabotTemplates;
     try {
-        const response = await axios.get('https://vaartabot.com/api/v1/templates', {
-            headers: { 'X-API-Key': apiKey },
-        });
-        // Vaartabot returns { data: [...] } or { templates: [...] } — handle both shapes
+        // /templates/sync force-refetches from Meta; falls back to /templates if it fails
+        const response = await axios.get(`${VB_BASE}/templates/sync`, { headers: vbHeaders() })
+            .catch(() => axios.get(`${VB_BASE}/templates`, { headers: vbHeaders() }));
         const payload = response.data?.data || response.data?.templates || response.data;
         vaartabotTemplates = Array.isArray(payload) ? payload : [];
     } catch (err) {
@@ -774,60 +801,122 @@ exports.syncTemplates = async (req, res) => {
         return res.status(502).json({ success: false, message: 'Could not fetch templates from Vaartabot.' });
     }
 
-    if (vaartabotTemplates.length === 0) {
+    if (!vaartabotTemplates.length) {
         return res.json({ success: true, synced: 0, message: 'No templates returned from Vaartabot.' });
     }
 
     let synced = 0;
     for (const t of vaartabotTemplates) {
-        // Vaartabot template shape: { name, language, category, components: [...] }
-        const templateName = t.name || t.template_name;
-        const languageCode = t.language || t.language_code || 'en';
-        const category     = (t.category || 'MARKETING').toUpperCase();
+        // Vaartabot shape: { name, status, category, language, components: [...] }
+        const templateName  = t.name || t.template_name;
+        const languageCode  = t.language || t.language_code || 'en';
+        const category      = (t.category || 'MARKETING').toUpperCase();
+        // Only APPROVED templates should be selectable for campaigns
+        const approvalStatus = (t.status || 'PENDING').toUpperCase();
+        const isActive       = approvalStatus === 'APPROVED' ? 1 : 0;
 
-        // Extract body text from components array if present
-        let bodyText = t.body_text || t.body || '';
-        let headerType    = 'none';
-        let headerContent = '';
-        let footerText    = '';
-        let variableCount = 0;
+        let bodyText = '', headerType = 'none', headerContent = '', footerText = '', variableCount = 0;
 
         if (Array.isArray(t.components)) {
             for (const comp of t.components) {
                 const type = (comp.type || '').toUpperCase();
-                if (type === 'BODY')   { bodyText = comp.text || ''; }
+                if (type === 'BODY')   bodyText      = comp.text || '';
                 if (type === 'HEADER') { headerType = (comp.format || 'TEXT').toLowerCase(); headerContent = comp.text || ''; }
-                if (type === 'FOOTER') { footerText = comp.text || ''; }
+                if (type === 'FOOTER') footerText    = comp.text || '';
             }
-            // Count {{N}} placeholders in body
-            const matches = bodyText.match(/\{\{\d+\}\}/g);
-            variableCount = matches ? new Set(matches).size : 0;
+            const matches  = bodyText.match(/\{\{\d+\}\}/g);
+            variableCount  = matches ? new Set(matches).size : 0;
         }
+        if (!bodyText) bodyText = t.body_text || t.body || '';
+        if (!templateName) continue;
 
-        if (!templateName || !bodyText) continue;
-
-        // Upsert: match on template_name (it's unique per account)
         const [[existing]] = await db.query(
             'SELECT id FROM whatsapp_templates WHERE template_name = ? AND deleted_at IS NULL LIMIT 1',
             [templateName]
         );
-
         if (existing) {
             await db.query(
                 `UPDATE whatsapp_templates SET language_code=?, category=?, body_text=?, header_type=?,
-                 header_content=?, footer_text=?, variable_count=?, is_active=1 WHERE id=?`,
-                [languageCode, category, bodyText, headerType, headerContent, footerText, variableCount, existing.id]
+                 header_content=?, footer_text=?, variable_count=?, is_active=? WHERE id=?`,
+                [languageCode, category, bodyText, headerType, headerContent, footerText, variableCount, isActive, existing.id]
             );
         } else {
             await db.query(
                 `INSERT INTO whatsapp_templates
-                   (created_by, template_name, language_code, category, header_type, header_content, body_text, footer_text, variable_count, is_active)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
-                [req.user.id, templateName, languageCode, category, headerType, headerContent, bodyText, footerText, variableCount]
+                   (created_by, template_name, language_code, category, header_type, header_content,
+                    body_text, footer_text, variable_count, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [req.user.id, templateName, languageCode, category, headerType, headerContent,
+                 bodyText, footerText, variableCount, isActive]
             );
         }
         synced++;
     }
 
-    res.json({ success: true, synced, total: vaartabotTemplates.length, message: `Synced ${synced} template(s) from Vaartabot.` });
+    const approved = vaartabotTemplates.filter(t => (t.status || '').toUpperCase() === 'APPROVED').length;
+    res.json({ success: true, synced, total: vaartabotTemplates.length, approved,
+               message: `Synced ${synced} template(s) — ${approved} approved, ${synced - approved} pending/rejected.` });
+};
+
+// ── Webhook management (proxy to Vaartabot API) ───────────────────────────────
+
+exports.listWebhooks = async (req, res) => {
+    try {
+        const response = await axios.get(`${VB_BASE}/webhooks`, { headers: vbHeaders() });
+        res.json({ success: true, data: response.data?.data || response.data });
+    } catch (err) {
+        console.error('[vaartabot.webhooks.list]', err.response?.data || err.message);
+        res.status(502).json({ success: false, message: 'Could not fetch webhooks.' });
+    }
+};
+
+exports.registerWebhook = async (req, res) => {
+    const { name, url, events } = req.body;
+    if (!url) return res.status(422).json({ success: false, message: 'url is required.' });
+    try {
+        const response = await axios.post(`${VB_BASE}/webhooks`,
+            { name: name || 'LadderStep', url, events: events || ['message.received','message.delivered','message.read','message.failed'] },
+            { headers: vbHeaders() }
+        );
+        res.status(201).json({ success: true, data: response.data?.data || response.data,
+            message: 'Webhook registered. Save the secret — it is shown only once.' });
+    } catch (err) {
+        console.error('[vaartabot.webhooks.register]', err.response?.data || err.message);
+        res.status(err.response?.status || 502).json({
+            success: false, message: err.response?.data?.message || 'Could not register webhook.'
+        });
+    }
+};
+
+exports.updateWebhook = async (req, res) => {
+    try {
+        const response = await axios.patch(`${VB_BASE}/webhooks/${req.params.id}`, req.body, { headers: vbHeaders() });
+        res.json({ success: true, data: response.data?.data || response.data });
+    } catch (err) {
+        res.status(err.response?.status || 502).json({
+            success: false, message: err.response?.data?.message || 'Could not update webhook.'
+        });
+    }
+};
+
+exports.testWebhook = async (req, res) => {
+    try {
+        const response = await axios.post(`${VB_BASE}/webhooks/${req.params.id}/test`, {}, { headers: vbHeaders() });
+        res.json({ success: true, data: response.data?.data || response.data, message: 'Test event sent.' });
+    } catch (err) {
+        res.status(err.response?.status || 502).json({
+            success: false, message: err.response?.data?.message || 'Test failed.'
+        });
+    }
+};
+
+exports.deleteWebhook = async (req, res) => {
+    try {
+        await axios.delete(`${VB_BASE}/webhooks/${req.params.id}`, { headers: vbHeaders() });
+        res.json({ success: true, message: 'Webhook deleted.' });
+    } catch (err) {
+        res.status(err.response?.status || 502).json({
+            success: false, message: err.response?.data?.message || 'Could not delete webhook.'
+        });
+    }
 };

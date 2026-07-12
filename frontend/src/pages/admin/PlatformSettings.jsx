@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { adminSettingsAPI, adminAIAPI } from '../../api/admin';
+import { vaartabotAPI } from '../../api/outreach';
 import toast from 'react-hot-toast';
 
 // ── Platform behaviour settings ───────────────────────────────────────────────
@@ -249,6 +250,184 @@ const FieldInput = ({ field, value, onChange }) => {
     );
 };
 
+// ── Webhook Manager ───────────────────────────────────────────────────────────
+
+const WH_EVENTS = ['message.received', 'message.delivered', 'message.read', 'message.failed'];
+
+function WebhookManager() {
+    const [webhooks, setWebhooks]       = useState([]);
+    const [loading,  setLoading]        = useState(true);
+    const [showForm, setShowForm]       = useState(false);
+    const [form,     setForm]           = useState({ url: '', events: [] });
+    const [saving,   setSaving]         = useState(false);
+    const [newSecret, setNewSecret]     = useState(null); // shown once after registration
+    const [testing,  setTesting]        = useState(null);
+
+    const load = () => {
+        setLoading(true);
+        vaartabotAPI.listWebhooks()
+            .then(r => setWebhooks(r.data?.data?.webhooks || r.data?.data || []))
+            .catch(() => toast.error('Failed to load webhooks'))
+            .finally(() => setLoading(false));
+    };
+
+    useEffect(() => { load(); }, []);
+
+    const toggleEvent = (ev) => setForm(f => ({
+        ...f,
+        events: f.events.includes(ev) ? f.events.filter(e => e !== ev) : [...f.events, ev],
+    }));
+
+    const handleRegister = async (e) => {
+        e.preventDefault();
+        if (!form.url) return toast.error('Webhook URL is required');
+        if (!form.events.length) return toast.error('Select at least one event');
+        setSaving(true);
+        try {
+            const r = await vaartabotAPI.registerWebhook({ url: form.url, events: form.events });
+            const secret = r.data?.data?.secret || r.data?.secret;
+            setNewSecret(secret || null);
+            toast.success('Webhook registered');
+            setShowForm(false);
+            setForm({ url: '', events: [] });
+            load();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Registration failed');
+        } finally { setSaving(false); }
+    };
+
+    const handleTest = async (id) => {
+        setTesting(id);
+        try {
+            await vaartabotAPI.testWebhook(id);
+            toast.success('Test payload sent');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Test failed');
+        } finally { setTesting(null); }
+    };
+
+    const handleDelete = async (id, url) => {
+        if (!confirm(`Remove webhook for ${url}?`)) return;
+        try {
+            await vaartabotAPI.deleteWebhook(id);
+            toast.success('Webhook removed');
+            load();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Delete failed');
+        }
+    };
+
+    return (
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                <div>
+                    <div className="flex items-center gap-2">
+                        <span className="text-lg">🔗</span>
+                        <span className="text-sm font-semibold text-gray-800">Vaartabot Webhook Manager</span>
+                        <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded font-mono">admin only</span>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-0.5 ml-7">
+                        Register this server's webhook URL with Vaartabot to receive inbound WhatsApp messages.
+                        The webhook secret is shown <strong>once</strong> on registration — save it to <code className="bg-gray-100 px-0.5 rounded">VAARTABOT_WEBHOOK_SECRET</code> in your <code className="bg-gray-100 px-0.5 rounded">.env</code>.
+                    </p>
+                </div>
+                <button
+                    onClick={() => { setShowForm(v => !v); setNewSecret(null); }}
+                    className="text-sm bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 transition shrink-0"
+                >
+                    + Register
+                </button>
+            </div>
+
+            {newSecret && (
+                <div className="mx-5 mt-4 bg-amber-50 border border-amber-300 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-amber-700 mb-1">⚠ Webhook secret — copy it now, it won't be shown again</p>
+                    <code className="block text-sm font-mono break-all text-amber-900 bg-amber-100 rounded px-3 py-2 mt-1 select-all">{newSecret}</code>
+                    <p className="text-xs text-amber-600 mt-2">Add this as <strong>VAARTABOT_WEBHOOK_SECRET</strong> in your backend <code>.env</code>, then restart the server.</p>
+                    <button onClick={() => setNewSecret(null)} className="mt-2 text-xs text-amber-700 hover:underline">Dismiss</button>
+                </div>
+            )}
+
+            {showForm && (
+                <form onSubmit={handleRegister} className="mx-5 my-4 space-y-4 bg-gray-50 rounded-xl p-4 border border-gray-100">
+                    <div>
+                        <label className="text-xs font-medium text-gray-600 block mb-1">Webhook URL *</label>
+                        <input
+                            type="url"
+                            value={form.url}
+                            onChange={e => setForm(f => ({ ...f, url: e.target.value }))}
+                            placeholder="https://api.theladderconsulting.com/api/outreach/webhooks/whatsapp"
+                            className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                        />
+                    </div>
+                    <div>
+                        <label className="text-xs font-medium text-gray-600 block mb-2">Events to subscribe *</label>
+                        <div className="flex flex-wrap gap-2">
+                            {WH_EVENTS.map(ev => (
+                                <label key={ev} className="flex items-center gap-1.5 cursor-pointer">
+                                    <input
+                                        type="checkbox"
+                                        checked={form.events.includes(ev)}
+                                        onChange={() => toggleEvent(ev)}
+                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-400"
+                                    />
+                                    <span className="text-xs font-mono text-gray-700">{ev}</span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                    <div className="flex gap-3">
+                        <button type="submit" disabled={saving}
+                            className="bg-indigo-600 text-white text-sm px-4 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition">
+                            {saving ? 'Registering…' : 'Register Webhook'}
+                        </button>
+                        <button type="button" onClick={() => setShowForm(false)} className="text-sm text-gray-500 hover:underline">Cancel</button>
+                    </div>
+                </form>
+            )}
+
+            <div className="px-5 py-4">
+                {loading ? (
+                    <p className="text-sm text-gray-400">Loading webhooks…</p>
+                ) : webhooks.length === 0 ? (
+                    <p className="text-sm text-gray-400">No webhooks registered yet.</p>
+                ) : (
+                    <div className="space-y-3">
+                        {webhooks.map(wh => (
+                            <div key={wh.id || wh.webhook_id} className="flex items-start justify-between gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                <div className="min-w-0">
+                                    <p className="text-sm font-mono text-gray-800 truncate">{wh.url}</p>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                        {(wh.events || []).map(ev => (
+                                            <span key={ev} className="text-[10px] font-mono bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{ev}</span>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-gray-400 mt-1">ID: {wh.id || wh.webhook_id}</p>
+                                </div>
+                                <div className="flex gap-2 shrink-0">
+                                    <button
+                                        onClick={() => handleTest(wh.id || wh.webhook_id)}
+                                        disabled={testing === (wh.id || wh.webhook_id)}
+                                        className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
+                                    >
+                                        {testing === (wh.id || wh.webhook_id) ? 'Testing…' : 'Test'}
+                                    </button>
+                                    <button
+                                        onClick={() => handleDelete(wh.id || wh.webhook_id, wh.url)}
+                                        className="text-xs text-red-500 hover:underline"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 
 export default function PlatformSettings() {
@@ -468,6 +647,10 @@ export default function PlatformSettings() {
                     );
                 })}
             </div>
+
+            {/* ── Vaartabot Webhook Manager ─────────────────────────────────── */}
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mt-8 mb-3">WhatsApp Webhook Management</p>
+            <WebhookManager />
 
         </div>
     );

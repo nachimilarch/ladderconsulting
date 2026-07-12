@@ -37,7 +37,12 @@ export const waCampaignAPI = {
 };
 
 export const vaartabotAPI = {
-    getCredits: () => api.get('/outreach/whatsapp/credits'),
+    getCredits:      ()           => api.get('/outreach/whatsapp/credits'),
+    listWebhooks:    ()           => api.get('/outreach/whatsapp/webhooks'),
+    registerWebhook: (data)       => api.post('/outreach/whatsapp/webhooks', data),
+    updateWebhook:   (id, data)   => api.patch(`/outreach/whatsapp/webhooks/${id}`, data),
+    testWebhook:     (id)         => api.post(`/outreach/whatsapp/webhooks/${id}/test`),
+    deleteWebhook:   (id)         => api.delete(`/outreach/whatsapp/webhooks/${id}`),
 };
 
 export const autoReplyAPI = {
@@ -49,6 +54,7 @@ export const autoReplyAPI = {
 
 export const waTemplateAPI = {
     getAll:   (params)   => api.get('/outreach/whatsapp/templates', { params }),
+    sync:     ()         => api.post('/outreach/whatsapp/templates/sync'),
     create:   (data)     => api.post('/outreach/whatsapp/templates', data),
     update:   (id, data) => api.put(`/outreach/whatsapp/templates/${id}`, data),
     remove:   (id)       => api.delete(`/outreach/whatsapp/templates/${id}`),

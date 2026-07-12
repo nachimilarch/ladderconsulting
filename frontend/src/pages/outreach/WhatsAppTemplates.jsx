@@ -12,6 +12,7 @@ export default function WhatsAppTemplates() {
     const [editing, setEditing]     = useState(null);
     const [form, setForm]           = useState(EMPTY);
     const [saving, setSaving]       = useState(false);
+    const [syncing, setSyncing]     = useState(false);
     const [credits, setCredits]     = useState(null);
 
     const fetch = () => {
@@ -29,6 +30,17 @@ export default function WhatsAppTemplates() {
             .catch(() => {});
     }, []);
 
+
+    const handleSync = async () => {
+        setSyncing(true);
+        try {
+            const r = await waTemplateAPI.sync();
+            toast.success(r.data.message || `Synced ${r.data.synced} template(s)`);
+            fetch();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Sync failed');
+        } finally { setSyncing(false); }
+    };
 
     const openEdit = (t) => {
         setEditing(t.id);
@@ -82,10 +94,16 @@ export default function WhatsAppTemplates() {
                     </div>
                     <p className="text-sm text-gray-500 mt-0.5">Manage Vaartabot-approved message templates</p>
                 </div>
-                <button onClick={() => { setShowForm(!showForm); setEditing(null); setForm(EMPTY); }}
-                    className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">
-                    + Add Template
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={handleSync} disabled={syncing}
+                        className="border border-gray-200 text-sm px-3 py-2 rounded-xl hover:bg-gray-50 transition disabled:opacity-50">
+                        {syncing ? 'Syncing…' : '↻ Sync from Vaartabot'}
+                    </button>
+                    <button onClick={() => { setShowForm(!showForm); setEditing(null); setForm(EMPTY); }}
+                        className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">
+                        + Add Template
+                    </button>
+                </div>
             </div>
 
             <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-700">
@@ -157,10 +175,13 @@ export default function WhatsAppTemplates() {
                             <div key={t.id} className="px-5 py-4">
                                 <div className="flex items-start justify-between">
                                     <div>
-                                        <div className="flex items-center gap-2">
+                                        <div className="flex items-center gap-2 flex-wrap">
                                             <p className="text-sm font-semibold text-gray-800">{t.template_name}</p>
                                             <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{t.category}</span>
-                                            {!t.is_active && <span className="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded-full">Inactive</span>}
+                                            {t.is_active
+                                                ? <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">✓ Approved</span>
+                                                : <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">⏳ Pending / Rejected</span>
+                                            }
                                         </div>
                                         <p className="text-xs text-gray-500 mt-1 max-w-lg">{t.body_text}</p>
                                         <p className="text-xs text-gray-400 mt-0.5">{t.variable_count} variable(s) · {t.language_code}</p>
