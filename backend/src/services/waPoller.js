@@ -133,6 +133,9 @@ async function processInboundMessage(msg) {
 async function runPollCycle() {
     const apiKey = process.env.VAARTABOT_API_KEY;
     if (!apiKey) return;
+    // Vaartabot message log/inbox endpoints currently return server errors.
+    // Rely on webhook delivery instead; this poller is a no-op until fixed upstream.
+    return;
 
     try {
         // /messages/inbox has a server-side bug on Vaartabot; use /messages/logs instead

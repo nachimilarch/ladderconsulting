@@ -16,6 +16,7 @@ const db    = require('../config/db');
 const { getGraphToken }        = require('../utils/graphMail');
 const { parseReplyToTag }      = require('../utils/outreachEmail');
 const { createLeadFromContact } = require('./leadConverter');
+const { fireEmailAutoReply }    = require('./emailAutoReply');
 
 const POLL_INTERVAL_MS = 2 * 60 * 1000; // 2 minutes
 
@@ -194,6 +195,12 @@ const processMail = async (parsed) => {
             );
         }
     }
+
+    // Fire email auto-reply (non-blocking — errors are caught inside)
+    fireEmailAutoReply({
+        id: replyId, from_email: fromAddr, from_name: fromName,
+        subject, body_text: bodyText, campaign_id: campaignId, message_id: messageId,
+    }).catch(e => console.error('[mailPoller:autoReply]', e.message));
 };
 
 // Token is managed by graphMail.js (shared with email sending)

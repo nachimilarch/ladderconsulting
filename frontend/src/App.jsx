@@ -85,6 +85,7 @@ import WhatsAppCampaignNew from './pages/outreach/WhatsAppCampaignNew';
 import WhatsAppCampaignDetail from './pages/outreach/WhatsAppCampaignDetail';
 import WhatsAppTemplates from './pages/outreach/WhatsAppTemplates';
 import AutoReplyFlows from './pages/outreach/AutoReplyFlows';
+import EmailAutoReplyFlows from './pages/outreach/EmailAutoReplyFlows';
 import Replies from './pages/outreach/Replies';
 import ReplyDetail from './pages/outreach/ReplyDetail';
 import OutreachCalls from './pages/outreach/OutreachCalls';
@@ -250,6 +251,7 @@ export default function App() {
           <Route path="whatsapp/new" element={<WhatsAppCampaignNew />} />
           <Route path="whatsapp/templates" element={<WhatsAppTemplates />} />
           <Route path="whatsapp/auto-replies" element={<AutoReplyFlows />} />
+          <Route path="email/auto-replies" element={<EmailAutoReplyFlows />} />
           <Route path="whatsapp/:id" element={<WhatsAppCampaignDetail />} />
           <Route path="replies" element={<Replies />} />
           <Route path="replies/:id" element={<ReplyDetail />} />

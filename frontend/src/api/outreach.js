@@ -60,6 +60,13 @@ export const waTemplateAPI = {
     remove:   (id)       => api.delete(`/outreach/whatsapp/templates/${id}`),
 };
 
+export const emailAutoReplyAPI = {
+    getAll:  ()          => api.get('/outreach/email/auto-replies'),
+    create:  (data)      => api.post('/outreach/email/auto-replies', data),
+    update:  (id, data)  => api.put(`/outreach/email/auto-replies/${id}`, data),
+    remove:  (id)        => api.delete(`/outreach/email/auto-replies/${id}`),
+};
+
 export const outreachCallAPI = {
     getAll:  (params)   => api.get('/outreach/calls', { params }),
     log:     (data)     => api.post('/outreach/calls', data),

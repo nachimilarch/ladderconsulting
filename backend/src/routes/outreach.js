@@ -6,7 +6,8 @@ const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const contactCtrl   = require('../controllers/outreachContactController');
 const campaignCtrl  = require('../controllers/outreachCampaignController');
 const replyCtrl     = require('../controllers/outreachReplyController');
-const callCtrl      = require('../controllers/outreachCallController');
+const callCtrl           = require('../controllers/outreachCallController');
+const emailAutoReplyCtrl = require('../controllers/emailAutoReplyController');
 const whatsappCtrl  = require('../controllers/whatsappController');
 const analyticsCtrl = require('../controllers/outreachAnalyticsController');
 
@@ -78,6 +79,12 @@ router.post('/whatsapp-campaigns',             whatsappCtrl.createWACampaign);
 router.get('/whatsapp-campaigns',              whatsappCtrl.listWACampaigns);
 router.get('/whatsapp-campaigns/:id',          whatsappCtrl.getWACampaign);
 router.post('/whatsapp-campaigns/:id/send',    whatsappCtrl.sendWACampaign);
+
+// ── Email Auto-Replies ───────────────────────────────────────────────────────
+router.get('/email/auto-replies',              emailAutoReplyCtrl.listFlows);
+router.post('/email/auto-replies',             emailAutoReplyCtrl.createFlow);
+router.put('/email/auto-replies/:id',          emailAutoReplyCtrl.updateFlow);
+router.delete('/email/auto-replies/:id',       emailAutoReplyCtrl.deleteFlow);
 
 // ── Cold Calls ───────────────────────────────────────────────────────────────
 router.get('/calls',                           callCtrl.getCalls);
