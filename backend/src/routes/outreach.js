@@ -56,12 +56,18 @@ router.patch('/replies/:id/ignore',            replyCtrl.ignoreReply);
 router.patch('/replies/:id/assign',            authorizeRole('admin'), replyCtrl.assignReply);
 
 // ── WhatsApp / Vaartabot ─────────────────────────────────────────────────────
-router.get('/whatsapp/credits',                whatsappCtrl.getCredits);
-router.post('/whatsapp/templates/sync',        whatsappCtrl.syncTemplates);
-router.get('/whatsapp/templates',              whatsappCtrl.listTemplates);
-router.post('/whatsapp/templates',             whatsappCtrl.createTemplate);
-router.put('/whatsapp/templates/:id',          whatsappCtrl.updateTemplate);
-router.delete('/whatsapp/templates/:id',       whatsappCtrl.deleteTemplate);
+router.get('/whatsapp/credits',                    whatsappCtrl.getCredits);
+router.get('/whatsapp/vaartabot-contacts/groups',  whatsappCtrl.getVaartabotGroups);
+router.post('/whatsapp/vaartabot-contacts/sync',   whatsappCtrl.syncVaartabotGroup);
+router.post('/whatsapp/templates/sync',            whatsappCtrl.syncTemplates);
+router.get('/whatsapp/templates',                  whatsappCtrl.listTemplates);
+router.post('/whatsapp/templates',                 whatsappCtrl.createTemplate);
+router.put('/whatsapp/templates/:id',              whatsappCtrl.updateTemplate);
+router.delete('/whatsapp/templates/:id',           whatsappCtrl.deleteTemplate);
+router.get('/whatsapp/auto-replies',               whatsappCtrl.listAutoReplyFlows);
+router.post('/whatsapp/auto-replies',              whatsappCtrl.createAutoReplyFlow);
+router.put('/whatsapp/auto-replies/:id',           whatsappCtrl.updateAutoReplyFlow);
+router.delete('/whatsapp/auto-replies/:id',        whatsappCtrl.deleteAutoReplyFlow);
 
 // ── WhatsApp Campaigns ───────────────────────────────────────────────────────
 router.post('/whatsapp-campaigns',             whatsappCtrl.createWACampaign);
