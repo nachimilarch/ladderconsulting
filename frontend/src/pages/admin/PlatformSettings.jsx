@@ -172,15 +172,6 @@ const ENV_SECTIONS = [
             { key: 'cashfree_webhook_secret', label: 'Webhook Secret',  type: 'password', placeholder: '••••••••' },
         ],
     },
-    {
-        id: 'ai',
-        title: 'AI / OpenAI',
-        description: 'OpenAI API key — only needed for Training course recommendations. Resume parsing and matching are fully offline.',
-        icon: '🤖',
-        fields: [
-            { key: 'openai_api_key', label: 'OpenAI API Key', type: 'password', placeholder: 'sk-…' },
-        ],
-    },
 ];
 
 
@@ -398,8 +389,8 @@ function WebhookManager() {
                                 <div className="min-w-0">
                                     <p className="text-sm font-mono text-gray-800 truncate">{wh.url}</p>
                                     <div className="flex flex-wrap gap-1 mt-1">
-                                        {(wh.events || []).map(ev => (
-                                            <span key={ev} className="text-[10px] font-mono bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{ev}</span>
+                                        {(Array.isArray(wh.events) ? wh.events : String(wh.events || '').split(',')).filter(Boolean).map(ev => (
+                                            <span key={ev} className="text-[10px] font-mono bg-indigo-50 text-indigo-700 px-1.5 py-0.5 rounded">{ev.trim()}</span>
                                         ))}
                                     </div>
                                     <p className="text-[10px] text-gray-400 mt-1">ID: {wh.id || wh.webhook_id}</p>
