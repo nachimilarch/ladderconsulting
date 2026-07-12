@@ -452,16 +452,19 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
         ? (typeof timestamp === 'string' ? new Date(timestamp) : new Date(parseInt(timestamp) * 1000))
         : new Date();
     const e164Phone  = toE164(fromPhone);
+    // Digits-only form for DB matching — contacts are stored without '+'
+    const digitsPhone = fromPhone.replace(/\D/g, '');
 
-    // Find campaign log by phone number
+    // Find campaign log by phone number — match against digits-only since contacts are stored without '+'
     const [[logRow]] = await db.query(
         `SELECT ocl.id, ocl.campaign_id, ocl.contact_id, oc.created_by
          FROM outreach_campaign_logs ocl
          JOIN outreach_campaigns oc ON oc.id = ocl.campaign_id
          JOIN outreach_contacts ct ON ct.id = ocl.contact_id
-         WHERE (ct.whatsapp_number = ? OR ct.phone = ?) AND ocl.channel = 'whatsapp' AND ocl.status = 'sent'
+         WHERE (REPLACE(ct.whatsapp_number,'+','') = ? OR REPLACE(ct.phone,'+','') = ?)
+           AND ocl.channel = 'whatsapp' AND ocl.status = 'sent'
          ORDER BY ocl.sent_at DESC LIMIT 1`,
-        [e164Phone, e164Phone]
+        [digitsPhone, digitsPhone]
     );
 
     const campaignId  = logRow?.campaign_id  || null;
@@ -635,11 +638,13 @@ async function fireAutoReply(fromPhone, messageText) {
             matched = true;
         } else if (flow.trigger_type === 'first_contact') {
             // Only reply if this phone has never been seen before in campaign logs
+            const digits = fromPhone.replace(/\D/g, '');
             const [[seen]] = await db.query(
                 `SELECT id FROM outreach_campaign_logs l
                  JOIN outreach_contacts c ON c.id = l.contact_id
-                 WHERE (c.phone = ? OR c.whatsapp_number = ?) AND l.channel = 'whatsapp' LIMIT 1`,
-                [fromPhone, fromPhone]
+                 WHERE (REPLACE(c.phone,'+','') = ? OR REPLACE(c.whatsapp_number,'+','') = ?)
+                   AND l.channel = 'whatsapp' LIMIT 1`,
+                [digits, digits]
             );
             matched = !seen;
         } else {
