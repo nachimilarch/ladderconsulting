@@ -42,6 +42,7 @@ export const vaartabotAPI = {
 
 export const waTemplateAPI = {
     getAll:   (params)   => api.get('/outreach/whatsapp/templates', { params }),
+    sync:     ()         => api.post('/outreach/whatsapp/templates/sync'),
     create:   (data)     => api.post('/outreach/whatsapp/templates', data),
     update:   (id, data) => api.put(`/outreach/whatsapp/templates/${id}`, data),
     remove:   (id)       => api.delete(`/outreach/whatsapp/templates/${id}`),

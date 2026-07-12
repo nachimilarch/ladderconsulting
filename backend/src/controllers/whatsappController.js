@@ -455,3 +455,80 @@ exports.getCredits = async (req, res) => {
         res.status(502).json({ success: false, message: 'Could not fetch credit balance.' });
     }
 };
+
+// ── POST /api/outreach/whatsapp/templates/sync ────────────────────────────────
+// Fetch approved templates from Vaartabot and upsert into local whatsapp_templates.
+exports.syncTemplates = async (req, res) => {
+    const apiKey = process.env.VAARTABOT_API_KEY;
+    if (!apiKey) return res.status(503).json({ success: false, message: 'Vaartabot API key not configured.' });
+
+    let vaartabotTemplates;
+    try {
+        const response = await axios.get('https://api.vaartabot.com/api/v1/templates', {
+            headers: { 'X-API-Key': apiKey },
+        });
+        // Vaartabot returns { data: [...] } or { templates: [...] } — handle both shapes
+        const payload = response.data?.data || response.data?.templates || response.data;
+        vaartabotTemplates = Array.isArray(payload) ? payload : [];
+    } catch (err) {
+        console.error('[vaartabot.syncTemplates]', err.response?.data || err.message);
+        return res.status(502).json({ success: false, message: 'Could not fetch templates from Vaartabot.' });
+    }
+
+    if (vaartabotTemplates.length === 0) {
+        return res.json({ success: true, synced: 0, message: 'No templates returned from Vaartabot.' });
+    }
+
+    let synced = 0;
+    for (const t of vaartabotTemplates) {
+        // Vaartabot template shape: { name, language, category, components: [...] }
+        const templateName = t.name || t.template_name;
+        const languageCode = t.language || t.language_code || 'en';
+        const category     = (t.category || 'MARKETING').toUpperCase();
+
+        // Extract body text from components array if present
+        let bodyText = t.body_text || t.body || '';
+        let headerType    = 'none';
+        let headerContent = '';
+        let footerText    = '';
+        let variableCount = 0;
+
+        if (Array.isArray(t.components)) {
+            for (const comp of t.components) {
+                const type = (comp.type || '').toUpperCase();
+                if (type === 'BODY')   { bodyText = comp.text || ''; }
+                if (type === 'HEADER') { headerType = (comp.format || 'TEXT').toLowerCase(); headerContent = comp.text || ''; }
+                if (type === 'FOOTER') { footerText = comp.text || ''; }
+            }
+            // Count {{N}} placeholders in body
+            const matches = bodyText.match(/\{\{\d+\}\}/g);
+            variableCount = matches ? new Set(matches).size : 0;
+        }
+
+        if (!templateName || !bodyText) continue;
+
+        // Upsert: match on template_name (it's unique per account)
+        const [[existing]] = await db.query(
+            'SELECT id FROM whatsapp_templates WHERE template_name = ? AND deleted_at IS NULL LIMIT 1',
+            [templateName]
+        );
+
+        if (existing) {
+            await db.query(
+                `UPDATE whatsapp_templates SET language_code=?, category=?, body_text=?, header_type=?,
+                 header_content=?, footer_text=?, variable_count=?, is_active=1 WHERE id=?`,
+                [languageCode, category, bodyText, headerType, headerContent, footerText, variableCount, existing.id]
+            );
+        } else {
+            await db.query(
+                `INSERT INTO whatsapp_templates
+                   (created_by, template_name, language_code, category, header_type, header_content, body_text, footer_text, variable_count, is_active)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1)`,
+                [req.user.id, templateName, languageCode, category, headerType, headerContent, bodyText, footerText, variableCount]
+            );
+        }
+        synced++;
+    }
+
+    res.json({ success: true, synced, total: vaartabotTemplates.length, message: `Synced ${synced} template(s) from Vaartabot.` });
+};

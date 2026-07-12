@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { analyticsAPI } from '../../api/outreach';
+import { analyticsAPI, vaartabotAPI } from '../../api/outreach';
 
 const Stat = ({ label, value, color }) => {
     const colors = {
@@ -22,6 +22,7 @@ export default function OutreachDashboard() {
     const [summary, setSummary] = useState(null);
     const [campaigns, setCampaigns] = useState([]);
     const [loading, setLoading]   = useState(true);
+    const [credits, setCredits]   = useState(null);
 
     useEffect(() => {
         analyticsAPI.campaigns()
@@ -31,6 +32,9 @@ export default function OutreachDashboard() {
             })
             .catch(console.error)
             .finally(() => setLoading(false));
+        vaartabotAPI.getCredits()
+            .then(r => setCredits(r.data?.data?.balance ?? r.data?.data?.credits ?? null))
+            .catch(() => {});
     }, []);
 
     const statusColor = (s) => ({
@@ -44,9 +48,20 @@ export default function OutreachDashboard() {
 
     return (
         <div className="max-w-5xl mx-auto">
-            <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Outreach Dashboard</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Campaign overview and lead generation stats</p>
+            <div className="flex items-start justify-between mb-6">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-800">Outreach Dashboard</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">Campaign overview and lead generation stats</p>
+                </div>
+                {credits !== null && (
+                    <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-2">
+                        <span className="text-lg">💬</span>
+                        <div>
+                            <div className="text-sm font-bold text-green-700">{credits}</div>
+                            <div className="text-xs text-green-600">Vaartabot credits</div>
+                        </div>
+                    </div>
+                )}
             </div>
 
             {loading ? (

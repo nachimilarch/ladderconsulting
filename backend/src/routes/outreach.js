@@ -57,6 +57,7 @@ router.patch('/replies/:id/assign',            authorizeRole('admin'), replyCtrl
 
 // ── WhatsApp / Vaartabot ─────────────────────────────────────────────────────
 router.get('/whatsapp/credits',                whatsappCtrl.getCredits);
+router.post('/whatsapp/templates/sync',        whatsappCtrl.syncTemplates);
 router.get('/whatsapp/templates',              whatsappCtrl.listTemplates);
 router.post('/whatsapp/templates',             whatsappCtrl.createTemplate);
 router.put('/whatsapp/templates/:id',          whatsappCtrl.updateTemplate);
