@@ -40,10 +40,7 @@ const toE164 = (phone, defaultCountry = '91') => {
 exports.listTemplates = async (req, res) => {
     const filters = ['t.deleted_at IS NULL'];
     const params  = [];
-    if (req.user.role === 'hr_staff') {
-        filters.push('created_by = ?');
-        params.push(req.user.id);
-    }
+    // Templates are org-wide config — all roles see all templates
     try {
         const [rows] = await db.query(
             `SELECT t.*, u.name AS created_by_name FROM whatsapp_templates t
@@ -539,7 +536,7 @@ exports.getCredits = async (req, res) => {
 exports.listAutoReplyFlows = async (req, res) => {
     const filters = ['f.deleted_at IS NULL'];
     const params  = [];
-    if (req.user.role === 'hr_staff') { filters.push('f.created_by = ?'); params.push(req.user.id); }
+    // Auto-reply flows are org-wide config — all roles see all flows
     try {
         const [rows] = await db.query(
             `SELECT f.*, u.name AS created_by_name, t.template_name
