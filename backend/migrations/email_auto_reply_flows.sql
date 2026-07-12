@@ -4,7 +4,7 @@
 
 CREATE TABLE IF NOT EXISTS email_auto_reply_flows (
     id                INT AUTO_INCREMENT PRIMARY KEY,
-    created_by        INT NOT NULL,
+    created_by        INT UNSIGNED NOT NULL,
     flow_name         VARCHAR(255) NOT NULL,
     trigger_type      ENUM('keyword','any','first_contact') NOT NULL DEFAULT 'keyword',
     trigger_keywords  JSON,
