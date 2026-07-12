@@ -5,7 +5,6 @@ import NotificationBell from '../NotificationBell';
 
 const navItems = [
     { label: 'Dashboard',       to: '/hr',                      icon: '📊', exact: true },
-    { label: 'Employees',       to: '/hr/employees',            icon: '👤' },
     { label: 'Reports',         to: '/hr/reports',              icon: '📈' },
     { label: 'Resume Sourcing', to: '/hr/sourcing',             icon: '📄' },
     { label: 'Interviews',      to: '/hr/interviews',           icon: '🗓' },
