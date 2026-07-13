@@ -24,7 +24,7 @@ export const replyAPI = {
     getAll:   (params)        => api.get('/outreach/replies', { params }),
     getOne:   (id)            => api.get(`/outreach/replies/${id}`),
     reply:    (id, data)      => api.post(`/outreach/replies/${id}/reply`, data),
-    convert:  (id)            => api.patch(`/outreach/replies/${id}/convert`),
+    convert:  (id, data)      => api.patch(`/outreach/replies/${id}/convert`, data),
     ignore:   (id)            => api.patch(`/outreach/replies/${id}/ignore`),
     assign:   (id, userId)    => api.patch(`/outreach/replies/${id}/assign`, { assigned_to: userId }),
 };

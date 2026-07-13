@@ -173,12 +173,15 @@ exports.convertToLead = async (req, res) => {
             return res.status(422).json({ success: false, message: 'Reply has no linked contact. Cannot auto-convert.' });
         }
 
+        // Allow caller to specify which executive owns the lead; default to assignee or self
+        const executiveUserId = req.body.executive_user_id || reply.assigned_to || req.user.id;
+
         const source   = reply.channel === 'whatsapp' ? 'whatsapp' : 'cold_email';
         const leadId   = await createLeadFromContact({
             contactId: reply.contact_id,
             source,
             campaignId: reply.campaign_id,
-            executiveUserId: reply.assigned_to || req.user.id,
+            executiveUserId,
             replyId: reply.id,
         });
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { replyAPI } from '../../api/outreach';
+import { employeeAPI } from '../../api/hr';
 import { useAuth } from '../../context/AuthContext';
 
 export default function ReplyDetail() {
@@ -10,11 +11,17 @@ export default function ReplyDetail() {
     const { user }  = useAuth();
     const isAdmin   = user?.role === 'admin';
 
-    const [reply, setReply]     = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [reply, setReply]         = useState(null);
+    const [loading, setLoading]     = useState(true);
     const [replyText, setReplyText] = useState('');
-    const [sending, setSending] = useState(false);
+    const [sending, setSending]     = useState(false);
     const [converting, setConverting] = useState(false);
+
+    // Convert-to-lead modal
+    const [showConvertModal, setShowConvertModal] = useState(false);
+    const [executives, setExecutives]             = useState([]);
+    const [execLoading, setExecLoading]           = useState(false);
+    const [selectedExec, setSelectedExec]         = useState('');
 
     useEffect(() => {
         replyAPI.getOne(id)
@@ -22,6 +29,36 @@ export default function ReplyDetail() {
             .catch(() => toast.error('Failed to load reply'))
             .finally(() => setLoading(false));
     }, [id]);
+
+    const openConvertModal = async () => {
+        setShowConvertModal(true);
+        setExecLoading(true);
+        try {
+            const r = await employeeAPI.getAll({ limit: 100 });
+            setExecutives(r.data.data || r.data);
+            // Pre-select: reply's assignee, or current user
+            setSelectedExec(reply.assigned_to?.toString() || user.id.toString());
+        } catch {
+            toast.error('Failed to load executives');
+        } finally {
+            setExecLoading(false);
+        }
+    };
+
+    const handleConvert = async () => {
+        setConverting(true);
+        try {
+            const payload = selectedExec ? { executive_user_id: parseInt(selectedExec) } : {};
+            const r = await replyAPI.convert(id, payload);
+            toast.success('Lead created and assigned!');
+            setShowConvertModal(false);
+            navigate(`/hr/leads/${r.data.lead_id}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Conversion failed');
+        } finally {
+            setConverting(false);
+        }
+    };
 
     const handleSendReply = async (e) => {
         e.preventDefault();
@@ -36,20 +73,6 @@ export default function ReplyDetail() {
             toast.error(err.response?.data?.message || 'Failed to send reply');
         } finally {
             setSending(false);
-        }
-    };
-
-    const handleConvert = async () => {
-        if (!confirm('Convert this contact to a lead in the pipeline?')) return;
-        setConverting(true);
-        try {
-            const r = await replyAPI.convert(id);
-            toast.success('Lead created!');
-            navigate(`/hr/leads/${r.data.lead_id}`);
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Conversion failed');
-        } finally {
-            setConverting(false);
         }
     };
 
@@ -104,9 +127,9 @@ export default function ReplyDetail() {
             {!['converted','ignored'].includes(reply.reply_status) && (
                 <div className="flex gap-2 mb-4 flex-wrap">
                     {reply.contact_id && (
-                        <button onClick={handleConvert} disabled={converting}
-                            className="bg-green-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50 transition">
-                            {converting ? 'Converting…' : 'Convert to Lead'}
+                        <button onClick={openConvertModal}
+                            className="bg-green-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-green-700 transition">
+                            Convert to Lead
                         </button>
                     )}
                     <button onClick={handleIgnore}
@@ -122,7 +145,7 @@ export default function ReplyDetail() {
                 </div>
             )}
 
-            {/* Reply composer — only for email channel */}
+            {/* Reply composer */}
             {reply.channel === 'email' && !['ignored'].includes(reply.reply_status) && (
                 <form onSubmit={handleSendReply} className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
                     <h3 className="font-semibold text-gray-800 mb-3 text-sm">Send Reply</h3>
@@ -136,6 +159,52 @@ export default function ReplyDetail() {
                         </button>
                     </div>
                 </form>
+            )}
+
+            {/* Convert to Lead modal */}
+            {showConvertModal && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
+                        <h3 className="text-lg font-bold text-gray-800 mb-1">Convert to Lead</h3>
+                        <p className="text-sm text-gray-500 mb-5">
+                            Choose which executive this lead will be assigned to.
+                        </p>
+
+                        {execLoading ? (
+                            <div className="text-sm text-gray-400 py-4 text-center">Loading executives…</div>
+                        ) : (
+                            <div className="mb-5">
+                                <label className="block text-xs font-medium text-gray-500 mb-1.5">Assign to Executive</label>
+                                <select
+                                    value={selectedExec}
+                                    onChange={e => setSelectedExec(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-brand-500"
+                                >
+                                    <option value="">— Select executive —</option>
+                                    {executives.map(emp => (
+                                        <option key={emp.user_id} value={emp.user_id}>
+                                            {emp.name} {emp.designation ? `· ${emp.designation}` : ''}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2 justify-end">
+                            <button
+                                onClick={() => setShowConvertModal(false)}
+                                className="border border-gray-200 text-gray-600 text-sm px-4 py-2 rounded-xl hover:bg-gray-50 transition">
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleConvert}
+                                disabled={converting || !selectedExec}
+                                className="bg-green-600 text-white text-sm px-5 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50 transition">
+                                {converting ? 'Converting…' : 'Confirm & Create Lead'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
