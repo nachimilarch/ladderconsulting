@@ -88,4 +88,9 @@ router.get('/audit-logs',                  ...admin, ctrl.getAuditLogs);
 router.get('/settings',                    ...admin, ctrl.getSettings);
 router.patch('/settings',                  ...admin, ctrl.updateSettings);
 
+// Job Postings management
+router.get('/jobs',                        ...admin, ctrl.listAllJobs);
+router.patch('/jobs/:id/status',           ...admin, ctrl.setJobStatus);
+router.delete('/jobs/:id',                 ...admin, ctrl.deleteJob);
+
 module.exports = router;

@@ -74,3 +74,10 @@ export const adminOfferRequestAPI = {
     approve: (id) => api.put(`/offer-requests/executive/${id}/approve`),
     reject: (id, rejection_reason) => api.put(`/offer-requests/executive/${id}/reject`, { rejection_reason }),
 };
+
+
+export const adminJobAPI = {
+    list:      (params) => api.get('/admin/jobs', { params }),
+    setStatus: (id, status) => api.patch(`/admin/jobs/${id}/status`, { status }),
+    remove:    (id) => api.delete(`/admin/jobs/${id}`),
+};

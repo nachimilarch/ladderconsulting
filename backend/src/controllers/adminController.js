@@ -1543,3 +1543,71 @@ exports.activatePackage = async (req, res) => {
         res.status(500).json({ message: 'Failed to activate package.' });
     }
 };
+
+// ── GET /api/admin/jobs ───────────────────────────────────────────────────────
+exports.listAllJobs = async (req, res) => {
+    const { company_id, status, search } = req.query;
+    const filters = ['jp.deleted_at IS NULL'];
+    const params  = [];
+
+    if (company_id) { filters.push('jp.company_id = ?'); params.push(company_id); }
+    if (status)     { filters.push('jp.status = ?');     params.push(status); }
+    if (search)     { filters.push('(jp.title LIKE ? OR co.company_name LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
+
+    try {
+        const [jobs] = await db.query(
+            `SELECT jp.id, jp.title, jp.location, jp.job_type, jp.work_mode, jp.status,
+                    jp.openings, jp.deadline, jp.created_at,
+                    co.id AS company_id, co.company_name,
+                    (SELECT COUNT(*) FROM applications a WHERE a.job_id = jp.id AND a.deleted_at IS NULL) AS applicant_count
+             FROM job_postings jp
+             JOIN companies co ON co.id = jp.company_id AND co.deleted_at IS NULL
+             WHERE ${filters.join(' AND ')}
+             ORDER BY jp.created_at DESC`,
+            params
+        );
+        res.json({ success: true, data: jobs });
+    } catch (err) {
+        console.error('admin.listAllJobs:', err);
+        res.status(500).json({ message: 'Failed to fetch jobs.' });
+    }
+};
+
+// ── PATCH /api/admin/jobs/:id/status ─────────────────────────────────────────
+exports.setJobStatus = async (req, res) => {
+    const { status } = req.body;
+    const valid = ['active', 'draft', 'paused', 'closed'];
+    if (!status || !valid.includes(status)) {
+        return res.status(400).json({ message: 'Valid status required: active | draft | paused | closed' });
+    }
+    try {
+        const [[job]] = await db.query(
+            'SELECT id, company_id FROM job_postings WHERE id = ? AND deleted_at IS NULL', [req.params.id]
+        );
+        if (!job) return res.status(404).json({ message: 'Job not found.' });
+        await db.query('UPDATE job_postings SET status = ? WHERE id = ?', [status, req.params.id]);
+        await logAction(req.user.id, 'set_job_status', 'job_posting', req.params.id,
+            { status }, ip(req));
+        res.json({ success: true, message: `Job status set to ${status}.` });
+    } catch (err) {
+        console.error('admin.setJobStatus:', err);
+        res.status(500).json({ message: 'Failed to update status.' });
+    }
+};
+
+// ── DELETE /api/admin/jobs/:id ────────────────────────────────────────────────
+exports.deleteJob = async (req, res) => {
+    try {
+        const [[job]] = await db.query(
+            'SELECT id, title, company_id FROM job_postings WHERE id = ? AND deleted_at IS NULL', [req.params.id]
+        );
+        if (!job) return res.status(404).json({ message: 'Job not found.' });
+        await db.query('UPDATE job_postings SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
+        await logAction(req.user.id, 'delete_job_posting', 'job_posting', req.params.id,
+            { title: job.title, company_id: job.company_id }, ip(req));
+        res.json({ success: true, message: 'Job posting deleted.' });
+    } catch (err) {
+        console.error('admin.deleteJob:', err);
+        res.status(500).json({ message: 'Failed to delete job.' });
+    }
+};

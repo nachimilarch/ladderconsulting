@@ -103,6 +103,7 @@ import PlatformAnalytics from './pages/admin/PlatformAnalytics';
 import AuditLog from './pages/admin/AuditLog';
 import PlatformSettings from './pages/admin/PlatformSettings';
 import TrainingManager from './pages/admin/TrainingManager';
+import AdminJobPostings from './pages/admin/AdminJobPostings';
 
 // Company requests page
 import CompanyRequestsPage from './pages/company/CompanyRequestsPage';
@@ -223,6 +224,7 @@ export default function App() {
         }>
           <Route index element={<AdminHome />} />
           <Route path="companies" element={<CompanyApprovals />} />
+          <Route path="jobs" element={<AdminJobPostings />} />
           <Route path="staff" element={<HRStaffManagement />} />
           <Route path="analytics" element={<PlatformAnalytics />} />
           <Route path="audit-log" element={<AuditLog />} />
