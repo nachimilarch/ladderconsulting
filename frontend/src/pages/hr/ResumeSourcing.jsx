@@ -211,13 +211,20 @@ function JobPicker({ jobs, selected, onSelect }) {
             <input type="text" value={q} onChange={e => setQ(e.target.value)}
                 placeholder="Search title or company…" className="form-input-sm w-full mb-3" />
             <div className="max-h-72 overflow-y-auto flex flex-col gap-1.5 pr-1">
-                {!filtered.length && <p className="text-sm text-gray-400 py-6 text-center">No active job postings.</p>}
+                {!filtered.length && <p className="text-sm text-gray-400 py-6 text-center">No job postings found.</p>}
                 {filtered.map(j => (
                     <button key={j.id} type="button" onClick={() => onSelect(j)}
                         className={`text-left rounded-xl border px-4 py-3 transition ${selected?.id === j.id
                             ? 'border-blue-500 bg-blue-50 ring-1 ring-blue-300'
                             : 'border-gray-200 hover:border-blue-300 hover:bg-gray-50'}`}>
-                        <div className="font-semibold text-sm text-gray-900">{j.title}</div>
+                        <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-gray-900">{j.title}</span>
+                            {j.status !== 'active' && (
+                                <span className={`text-xs px-1.5 py-0.5 rounded font-medium ${j.status === 'draft' ? 'bg-gray-100 text-gray-500' : 'bg-yellow-100 text-yellow-700'}`}>
+                                    {j.status}
+                                </span>
+                            )}
+                        </div>
                         <div className="text-xs text-gray-500 mt-0.5">{j.company_name}{j.location ? ` · ${j.location}` : ''}{j.openings ? ` · ${j.openings} opening(s)` : ''}</div>
                         <div className="text-xs text-gray-400 mt-0.5">{j.applicant_count} applicant(s) · {j.sourced_count} sourced by Ladder</div>
                     </button>

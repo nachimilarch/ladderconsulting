@@ -38,15 +38,15 @@ exports.listActiveJobs = async (req, res) => {
         const [jobs] = await db.query(
             `SELECT jp.id, jp.title, jp.location, jp.job_type, jp.work_mode,
                     jp.experience_min, jp.experience_max, jp.openings, jp.deadline,
-                    jp.created_at, co.id AS company_id, co.company_name,
+                    jp.status, jp.created_at, co.id AS company_id, co.company_name,
                     (SELECT COUNT(*) FROM applications a
                      WHERE a.job_id = jp.id AND a.deleted_at IS NULL) AS applicant_count,
                     (SELECT COUNT(*) FROM applications a
                      WHERE a.job_id = jp.id AND a.source = 'executive' AND a.deleted_at IS NULL) AS sourced_count
              FROM job_postings jp
              JOIN companies co ON co.id = jp.company_id AND co.deleted_at IS NULL
-             WHERE jp.status = 'active' AND jp.deleted_at IS NULL
-             ORDER BY co.company_name, jp.created_at DESC`
+             WHERE jp.status IN ('active', 'draft', 'paused') AND jp.deleted_at IS NULL
+             ORDER BY FIELD(jp.status,'active','paused','draft'), co.company_name, jp.created_at DESC`
         );
         res.json({ success: true, data: jobs });
     } catch (err) {
@@ -71,10 +71,10 @@ exports.getJobDetail = async (req, res) => {
                      WHERE a.job_id = jp.id AND a.source = 'executive' AND a.deleted_at IS NULL) AS sourced_count
              FROM job_postings jp
              JOIN companies co ON co.id = jp.company_id AND co.deleted_at IS NULL
-             WHERE jp.id = ? AND jp.status = 'active' AND jp.deleted_at IS NULL`,
+             WHERE jp.id = ? AND jp.status IN ('active','draft','paused') AND jp.deleted_at IS NULL`,
             [req.params.jobId]
         );
-        if (!job) return res.status(404).json({ success: false, message: 'Job not found or not active.' });
+        if (!job) return res.status(404).json({ success: false, message: 'Job not found.' });
 
         // AI-extracted skills (job_skill_vectors) — what the matcher scores against
         const [skills] = await db.query(

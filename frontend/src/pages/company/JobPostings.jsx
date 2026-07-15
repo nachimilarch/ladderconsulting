@@ -12,7 +12,7 @@ const EMPTY_FORM = {
     title: '', description: '', requirements: '', location: '',
     job_type: 'full_time', work_mode: 'onsite',
     salary_min: '', salary_max: '', experience_min: '', experience_max: '',
-    openings: 1, deadline: '', status: 'draft',
+    openings: 1, deadline: '', status: 'active',
 };
 
 export default function JobPostings() {
@@ -250,6 +250,7 @@ export default function JobPostings() {
                                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                 </div>
 
+                                {editing && (
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Status</label>
                                     <select value={form.status} onChange={f('status')}
@@ -259,6 +260,7 @@ export default function JobPostings() {
                                         <option value="paused">Paused</option>
                                     </select>
                                 </div>
+                                )}
 
                                 <div className="md:col-span-2">
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Job Description *</label>
