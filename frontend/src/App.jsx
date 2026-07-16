@@ -231,7 +231,6 @@ export default function App() {
           <Route path="audit-log" element={<AuditLog />} />
           <Route path="training" element={<TrainingManager />} />
           <Route path="settings" element={<PlatformSettings />} />
-          <Route path="email-templates" element={<AdminEmailTemplates />} />
           <Route path="placement-fees" element={<Navigate to="/admin/payments" replace />} />
           <Route path="payments" element={<AdminPayments />} />
         </Route>
@@ -252,6 +251,7 @@ export default function App() {
           <Route path="whatsapp/new" element={<WhatsAppCampaignNew />} />
           <Route path="whatsapp/templates" element={<WhatsAppTemplates />} />
           <Route path="whatsapp/auto-replies" element={<AutoReplyFlows />} />
+          <Route path="email/templates" element={<AdminEmailTemplates />} />
           <Route path="email/auto-replies" element={<EmailAutoReplyFlows />} />
           <Route path="whatsapp/:id" element={<WhatsAppCampaignDetail />} />
           <Route path="replies" element={<Replies />} />

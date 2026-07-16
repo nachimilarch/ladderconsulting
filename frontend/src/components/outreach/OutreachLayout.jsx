@@ -7,6 +7,7 @@ const navItems = [
     { label: 'Dashboard',       to: '/outreach',                    exact: true, icon: '📊' },
     { label: 'Contact Lists',   to: '/outreach/lists',              icon: '📋' },
     { label: 'Email Campaigns', to: '/outreach/email',              icon: '✉️' },
+    { label: 'Email Templates', to: '/outreach/email/templates',    icon: '📄' },
     { label: 'WhatsApp',        to: '/outreach/whatsapp',           icon: '💬' },
     { label: 'WA Templates',    to: '/outreach/whatsapp/templates',    icon: '📝' },
     { label: 'WA Auto-Replies', to: '/outreach/whatsapp/auto-replies',  icon: '🤖' },
