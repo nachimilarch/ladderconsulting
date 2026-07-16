@@ -46,7 +46,7 @@ exports.listCompanies = async (req, res) => {
         const [companies] = await db.query(
             `SELECT co.id, co.company_name, co.industry, co.size, co.is_approved, co.created_at,
                     co.headquarters, co.website,
-                    u.id AS user_id, u.name AS contact_name, u.email, u.status,
+                    u.id AS user_id, u.name AS contact_name, u.email, u.phone AS contact_phone, u.status,
                     (u.last_login_at IS NULL) AS never_logged_in,
                     COUNT(DISTINCT jp.id) AS job_count,
                     COUNT(DISTINCT he.id) AS hire_count,
@@ -61,7 +61,7 @@ exports.listCompanies = async (req, res) => {
              LEFT JOIN hired_employees he ON he.company_id = co.id AND he.deleted_at IS NULL
              WHERE co.deleted_at IS NULL ${statusWhere}
              GROUP BY co.id, co.company_name, co.industry, co.size, co.is_approved, co.created_at,
-                      co.headquarters, co.website, u.id, u.name, u.email, u.status, u.last_login_at
+                      co.headquarters, co.website, u.id, u.name, u.email, u.phone, u.status, u.last_login_at
              ORDER BY co.created_at DESC`
         );
         res.json({ success: true, data: companies });
