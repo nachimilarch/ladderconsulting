@@ -37,8 +37,8 @@ export const AuthProvider = ({ children }) => {
         return data.user;
     };
 
-    const loginWithGoogle = async (idToken, role) => {
-        const { data } = await api.post('/auth/google', { idToken, role });
+    const loginWithGoogle = async (idToken, role, phone) => {
+        const { data } = await api.post('/auth/google', { idToken, role, phone: phone || undefined });
         setUser(data.user);
         return data.user;
     };

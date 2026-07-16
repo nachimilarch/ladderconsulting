@@ -203,7 +203,7 @@ exports.microsoftLogin = async (req, res) => {
 // a company_approvals row for admin review (email is already verified by
 // Google so no separate verify-email step is needed either way).
 exports.googleLogin = async (req, res) => {
-    const { idToken, role } = req.body;
+    const { idToken, role, phone } = req.body;
     if (!idToken) return res.status(400).json({ message: 'idToken is required.' });
 
     try {
@@ -241,9 +241,9 @@ exports.googleLogin = async (req, res) => {
             const status = role === 'company' ? 'pending' : 'active';
 
             const [result] = await db.query(
-                `INSERT INTO users (name, email, password, role_id, status, is_email_verified)
-                 VALUES (?, ?, ?, ?, ?, 1)`,
-                [payload.name || email, email, randomHash, roleRow.id, status]
+                `INSERT INTO users (name, email, password, role_id, status, is_email_verified, phone)
+                 VALUES (?, ?, ?, ?, ?, 1, ?)`,
+                [payload.name || email, email, randomHash, roleRow.id, status, phone || null]
             );
             const userId = result.insertId;
 
@@ -257,6 +257,7 @@ exports.googleLogin = async (req, res) => {
                         <table style="border-collapse:collapse;margin:16px 0">
                             <tr><td style="padding:4px 12px 4px 0;color:#666">Name</td><td><strong>${payload.name || email}</strong></td></tr>
                             <tr><td style="padding:4px 12px 4px 0;color:#666">Email</td><td>${email}</td></tr>
+                            <tr><td style="padding:4px 12px 4px 0;color:#666">Phone</td><td><strong>${phone || '—'}</strong></td></tr>
                             <tr><td style="padding:4px 12px 4px 0;color:#666">Registered via</td><td>Google SSO</td></tr>
                         </table>
                         <p><a href="https://theladderconsulting.com/ladder" style="background:#6a47d4;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;display:inline-block">Login to Admin Panel</a></p>
