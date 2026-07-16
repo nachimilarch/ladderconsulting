@@ -316,8 +316,19 @@ exports.reactivateCompany = async (req, res) => {
 
 exports.deleteCompany = async (req, res) => {
     try {
-        await db.query('UPDATE companies SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
-        await logAction(req.user.id, 'delete_company', 'company', req.params.id, {}, ip(req));
+        const [[co]] = await db.query('SELECT id, user_id FROM companies WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
+        if (!co) return res.status(404).json({ message: 'Company not found.' });
+
+        await db.query('UPDATE companies SET deleted_at = NOW() WHERE id = ?', [co.id]);
+        // Soft-delete the user and free the email so the address can be re-registered later
+        await db.query(
+            `UPDATE users SET deleted_at = NOW(), email = CONCAT('deleted_', id, '_', email)
+             WHERE id = ? AND deleted_at IS NULL`,
+            [co.user_id]
+        );
+        await db.query('DELETE FROM user_oauth_identities WHERE user_id = ?', [co.user_id]);
+
+        await logAction(req.user.id, 'delete_company', 'company', co.id, {}, ip(req));
         res.json({ message: 'Company deleted.' });
     } catch (err) {
         console.error('deleteCompany:', err);
