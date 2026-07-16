@@ -4,6 +4,7 @@ const fs = require('fs');
 const { sendEmail } = require('../utils/email');
 const { logAction } = require('../utils/auditLog');
 const crypto = require('crypto');
+const wa = require('../utils/whatsappNotify');
 
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
@@ -212,6 +213,10 @@ exports.approveCompany = async (req, res) => {
                 <br/><p>Welcome to LadderStep Human Consulting!<br/>The Team</p>
             `,
         });
+
+        // WhatsApp notification
+        const [[companyUser]] = await db.query('SELECT phone FROM users WHERE id = ?', [company.user_id]);
+        wa.notifyCompanyApproved(companyUser?.phone, company.company_name);
 
         res.json({ message: 'Company approved.' });
     } catch (err) {

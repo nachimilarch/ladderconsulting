@@ -5,6 +5,7 @@ const { maskCandidateForCompany } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
 const { hasSelectedPackage } = require('./resumeUnlockController');
 const { sendEmail } = require('../utils/email');
+const wa = require('../utils/whatsappNotify');
 
 const safeEmail = (opts) => sendEmail(opts).catch(err => console.error('[Email]', err.message));
 
@@ -372,6 +373,11 @@ exports.shortlistApplication = async (req, res) => {
                 `,
             });
         }
+
+        // WhatsApp
+        db.query('SELECT phone FROM users WHERE email = ?', [candidate_email]).then(([[u]]) => {
+            wa.notifyShortlistedCand(u?.phone, candidate_name, job_title, company_name);
+        }).catch(() => {});
 
         res.json({ message: 'Candidate shortlisted.' });
     } catch (err) {

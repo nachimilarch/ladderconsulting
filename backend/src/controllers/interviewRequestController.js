@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const { sendEmail } = require('../utils/email');
+const wa = require('../utils/whatsappNotify');
 
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
 
@@ -534,6 +535,12 @@ exports.approveRequest = async (req, res) => {
                 });
             }
 
+            // WhatsApp notifications
+            const [[coUser]]   = await db.query('SELECT phone FROM users WHERE id = ?', [cr.company_user_id]);
+            const [[candUser]] = await db.query('SELECT phone FROM users WHERE id = ?', [cr.candidate_user_id]);
+            wa.notifyInterviewRequestApproved(coUser?.phone, cr.candidate_name, cr.job_title, fmtDateTime(finalDatetime));
+            wa.notifyInterviewScheduledCand(candUser?.phone, cr.candidate_name, cr.job_title, cr.company_name, fmtDateTime(finalDatetime), modeLabel);
+
             res.json({ message: 'Interview approved and slot created.', slot_id: slotResult.insertId });
         } catch (e) {
             await conn.rollback();
@@ -723,6 +730,17 @@ exports.rejectRequest = async (req, res) => {
                 `,
             });
         }
+
+        // WhatsApp — need job_title for the template; fetch it
+        db.query(
+            `SELECT jp.title AS job_title FROM company_requests cr
+             JOIN applications a ON a.id = cr.application_id
+             JOIN job_postings jp ON jp.id = a.job_id
+             WHERE cr.id = ?`, [cr.id]
+        ).then(async ([[jobRow]]) => {
+            const [[coUser]] = await db.query('SELECT phone FROM users WHERE id = ?', [cr.company_user_id]);
+            wa.notifyInterviewRequestRejected(coUser?.phone, cr.candidate_name, jobRow?.job_title || '');
+        }).catch(() => {});
 
         res.json({ message: 'Request rejected.' });
     } catch (err) {

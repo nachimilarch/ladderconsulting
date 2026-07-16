@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { logAction } = require('../utils/auditLog');
 const { sendEmail } = require('../utils/email');
 const { nextInvoiceNumber } = require('../utils/placementFee');
+const wa = require('../utils/whatsappNotify');
 
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || null;
@@ -535,6 +536,11 @@ exports.approveRequest = async (req, res) => {
             );
         }
 
+        // WhatsApp — offer approved for company
+        db.query('SELECT phone FROM users WHERE id = ?', [cr.company_user_id]).then(([[coUser]]) => {
+            wa.notifyOfferRequestApproved(coUser?.phone, cr.candidate_name, cr.job_title);
+        }).catch(() => {});
+
         if (cr.company_email) {
             safeEmail({
                 to: cr.company_email,
@@ -643,6 +649,16 @@ exports.rejectRequest = async (req, res) => {
                 `,
             });
         }
+
+        // WhatsApp — offer rejected for company
+        db.query(
+            `SELECT jp.title AS job_title FROM company_requests cr
+             JOIN applications a ON a.id = cr.application_id
+             JOIN job_postings jp ON jp.id = a.job_id WHERE cr.id = ?`, [cr.id]
+        ).then(async ([[jobRow]]) => {
+            const [[coUser]] = await db.query('SELECT phone FROM users WHERE id = ?', [cr.company_user_id]);
+            wa.notifyOfferRequestRejected(coUser?.phone, cr.candidate_name, jobRow?.job_title || '');
+        }).catch(() => {});
 
         await logAction(req.user.id, 'reject_offer_request', 'company_request', cr.id,
             { reason: rejection_reason, candidate_id: cr.candidate_id }, ip(req));

@@ -2,6 +2,7 @@ const db = require('../config/db');
 const { sendEmail } = require('../utils/email');
 const { maskName } = require('../utils/maskPII');
 const { generateOfferLetterPDF } = require('../utils/offerLetterPdf');
+const wa = require('../utils/whatsappNotify');
 
 const notify = async (userId, type, title, body, metadata = null) => {
     if (!userId) return;
@@ -209,6 +210,12 @@ exports.cancelSlot = async (req, res) => {
                 });
             }
         }
+
+        // WhatsApp — notify candidate of cancellation
+        wa.notifyInterviewCancelledCand(ctx.candidate_email ? null : undefined, ctx.candidate_name, ctx.job_title, ctx.company_name);
+        db.query('SELECT phone FROM users WHERE id = ?', [ctx.candidate_user_id]).then(([[u]]) => {
+            wa.notifyInterviewCancelledCand(u?.phone, ctx.candidate_name, ctx.job_title, ctx.company_name);
+        }).catch(() => {});
 
         res.json({ message: 'Interview cancelled.' });
     } catch (err) {
@@ -445,6 +452,11 @@ exports.generateOffer = async (req, res) => {
             });
         }
 
+        // WhatsApp — notify candidate about the offer
+        db.query('SELECT phone FROM users WHERE email = ?', [ctx.candidate_email]).then(([[u]]) => {
+            wa.notifyOfferReceivedCand(u?.phone, ctx.candidate_name, ctx.company_name, ctx.job_title);
+        }).catch(() => {});
+
         res.status(201).json({ message: 'Offer sent.', id: result.insertId });
     } catch (err) {
         if (err.code === 'ER_DUP_ENTRY') {
@@ -546,6 +558,12 @@ exports.confirmSlot = async (req, res) => {
                 { slot_id: req.params.id }
             );
         }
+
+        // WhatsApp — notify company contact that candidate confirmed
+        wa.notifyInterviewConfirmedCo(ctx.company_email ? undefined : null, candidateUser.name, ctx.job_title, fmtDateTime(ctx.slot_datetime));
+        db.query('SELECT phone FROM users WHERE email = ?', [ctx.company_email]).then(([[u]]) => {
+            wa.notifyInterviewConfirmedCo(u?.phone, candidateUser.name, ctx.job_title, fmtDateTime(ctx.slot_datetime));
+        }).catch(() => {});
 
         res.json({ message: 'Interview confirmed.' });
     } catch (err) {
