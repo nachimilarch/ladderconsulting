@@ -194,7 +194,7 @@ export default function CompanyApprovals() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
-                                    {['Company', 'Email', 'Industry', 'Joined', 'Status', ''].map((h) => (
+                                    {['Company', 'Email / Phone', 'Industry', 'Joined', 'Status', ''].map((h) => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                                     ))}
                                 </tr>
@@ -203,7 +203,10 @@ export default function CompanyApprovals() {
                                 {(Array.isArray(companies) ? companies : []).map((c) => (
                                     <tr key={c.id} className="hover:bg-gray-50">
                                         <td className="px-4 py-3 font-medium text-gray-800">{c.company_name || '—'}</td>
-                                        <td className="px-4 py-3 text-gray-500">{c.email}</td>
+                                        <td className="px-4 py-3 text-gray-500">
+                                            <div>{c.email}</div>
+                                            {c.contact_phone && <div className="text-xs text-indigo-600 font-medium">📞 {c.contact_phone}</div>}
+                                        </td>
                                         <td className="px-4 py-3 text-gray-500">{c.industry || '—'}</td>
                                         <td className="px-4 py-3 text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
                                         <td className="px-4 py-3">{statusBadge(c.company_status, c.never_logged_in)}</td>

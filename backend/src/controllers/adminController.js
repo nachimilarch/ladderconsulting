@@ -23,7 +23,7 @@ exports.listCompanies = async (req, res) => {
                 `SELECT u.id AS id, u.id AS user_id,
                         COALESCE(co.company_name, u.name) AS company_name,
                         co.industry, co.size, co.website, co.headquarters,
-                        u.email, u.name AS contact_name, u.status, u.created_at,
+                        u.email, u.name AS contact_name, u.phone AS contact_phone, u.status, u.created_at,
                         'pending' AS company_status,
                         0 AS job_count, 0 AS hire_count
                  FROM company_approvals ca
@@ -111,7 +111,7 @@ exports.getCompanyDetail = async (req, res) => {
             // Second try: by user_id (pending registration, no companies row yet)
             const [[usr]] = await db.query(
                 `SELECT u.id, u.id AS user_id, u.name AS company_name, u.name AS contact_name,
-                        u.email, u.status, u.created_at,
+                        u.email, u.phone AS contact_phone, u.status, u.created_at,
                         'pending' AS company_status, NULL AS assigned_executive_id
                  FROM users u
                  WHERE u.id = ? AND u.deleted_at IS NULL`,
