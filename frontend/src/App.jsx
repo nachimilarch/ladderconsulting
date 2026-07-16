@@ -102,6 +102,7 @@ import RecruitmentOversight from './pages/admin/RecruitmentOversight';
 import PlatformAnalytics from './pages/admin/PlatformAnalytics';
 import AuditLog from './pages/admin/AuditLog';
 import PlatformSettings from './pages/admin/PlatformSettings';
+import AdminEmailTemplates from './pages/admin/AdminEmailTemplates';
 import TrainingManager from './pages/admin/TrainingManager';
 import AdminJobPostings from './pages/admin/AdminJobPostings';
 
@@ -230,6 +231,7 @@ export default function App() {
           <Route path="audit-log" element={<AuditLog />} />
           <Route path="training" element={<TrainingManager />} />
           <Route path="settings" element={<PlatformSettings />} />
+          <Route path="email-templates" element={<AdminEmailTemplates />} />
           <Route path="placement-fees" element={<Navigate to="/admin/payments" replace />} />
           <Route path="payments" element={<AdminPayments />} />
         </Route>

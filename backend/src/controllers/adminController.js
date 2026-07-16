@@ -1627,3 +1627,85 @@ exports.deleteJob = async (req, res) => {
         res.status(500).json({ message: 'Failed to delete job.' });
     }
 };
+
+// ── Email Templates ──────────────────────────────────────────────────────────
+exports.listEmailTemplates = async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT id, name, description, subject, variables, is_active, created_at, updated_at
+             FROM email_templates WHERE deleted_at IS NULL ORDER BY name ASC`
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        console.error('admin.listEmailTemplates:', err);
+        res.status(500).json({ message: 'Failed to fetch templates.' });
+    }
+};
+
+exports.getEmailTemplate = async (req, res) => {
+    try {
+        const [[tpl]] = await db.query(
+            'SELECT * FROM email_templates WHERE id = ? AND deleted_at IS NULL',
+            [req.params.id]
+        );
+        if (!tpl) return res.status(404).json({ message: 'Template not found.' });
+        res.json({ success: true, data: tpl });
+    } catch (err) {
+        console.error('admin.getEmailTemplate:', err);
+        res.status(500).json({ message: 'Failed to fetch template.' });
+    }
+};
+
+exports.createEmailTemplate = async (req, res) => {
+    try {
+        const { name, description, subject, body_html, variables, is_active } = req.body;
+        if (!name || !subject || !body_html) {
+            return res.status(400).json({ message: 'name, subject, and body_html are required.' });
+        }
+        const [result] = await db.query(
+            `INSERT INTO email_templates (created_by, name, description, subject, body_html, variables, is_active)
+             VALUES (?, ?, ?, ?, ?, ?, ?)`,
+            [req.user.id, name.trim(), description || null, subject, body_html,
+             variables ? JSON.stringify(variables) : null, is_active !== false ? 1 : 0]
+        );
+        await logAction(req.user.id, 'create_email_template', 'email_template', result.insertId, { name }, ip(req));
+        res.status(201).json({ success: true, data: { id: result.insertId } });
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'A template with that name already exists.' });
+        console.error('admin.createEmailTemplate:', err);
+        res.status(500).json({ message: 'Failed to create template.' });
+    }
+};
+
+exports.updateEmailTemplate = async (req, res) => {
+    try {
+        const [[tpl]] = await db.query('SELECT id FROM email_templates WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
+        if (!tpl) return res.status(404).json({ message: 'Template not found.' });
+        const { name, description, subject, body_html, variables, is_active } = req.body;
+        await db.query(
+            `UPDATE email_templates SET name=?, description=?, subject=?, body_html=?, variables=?, is_active=? WHERE id=?`,
+            [name, description || null, subject, body_html,
+             variables ? JSON.stringify(variables) : null,
+             is_active !== false ? 1 : 0, req.params.id]
+        );
+        await logAction(req.user.id, 'update_email_template', 'email_template', req.params.id, { name }, ip(req));
+        res.json({ success: true, message: 'Template updated.' });
+    } catch (err) {
+        if (err.code === 'ER_DUP_ENTRY') return res.status(409).json({ message: 'A template with that name already exists.' });
+        console.error('admin.updateEmailTemplate:', err);
+        res.status(500).json({ message: 'Failed to update template.' });
+    }
+};
+
+exports.deleteEmailTemplate = async (req, res) => {
+    try {
+        const [[tpl]] = await db.query('SELECT id, name FROM email_templates WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
+        if (!tpl) return res.status(404).json({ message: 'Template not found.' });
+        await db.query('UPDATE email_templates SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
+        await logAction(req.user.id, 'delete_email_template', 'email_template', req.params.id, { name: tpl.name }, ip(req));
+        res.json({ success: true, message: 'Template deleted.' });
+    } catch (err) {
+        console.error('admin.deleteEmailTemplate:', err);
+        res.status(500).json({ message: 'Failed to delete template.' });
+    }
+};

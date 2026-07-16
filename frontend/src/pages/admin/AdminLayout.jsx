@@ -13,6 +13,7 @@ const navItems = [
     { label: 'Payments',   to: '/admin/payments',  icon: '💳' },
     { label: 'Audit Log',  to: '/admin/audit-log', icon: '📋' },
     { label: 'Training',   to: '/admin/training',  icon: '🎓' },
+    { label: 'Email Templates', to: '/admin/email-templates', icon: '✉️' },
     { label: 'Settings',   to: '/admin/settings',  icon: '⚙️' },
 ];
 

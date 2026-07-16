@@ -93,4 +93,11 @@ router.get('/jobs',                        ...admin, ctrl.listAllJobs);
 router.patch('/jobs/:id/status',           ...admin, ctrl.setJobStatus);
 router.delete('/jobs/:id',                 ...admin, ctrl.deleteJob);
 
+// Email Templates
+router.get('/email-templates',             ...admin, ctrl.listEmailTemplates);
+router.get('/email-templates/:id',         ...admin, ctrl.getEmailTemplate);
+router.post('/email-templates',            ...admin, ctrl.createEmailTemplate);
+router.put('/email-templates/:id',         ...admin, ctrl.updateEmailTemplate);
+router.delete('/email-templates/:id',      ...admin, ctrl.deleteEmailTemplate);
+
 module.exports = router;
