@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import AdminLayout from '../../components/admin/AdminLayout';
 import api from '../../api/axios';
 
 const EMPTY = { name: '', description: '', subject: '', body_html: '', variables: '', is_active: true };
@@ -93,8 +92,7 @@ export default function AdminEmailTemplates() {
     );
 
     return (
-        <AdminLayout>
-            <div className="max-w-6xl mx-auto">
+        <div className="max-w-6xl mx-auto">
                 <div className="flex items-center justify-between mb-6">
                     <div>
                         <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
@@ -275,6 +273,6 @@ export default function AdminEmailTemplates() {
                     </div>
                 </div>
             )}
-        </AdminLayout>
+        </div>
     );
 }
