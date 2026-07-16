@@ -107,62 +107,68 @@ const TEMPLATES = [
     },
 ];
 
-// ── Submit each template ──────────────────────────────────────────────────────
+// ── Seed templates into local DB + attempt Vaartabot submission ──────────────
 async function run() {
-    let created = 0, skipped = 0, failed = 0;
+    // Use the first admin user as creator
+    const [[adminUser]] = await db.query(
+        `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id
+         WHERE r.name = 'admin' AND u.deleted_at IS NULL ORDER BY u.id LIMIT 1`
+    );
+    const creatorId = adminUser?.id;
+    if (!creatorId) { console.error('No admin user found'); process.exit(1); }
+
+    let seeded = 0, submitted = 0, failed = 0;
 
     for (const tpl of TEMPLATES) {
+        // 1. Upsert into local DB (inactive until Meta approves)
         try {
-            // Build Vaartabot create-template payload
-            const payload = {
-                name:     tpl.name,
-                category: tpl.category,
-                language: tpl.language,
-                components: [
-                    { type: 'BODY', text: tpl.body },
-                ],
-            };
-
-            const res = await axios.post(`${VB_BASE}/templates`, payload, { headers });
-            console.log(`✓ Submitted: ${tpl.name} → ${res.data?.data?.status || 'submitted'}`);
-
-            // Also upsert in local DB (inactive until approved)
             await db.query(
                 `INSERT INTO whatsapp_templates
                     (created_by, template_name, language_code, category, body_text, variable_count, is_active)
-                 VALUES (1, ?, ?, ?, ?, ?, 0)
+                 VALUES (?, ?, ?, ?, ?, ?, 0)
                  ON DUPLICATE KEY UPDATE
-                    body_text = VALUES(body_text),
+                    body_text      = VALUES(body_text),
                     variable_count = VALUES(variable_count),
-                    category = VALUES(category)`,
-                [tpl.name, tpl.language, tpl.category, tpl.body, tpl.variables]
+                    category       = VALUES(category)`,
+                [creatorId, tpl.name, tpl.language, tpl.category, tpl.body, tpl.variables]
             );
-            created++;
+            seeded++;
+            console.log(`✓ DB: ${tpl.name}`);
+        } catch (err) {
+            console.error(`✗ DB failed: ${tpl.name} — ${err.message}`);
+            failed++;
+            continue;
+        }
+
+        // 2. Try submitting to Vaartabot API (best-effort — may not be supported)
+        try {
+            const res = await axios.post(
+                `${VB_BASE}/templates`,
+                { name: tpl.name, category: tpl.category, language: tpl.language,
+                  components: [{ type: 'BODY', text: tpl.body }] },
+                { headers, timeout: 10000 }
+            );
+            const status = res.data?.data?.status || res.data?.status || 'submitted';
+            console.log(`  ↳ Vaartabot: ${status}`);
+            submitted++;
         } catch (err) {
             const msg = err.response?.data?.message || err.message;
-            if (msg?.includes('already exists') || msg?.includes('duplicate')) {
-                console.log(`- Skipped (already exists): ${tpl.name}`);
-                // Still ensure it's in local DB
-                await db.query(
-                    `INSERT IGNORE INTO whatsapp_templates
-                        (created_by, template_name, language_code, category, body_text, variable_count, is_active)
-                     VALUES (1, ?, ?, ?, ?, ?, 0)`,
-                    [tpl.name, tpl.language, tpl.category, tpl.body, tpl.variables]
-                ).catch(() => {});
-                skipped++;
-            } else {
-                console.error(`✗ Failed: ${tpl.name} — ${msg}`);
-                failed++;
-            }
+            console.log(`  ↳ Vaartabot API skipped (${msg}) — create manually in Vaartabot dashboard`);
         }
     }
 
-    console.log(`\nDone. Created: ${created}, Skipped: ${skipped}, Failed: ${failed}`);
+    console.log(`\nDone. DB seeded: ${seeded}, Vaartabot submitted: ${submitted}, Failed: ${failed}`);
     console.log('\nNext steps:');
-    console.log('1. Wait 24–48 h for Meta to approve templates');
-    console.log('2. In Admin → Platform Settings → WhatsApp, click "Sync Templates"');
-    console.log('   This marks approved templates as active in the local DB.');
-    console.log('3. WhatsApp notifications will then auto-send alongside emails.');
+    console.log('1. Log in to vaartabot.com → Templates and create any templates not auto-submitted.');
+    console.log('   Template bodies are printed below. Use category UTILITY, language English.');
+    console.log('2. Wait 24–48 h for Meta approval.');
+    console.log('3. Admin → Platform Settings → WhatsApp → Sync Templates.');
+    console.log('   Approved templates become active and WhatsApp notifications start firing.\n');
+    for (const tpl of TEMPLATES) {
+        console.log(`── ${tpl.name} (${tpl.variables} var${tpl.variables !== 1 ? 's' : ''}) ──`);
+        console.log(tpl.body);
+        console.log('');
+    }
     process.exit(0);
 }
 
