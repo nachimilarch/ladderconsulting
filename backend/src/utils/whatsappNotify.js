@@ -64,48 +64,48 @@ async function sendWANotification(phone, name, vars = []) {
 
 /** Company: account approved by admin */
 exports.notifyCompanyApproved = (phone, companyName) =>
-    sendWANotification(phone, 'ladderstep_company_approved', [companyName]);
+    sendWANotification(phone, 'ladderstep_company_approved1', [companyName]);
 
 /** Company: interview request approved, slot created */
 exports.notifyInterviewRequestApproved = (phone, candidateName, jobTitle, slotTime) =>
-    sendWANotification(phone, 'ladderstep_interview_req_approved', [candidateName, jobTitle, slotTime]);
+    sendWANotification(phone, 'ladderstep_interview_req_approved1', [candidateName, jobTitle, slotTime]);
 
 /** Company: interview request rejected */
 exports.notifyInterviewRequestRejected = (phone, candidateName, jobTitle) =>
-    sendWANotification(phone, 'ladderstep_interview_req_rejected', [candidateName, jobTitle]);
+    sendWANotification(phone, 'ladderstep_interview_req_rejected1', [candidateName, jobTitle]);
 
 /** Company: offer request approved */
 exports.notifyOfferRequestApproved = (phone, candidateName, jobTitle) =>
-    sendWANotification(phone, 'ladderstep_offer_approved_co', [candidateName, jobTitle]);
+    sendWANotification(phone, 'ladderstep_offer_approved_co1', [candidateName, jobTitle]);
 
 /** Company: offer request rejected */
 exports.notifyOfferRequestRejected = (phone, candidateName, jobTitle) =>
-    sendWANotification(phone, 'ladderstep_offer_rejected_co', [candidateName, jobTitle]);
+    sendWANotification(phone, 'ladderstep_offer_rejected_co1', [candidateName, jobTitle]);
 
 /** Company: candidate confirmed interview */
 exports.notifyInterviewConfirmedCo = (phone, candidateName, jobTitle, slotTime) =>
-    sendWANotification(phone, 'ladderstep_interview_confirmed_co', [candidateName, jobTitle, slotTime]);
+    sendWANotification(phone, 'ladderstep_interview_confirmed_co1', [candidateName, jobTitle, slotTime]);
 
 /** Candidate: interview slot scheduled */
 exports.notifyInterviewScheduledCand = (phone, candidateName, jobTitle, companyName, slotTime, mode) =>
-    sendWANotification(phone, 'ladderstep_interview_scheduled_cand', [candidateName, jobTitle, companyName, slotTime, mode]);
+    sendWANotification(phone, 'ladderstep_interview_scheduled_cand1', [candidateName, jobTitle, companyName, slotTime, mode]);
 
 /** Candidate: interview cancelled */
 exports.notifyInterviewCancelledCand = (phone, candidateName, jobTitle, companyName) =>
-    sendWANotification(phone, 'ladderstep_interview_cancelled', [candidateName, jobTitle, companyName]);
+    sendWANotification(phone, 'ladderstep_interview_cancelled1', [candidateName, jobTitle, companyName]);
 
 /** Candidate: shortlisted for a job */
 exports.notifyShortlistedCand = (phone, candidateName, jobTitle, companyName) =>
-    sendWANotification(phone, 'ladderstep_shortlisted_cand', [candidateName, jobTitle, companyName]);
+    sendWANotification(phone, 'ladderstep_shortlisted_cand1', [candidateName, jobTitle, companyName]);
 
 /** Candidate: offer received */
 exports.notifyOfferReceivedCand = (phone, candidateName, companyName, jobTitle) =>
-    sendWANotification(phone, 'ladderstep_offer_received_cand', [candidateName, companyName, jobTitle]);
+    sendWANotification(phone, 'ladderstep_offer_received_cand1', [candidateName, companyName, jobTitle]);
 
 /** Candidate: offer letter ready to download */
 exports.notifyOfferLetterReadyCand = (phone, candidateName, jobTitle, companyName) =>
-    sendWANotification(phone, 'ladderstep_offer_letter_ready', [candidateName, jobTitle, companyName]);
+    sendWANotification(phone, 'ladderstep_offer_letter_ready1', [candidateName, jobTitle, companyName]);
 
 /** Candidate: application status updated */
 exports.notifyAppStatusCand = (phone, candidateName, jobTitle, companyName, status) =>
-    sendWANotification(phone, 'ladderstep_app_status_update', [candidateName, jobTitle, companyName, status]);
+    sendWANotification(phone, 'ladderstep_app_status_update1', [candidateName, jobTitle, companyName, status]);

@@ -456,6 +456,31 @@ exports.updateApplicationStatus = async (req, res) => {
             );
         }
 
+        // WA notification to candidate
+        db.query(
+            `SELECT u.phone, cp.full_name, jp.title AS job_title, c.company_name
+             FROM applications a
+             JOIN candidates cand ON cand.id = a.candidate_id
+             JOIN users u ON u.id = cand.user_id
+             LEFT JOIN candidate_profiles cp ON cp.candidate_id = cand.id
+             JOIN job_postings jp ON jp.id = a.job_id
+             JOIN companies c ON c.id = jp.company_id
+             WHERE a.id = ? AND a.deleted_at IS NULL`,
+            [req.params.appId]
+        ).then(([[row]]) => {
+            if (row) {
+                const label = {
+                    under_review:        'Under Review',
+                    shortlisted:         'Shortlisted',
+                    interview_scheduled: 'Interview Scheduled',
+                    interviewed:         'Interviewed',
+                    offer_sent:          'Offer Sent',
+                    rejected:            'Not Selected',
+                }[status] || status;
+                wa.notifyAppStatusCand(row.phone, row.full_name, row.job_title, row.company_name, label);
+            }
+        }).catch(() => {});
+
         res.json({ message: 'Application status updated.' });
     } catch (err) {
         console.error('updateApplicationStatus error:', err);
