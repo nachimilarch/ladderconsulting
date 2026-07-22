@@ -207,74 +207,110 @@ export default function PlatformAnalytics() {
 
                         {/* Executive operations table (period-filtered) */}
                         <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100">
-                                <h4 className="text-sm font-semibold text-gray-700">
-                                    Executive Operations — {PERIODS.find(pp => pp.key === period)?.label}
-                                </h4>
+                            <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+                                <div>
+                                    <h4 className="text-sm font-semibold text-gray-800">
+                                        Executive Operations — {PERIODS.find(pp => pp.key === period)?.label}
+                                    </h4>
+                                    <p className="text-xs text-gray-400 mt-0.5">All activity by each HR executive during the selected period</p>
+                                </div>
                             </div>
                             {mis.executives?.length === 0 ? (
                                 <p className="text-sm text-gray-400 p-5">No executive data.</p>
                             ) : (
                                 <div className="overflow-x-auto">
-                                    <table className="w-full text-sm">
+                                    <table className="w-full text-xs">
                                         <thead>
-                                            <tr className="text-xs text-gray-500 uppercase border-b border-gray-100 bg-gray-50">
-                                                <th className="px-4 py-3 text-left font-medium">Executive</th>
-                                                <th className="px-3 py-3 text-center font-medium">Cos Mgd</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Campaigns</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Msgs Sent</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Replies</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Calls</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Outreach → Leads">Leads Gen</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Outreach → Leads">Converted</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Sourced</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Interviews</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Offers</th>
-                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Hires</th>
-                                                <th className="px-3 py-3 text-center font-medium">Tasks</th>
-                                                <th className="px-4 py-3 text-right font-medium">Fees</th>
+                                            {/* Group header row */}
+                                            <tr className="border-b border-gray-100">
+                                                <th className="px-4 py-2 text-left" rowSpan={2}>
+                                                    <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Executive</span>
+                                                </th>
+                                                <th className="px-3 py-2 text-center" rowSpan={2}>
+                                                    <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Companies<br/>Assigned</span>
+                                                </th>
+                                                {/* Outreach group */}
+                                                <th colSpan={6} className="px-3 py-2 text-center bg-indigo-50 border-l border-indigo-100">
+                                                    <span className="text-[10px] font-bold text-indigo-600 uppercase tracking-wider">📣 Outreach Activity</span>
+                                                </th>
+                                                {/* Lead pipeline group */}
+                                                <th colSpan={2} className="px-3 py-2 text-center bg-amber-50 border-l border-amber-100">
+                                                    <span className="text-[10px] font-bold text-amber-600 uppercase tracking-wider">🎯 Lead Pipeline</span>
+                                                </th>
+                                                {/* Hiring group */}
+                                                <th colSpan={4} className="px-3 py-2 text-center bg-green-50 border-l border-green-100">
+                                                    <span className="text-[10px] font-bold text-green-600 uppercase tracking-wider">👥 Hiring Pipeline</span>
+                                                </th>
+                                                <th className="px-3 py-2 text-center" rowSpan={2}>
+                                                    <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Tasks<br/>Completed</span>
+                                                </th>
+                                                <th className="px-4 py-2 text-right" rowSpan={2}>
+                                                    <span className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Placement Fees<br/>Collected</span>
+                                                </th>
+                                            </tr>
+                                            {/* Column sub-headers */}
+                                            <tr className="border-b-2 border-gray-200 bg-gray-50">
+                                                {/* Outreach sub-cols */}
+                                                <th className="px-3 py-2 text-center font-semibold text-indigo-600 bg-indigo-50 border-l border-indigo-100 whitespace-nowrap">Campaigns<br/><span className="font-normal text-gray-400">launched</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-indigo-600 bg-indigo-50 whitespace-nowrap">Messages<br/><span className="font-normal text-gray-400">sent</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-indigo-600 bg-indigo-50 whitespace-nowrap">Replies<br/><span className="font-normal text-gray-400">received</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-indigo-600 bg-indigo-50 whitespace-nowrap">Cold Calls<br/><span className="font-normal text-gray-400">logged</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-indigo-600 bg-indigo-50 whitespace-nowrap">Email<br/><span className="font-normal text-gray-400">open rate</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-indigo-600 bg-indigo-50 whitespace-nowrap">Reply<br/><span className="font-normal text-gray-400">rate</span></th>
+                                                {/* Lead sub-cols */}
+                                                <th className="px-3 py-2 text-center font-semibold text-amber-600 bg-amber-50 border-l border-amber-100 whitespace-nowrap">Leads<br/><span className="font-normal text-gray-400">generated</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-amber-600 bg-amber-50 whitespace-nowrap">Leads<br/><span className="font-normal text-gray-400">converted</span></th>
+                                                {/* Hiring sub-cols */}
+                                                <th className="px-3 py-2 text-center font-semibold text-green-600 bg-green-50 border-l border-green-100 whitespace-nowrap">Candidates<br/><span className="font-normal text-gray-400">sourced</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-green-600 bg-green-50 whitespace-nowrap">Interviews<br/><span className="font-normal text-gray-400">scheduled</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-green-600 bg-green-50 whitespace-nowrap">Offers<br/><span className="font-normal text-gray-400">facilitated</span></th>
+                                                <th className="px-3 py-2 text-center font-semibold text-green-700 bg-green-50 whitespace-nowrap">Hires<br/><span className="font-normal text-gray-400">closed</span></th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
                                             {(mis.executives ?? []).map(e => {
-                                                const conversion = e.leads_created > 0
+                                                const replyRate = e.messages_sent > 0
+                                                    ? Math.round((e.replies_received / e.messages_sent) * 100)
+                                                    : 0;
+                                                const convRate = e.leads_created > 0
                                                     ? Math.round((e.leads_converted / e.leads_created) * 100)
                                                     : 0;
                                                 return (
-                                                    <tr key={e.user_id} className="hover:bg-indigo-50/30 transition-colors">
-                                                        <td className="px-4 py-3">
-                                                            <p className="font-medium text-gray-800">{e.executive_name}</p>
+                                                    <tr key={e.user_id} className="hover:bg-indigo-50/20 transition-colors">
+                                                        <td className="px-4 py-3 font-medium text-gray-800 whitespace-nowrap">{e.executive_name}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700 font-medium">{e.companies_assigned}</td>
+                                                        {/* Outreach */}
+                                                        <td className="px-3 py-3 text-center text-indigo-700 font-semibold bg-indigo-50/30 border-l border-indigo-50">{e.campaigns_run}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700 bg-indigo-50/30">{fmt(e.messages_sent)}</td>
+                                                        <td className="px-3 py-3 text-center text-blue-600 font-medium bg-indigo-50/30">{e.replies_received}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700 bg-indigo-50/30">{e.outreach_calls}</td>
+                                                        <td className="px-3 py-3 text-center bg-indigo-50/30">
+                                                            <span className="text-gray-400 text-[11px]">—</span>
                                                         </td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.companies_assigned}</td>
-                                                        <td className="px-3 py-3 text-center text-indigo-700 font-medium">{e.campaigns_run}</td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{fmt(e.messages_sent)}</td>
-                                                        <td className="px-3 py-3 text-center text-blue-600">{e.replies_received}</td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.outreach_calls}</td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.leads_created}</td>
-                                                        <td className="px-3 py-3 text-center">
-                                                            <div className="flex flex-col items-center">
-                                                                <span className={`text-xs font-semibold ${Number(e.leads_converted) > 0 ? 'text-green-600' : 'text-gray-400'}`}>
-                                                                    {e.leads_converted}
-                                                                </span>
-                                                                {e.leads_created > 0 && (
-                                                                    <span className="text-[10px] text-gray-400">{conversion}%</span>
-                                                                )}
+                                                        <td className="px-3 py-3 text-center bg-indigo-50/30">
+                                                            {e.messages_sent > 0
+                                                                ? <span className="text-indigo-600 font-medium">{replyRate}%</span>
+                                                                : <span className="text-gray-400">—</span>}
+                                                        </td>
+                                                        {/* Leads */}
+                                                        <td className="px-3 py-3 text-center text-amber-700 font-medium bg-amber-50/30 border-l border-amber-50">{e.leads_created}</td>
+                                                        <td className="px-3 py-3 text-center bg-amber-50/30">
+                                                            <div className="flex flex-col items-center gap-0.5">
+                                                                <span className={`font-semibold ${Number(e.leads_converted) > 0 ? 'text-green-600' : 'text-gray-400'}`}>{e.leads_converted}</span>
+                                                                {e.leads_created > 0 && <span className="text-[10px] text-gray-400">{convRate}%</span>}
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.candidates_sourced}</td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.interviews_scheduled}</td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.offers_facilitated}</td>
-                                                        <td className="px-3 py-3 text-center">
-                                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                                                                Number(e.hires_closed) > 0
-                                                                    ? 'bg-green-100 text-green-700'
-                                                                    : 'bg-gray-100 text-gray-400'
-                                                            }`}>
+                                                        {/* Hiring */}
+                                                        <td className="px-3 py-3 text-center text-gray-700 bg-green-50/30 border-l border-green-50">{e.candidates_sourced}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700 bg-green-50/30">{e.interviews_scheduled}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700 bg-green-50/30">{e.offers_facilitated}</td>
+                                                        <td className="px-3 py-3 text-center bg-green-50/30">
+                                                            <span className={`font-semibold px-2 py-0.5 rounded-full text-[11px] ${Number(e.hires_closed) > 0 ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
                                                                 {e.hires_closed}
                                                             </span>
                                                         </td>
                                                         <td className="px-3 py-3 text-center text-gray-700">{e.tasks_completed}</td>
-                                                        <td className="px-4 py-3 text-right font-medium text-green-700">{fmtINR(e.fees_collected)}</td>
+                                                        <td className="px-4 py-3 text-right font-semibold text-green-700">{fmtINR(e.fees_collected)}</td>
                                                     </tr>
                                                 );
                                             })}
@@ -297,10 +333,11 @@ export default function PlatformAnalytics() {
                                         </div>
                                         <p className="font-semibold text-gray-800 text-sm">{tp.name}</p>
                                         <p className="text-[10px] text-gray-400 mb-2">{tp.designation || '—'}</p>
-                                        <div className="flex flex-wrap gap-2 text-xs text-gray-600">
-                                            <span><span className="font-bold text-indigo-700">{tp.sourced}</span> sourced</span>
-                                            <span><span className="font-bold text-purple-700">{tp.campaigns}</span> campaigns</span>
-                                            <span><span className="font-bold text-blue-700">{tp.calls}</span> calls</span>
+                                        <div className="space-y-1 text-xs text-gray-600">
+                                            <div className="flex justify-between"><span className="text-gray-400">Candidates Sourced</span><span className="font-bold text-indigo-700">{tp.sourced}</span></div>
+                                            <div className="flex justify-between"><span className="text-gray-400">Campaigns Run</span><span className="font-bold text-purple-700">{tp.campaigns}</span></div>
+                                            <div className="flex justify-between"><span className="text-gray-400">Messages Sent</span><span className="font-bold text-blue-600">{fmt(tp.messages)}</span></div>
+                                            <div className="flex justify-between"><span className="text-gray-400">Cold Calls</span><span className="font-bold text-gray-700">{tp.calls}</span></div>
                                         </div>
                                     </div>
                                 ))}
