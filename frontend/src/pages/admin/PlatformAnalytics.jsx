@@ -221,16 +221,18 @@ export default function PlatformAnalytics() {
                                             <tr className="text-xs text-gray-500 uppercase border-b border-gray-100 bg-gray-50">
                                                 <th className="px-4 py-3 text-left font-medium">Executive</th>
                                                 <th className="px-3 py-3 text-center font-medium">Cos Mgd</th>
-                                                <th className="px-3 py-3 text-center font-medium">Leads</th>
-                                                <th className="px-3 py-3 text-center font-medium">Converted</th>
-                                                <th className="px-3 py-3 text-center font-medium">Calls</th>
-                                                <th className="px-3 py-3 text-center font-medium">Sourced</th>
-                                                <th className="px-3 py-3 text-center font-medium">Interviews Appvd</th>
-                                                <th className="px-3 py-3 text-center font-medium">Offers Fclt'd</th>
-                                                <th className="px-3 py-3 text-center font-medium">Hires Closed</th>
-                                                <th className="px-3 py-3 text-center font-medium">Tasks Done</th>
-                                                <th className="px-3 py-3 text-center font-medium">Campaigns</th>
-                                                <th className="px-4 py-3 text-right font-medium">Fees Collected</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Campaigns</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Msgs Sent</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Replies</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Outreach">Calls</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Outreach → Leads">Leads Gen</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Outreach → Leads">Converted</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Sourced</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Interviews</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Offers</th>
+                                                <th className="px-3 py-3 text-center font-medium" title="Hiring">Hires</th>
+                                                <th className="px-3 py-3 text-center font-medium">Tasks</th>
+                                                <th className="px-4 py-3 text-right font-medium">Fees</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-50">
@@ -239,12 +241,15 @@ export default function PlatformAnalytics() {
                                                     ? Math.round((e.leads_converted / e.leads_created) * 100)
                                                     : 0;
                                                 return (
-                                                    <tr key={e.employee_id} className="hover:bg-indigo-50/30 transition-colors">
+                                                    <tr key={e.user_id} className="hover:bg-indigo-50/30 transition-colors">
                                                         <td className="px-4 py-3">
                                                             <p className="font-medium text-gray-800">{e.executive_name}</p>
-                                                            <p className="text-[10px] text-gray-400">{e.designation || e.department || '—'}</p>
                                                         </td>
                                                         <td className="px-3 py-3 text-center text-gray-700">{e.companies_assigned}</td>
+                                                        <td className="px-3 py-3 text-center text-indigo-700 font-medium">{e.campaigns_run}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700">{fmt(e.messages_sent)}</td>
+                                                        <td className="px-3 py-3 text-center text-blue-600">{e.replies_received}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700">{e.outreach_calls}</td>
                                                         <td className="px-3 py-3 text-center text-gray-700">{e.leads_created}</td>
                                                         <td className="px-3 py-3 text-center">
                                                             <div className="flex flex-col items-center">
@@ -256,9 +261,8 @@ export default function PlatformAnalytics() {
                                                                 )}
                                                             </div>
                                                         </td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.calls_made}</td>
                                                         <td className="px-3 py-3 text-center text-gray-700">{e.candidates_sourced}</td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.interviews_approved}</td>
+                                                        <td className="px-3 py-3 text-center text-gray-700">{e.interviews_scheduled}</td>
                                                         <td className="px-3 py-3 text-center text-gray-700">{e.offers_facilitated}</td>
                                                         <td className="px-3 py-3 text-center">
                                                             <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
@@ -270,7 +274,6 @@ export default function PlatformAnalytics() {
                                                             </span>
                                                         </td>
                                                         <td className="px-3 py-3 text-center text-gray-700">{e.tasks_completed}</td>
-                                                        <td className="px-3 py-3 text-center text-gray-700">{e.campaigns_run}</td>
                                                         <td className="px-4 py-3 text-right font-medium text-green-700">{fmtINR(e.fees_collected)}</td>
                                                     </tr>
                                                 );
@@ -294,9 +297,9 @@ export default function PlatformAnalytics() {
                                         </div>
                                         <p className="font-semibold text-gray-800 text-sm">{tp.name}</p>
                                         <p className="text-[10px] text-gray-400 mb-2">{tp.designation || '—'}</p>
-                                        <div className="flex gap-3 text-xs text-gray-600">
-                                            <span><span className="font-bold text-indigo-700">{tp.leads}</span> leads</span>
-                                            <span><span className="font-bold text-green-700">{tp.converted}</span> conv</span>
+                                        <div className="flex flex-wrap gap-2 text-xs text-gray-600">
+                                            <span><span className="font-bold text-indigo-700">{tp.sourced}</span> sourced</span>
+                                            <span><span className="font-bold text-purple-700">{tp.campaigns}</span> campaigns</span>
                                             <span><span className="font-bold text-blue-700">{tp.calls}</span> calls</span>
                                         </div>
                                     </div>

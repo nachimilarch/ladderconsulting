@@ -1748,26 +1748,21 @@ exports.getMIS = async (req, res) => {
                 (SELECT COALESCE(SUM(amount),0) FROM invoices WHERE status IN ('paid','partially_paid') AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS revenue_collected
         `);
 
-        // ── 2. Per-executive breakdown ───────────────────────────────────────
+        // ── 2. Per-executive breakdown (keyed on users.id — employees table unused) ──
         const [executives] = await db.query(`
             SELECT
                 u.id AS user_id, u.name AS executive_name,
-                e.id AS employee_id, e.department, e.designation,
+                NULL AS employee_id, NULL AS department, NULL AS designation,
                 (SELECT COUNT(*) FROM companies co
                     WHERE co.assigned_executive_id = u.id AND co.deleted_at IS NULL) AS companies_assigned,
-                (SELECT COUNT(*) FROM leads l
-                    WHERE l.assigned_to = e.id AND l.created_at >= NOW() - ${interval} AND l.deleted_at IS NULL) AS leads_created,
-                (SELECT COUNT(*) FROM leads l
-                    WHERE l.assigned_to = e.id AND l.stage = 'converted' AND l.updated_at >= NOW() - ${interval} AND l.deleted_at IS NULL) AS leads_converted,
-                (SELECT COUNT(*) FROM call_logs cl
-                    WHERE cl.employee_id = e.id AND cl.created_at >= NOW() - ${interval} AND cl.deleted_at IS NULL) AS calls_made,
+                /* Hiring pipeline */
                 (SELECT COUNT(*) FROM applications a
-                    WHERE a.sourced_by = u.id AND a.source = 'executive' AND a.created_at >= NOW() - ${interval} AND a.deleted_at IS NULL) AS candidates_sourced,
+                    WHERE a.sourced_by = u.id AND a.created_at >= NOW() - ${interval} AND a.deleted_at IS NULL) AS candidates_sourced,
                 (SELECT COUNT(*) FROM interview_slots isl
                     JOIN applications ap ON ap.id = isl.application_id
                     JOIN job_postings jp0 ON jp0.id = ap.job_id
                     JOIN companies co0 ON co0.id = jp0.company_id AND co0.assigned_executive_id = u.id
-                    WHERE isl.created_at >= NOW() - ${interval} AND isl.deleted_at IS NULL) AS interviews_approved,
+                    WHERE isl.created_at >= NOW() - ${interval} AND isl.deleted_at IS NULL) AS interviews_scheduled,
                 (SELECT COUNT(*) FROM offers oo
                     JOIN applications aa ON aa.id = oo.application_id
                     JOIN job_postings jp ON jp.id = aa.job_id
@@ -1777,21 +1772,34 @@ exports.getMIS = async (req, res) => {
                     JOIN job_postings jp2 ON jp2.id = aa2.job_id
                     JOIN companies co3 ON co3.id = jp2.company_id AND co3.assigned_executive_id = u.id
                     WHERE aa2.status = 'hired' AND aa2.updated_at >= NOW() - ${interval} AND aa2.deleted_at IS NULL) AS hires_closed,
-                (SELECT COUNT(*) FROM tasks t
-                    WHERE t.assigned_by = u.id AND t.created_at >= NOW() - ${interval} AND t.deleted_at IS NULL) AS tasks_assigned,
+                /* Outreach operations */
+                (SELECT COUNT(*) FROM outreach_campaigns oc
+                    WHERE oc.created_by = u.id AND oc.created_at >= NOW() - ${interval} AND oc.deleted_at IS NULL) AS campaigns_run,
+                (SELECT COALESCE(SUM(oc2.sent_count),0) FROM outreach_campaigns oc2
+                    WHERE oc2.created_by = u.id AND oc2.created_at >= NOW() - ${interval} AND oc2.deleted_at IS NULL) AS messages_sent,
+                (SELECT COUNT(*) FROM outreach_email_replies oer
+                    JOIN outreach_campaigns oc3 ON oc3.id = oer.campaign_id AND oc3.created_by = u.id
+                    WHERE oer.received_at >= NOW() - ${interval} AND oer.deleted_at IS NULL) AS replies_received,
+                (SELECT COUNT(*) FROM outreach_call_logs ocl
+                    WHERE ocl.called_by = u.id AND ocl.created_at >= NOW() - ${interval}) AS outreach_calls,
+                /* Lead pipeline — attributed via outreach campaigns created by this exec */
+                (SELECT COUNT(*) FROM leads l
+                    JOIN outreach_campaigns oc4 ON oc4.id = l.outreach_campaign_id AND oc4.created_by = u.id
+                    WHERE l.created_at >= NOW() - ${interval} AND l.deleted_at IS NULL) AS leads_created,
+                (SELECT COUNT(*) FROM leads l2
+                    JOIN outreach_campaigns oc5 ON oc5.id = l2.outreach_campaign_id AND oc5.created_by = u.id
+                    WHERE l2.stage = 'converted' AND l2.updated_at >= NOW() - ${interval} AND l2.deleted_at IS NULL) AS leads_converted,
+                /* Tasks */
                 (SELECT COUNT(*) FROM tasks t2
                     WHERE t2.assigned_to = u.id AND t2.status = 'completed' AND t2.updated_at >= NOW() - ${interval} AND t2.deleted_at IS NULL) AS tasks_completed,
-                (SELECT COUNT(*) FROM outreach_campaigns oc
-                    WHERE oc.created_by = e.id AND oc.created_at >= NOW() - ${interval} AND oc.deleted_at IS NULL) AS campaigns_run,
-                (SELECT COALESCE(SUM(oc2.sent_count),0) FROM outreach_campaigns oc2
-                    WHERE oc2.created_by = e.id AND oc2.created_at >= NOW() - ${interval} AND oc2.deleted_at IS NULL) AS messages_sent,
+                /* Revenue */
                 (SELECT COALESCE(SUM(inv.amount),0) FROM invoices inv
                     WHERE inv.raised_by = u.id AND inv.status IN ('paid','partially_paid')
                     AND inv.updated_at >= NOW() - ${interval} AND inv.deleted_at IS NULL) AS fees_collected
-            FROM employees e
-            JOIN users u ON u.id = e.user_id AND u.deleted_at IS NULL
-            WHERE e.deleted_at IS NULL
-            ORDER BY hires_closed DESC, leads_converted DESC, calls_made DESC
+            FROM users u
+            JOIN roles r ON r.id = u.role_id AND r.name IN ('hr_staff','admin')
+            WHERE u.deleted_at IS NULL
+            ORDER BY hires_closed DESC, candidates_sourced DESC, campaigns_run DESC
         `);
 
         // ── 3. Daily trend (for sparklines) — last trendDays days ────────────
@@ -1814,17 +1822,19 @@ exports.getMIS = async (req, res) => {
 
         // ── 4. Top performers ────────────────────────────────────────────────
         const [topPerformers] = await db.query(`
-            SELECT u.name, e.designation,
-                   COUNT(DISTINCT l.id) AS leads,
-                   COALESCE(SUM(l.stage='converted'),0) AS converted,
-                   COUNT(DISTINCT cl.id) AS calls
-            FROM employees e
-            JOIN users u ON u.id = e.user_id AND u.deleted_at IS NULL
-            LEFT JOIN leads l ON l.assigned_to = e.id AND l.created_at >= NOW() - ${interval} AND l.deleted_at IS NULL
-            LEFT JOIN call_logs cl ON cl.employee_id = e.id AND cl.created_at >= NOW() - ${interval} AND cl.deleted_at IS NULL
-            WHERE e.deleted_at IS NULL
-            GROUP BY e.id, u.name, e.designation
-            ORDER BY converted DESC, calls DESC
+            SELECT u.name,
+                   COUNT(DISTINCT a.id) AS sourced,
+                   COUNT(DISTINCT oc.id) AS campaigns,
+                   COALESCE(SUM(oc.sent_count),0) AS messages,
+                   COUNT(DISTINCT ocl.id) AS calls
+            FROM users u
+            JOIN roles r ON r.id = u.role_id AND r.name IN ('hr_staff','admin')
+            LEFT JOIN applications a ON a.sourced_by = u.id AND a.created_at >= NOW() - ${interval} AND a.deleted_at IS NULL
+            LEFT JOIN outreach_campaigns oc ON oc.created_by = u.id AND oc.created_at >= NOW() - ${interval} AND oc.deleted_at IS NULL
+            LEFT JOIN outreach_call_logs ocl ON ocl.called_by = u.id AND ocl.created_at >= NOW() - ${interval}
+            WHERE u.deleted_at IS NULL
+            GROUP BY u.id, u.name
+            ORDER BY sourced DESC, campaigns DESC, messages DESC
             LIMIT 5
         `);
 
