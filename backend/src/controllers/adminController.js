@@ -1709,3 +1709,125 @@ exports.deleteEmailTemplate = async (req, res) => {
         res.status(500).json({ message: 'Failed to delete template.' });
     }
 };
+
+// ── MIS / OPERATIONAL ANALYTICS ──────────────────────────────────────────────
+
+exports.getMIS = async (req, res) => {
+    const period = req.query.period || 'weekly'; // daily | weekly | monthly
+
+    const intervalMap = {
+        daily:   'INTERVAL 1 DAY',
+        weekly:  'INTERVAL 7 DAY',
+        monthly: 'INTERVAL 30 DAY',
+    };
+    const interval = intervalMap[period] || intervalMap.weekly;
+
+    const trendDays = period === 'monthly' ? 30 : period === 'weekly' ? 7 : 1;
+
+    try {
+        // ── 1. Platform-wide operational metrics for the period ──────────────
+        const [[platform]] = await db.query(`
+            SELECT
+                (SELECT COUNT(*) FROM users WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS new_registrations,
+                (SELECT COUNT(*) FROM users u JOIN roles r ON r.id = u.role_id
+                    WHERE r.name = 'company' AND u.created_at >= NOW() - ${interval} AND u.deleted_at IS NULL) AS new_companies,
+                (SELECT COUNT(*) FROM users u JOIN roles r ON r.id = u.role_id
+                    WHERE r.name = 'candidate' AND u.created_at >= NOW() - ${interval} AND u.deleted_at IS NULL) AS new_candidates,
+                (SELECT COUNT(*) FROM job_postings WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS jobs_posted,
+                (SELECT COUNT(*) FROM applications WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS applications_received,
+                (SELECT COUNT(*) FROM interview_slots WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS interviews_scheduled,
+                (SELECT COUNT(*) FROM interview_slots WHERE status = 'completed' AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS interviews_completed,
+                (SELECT COUNT(*) FROM offers WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS offers_sent,
+                (SELECT COUNT(*) FROM applications WHERE status = 'hired' AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS hires_made,
+                (SELECT COUNT(*) FROM leads WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS leads_created,
+                (SELECT COUNT(*) FROM leads WHERE stage = 'converted' AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS leads_converted,
+                (SELECT COUNT(*) FROM outreach_campaigns WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS campaigns_launched,
+                (SELECT COALESCE(SUM(sent_count),0) FROM outreach_campaigns WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS outreach_messages_sent,
+                (SELECT COUNT(*) FROM tasks WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS tasks_created,
+                (SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS tasks_completed,
+                (SELECT COALESCE(SUM(amount),0) FROM invoices WHERE status IN ('paid','partial') AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS revenue_collected
+        `);
+
+        // ── 2. Per-executive breakdown ───────────────────────────────────────
+        const [executives] = await db.query(`
+            SELECT
+                u.id AS user_id, u.name AS executive_name,
+                e.id AS employee_id, e.department, e.designation,
+                (SELECT COUNT(*) FROM companies co
+                    WHERE co.assigned_executive_id = u.id AND co.deleted_at IS NULL) AS companies_assigned,
+                (SELECT COUNT(*) FROM leads l
+                    WHERE l.assigned_to = e.id AND l.created_at >= NOW() - ${interval} AND l.deleted_at IS NULL) AS leads_created,
+                (SELECT COUNT(*) FROM leads l
+                    WHERE l.assigned_to = e.id AND l.stage = 'converted' AND l.updated_at >= NOW() - ${interval} AND l.deleted_at IS NULL) AS leads_converted,
+                (SELECT COUNT(*) FROM call_logs cl
+                    WHERE cl.employee_id = e.id AND cl.created_at >= NOW() - ${interval} AND cl.deleted_at IS NULL) AS calls_made,
+                (SELECT COUNT(*) FROM applications a
+                    WHERE a.sourced_by = u.id AND a.source = 'executive' AND a.created_at >= NOW() - ${interval} AND a.deleted_at IS NULL) AS candidates_sourced,
+                (SELECT COUNT(*) FROM interview_request_logs irl
+                    WHERE irl.reviewed_by = u.id AND irl.created_at >= NOW() - ${interval}) AS interviews_approved,
+                (SELECT COUNT(*) FROM offers oo
+                    JOIN applications aa ON aa.id = oo.application_id
+                    JOIN job_postings jp ON jp.id = aa.job_id
+                    JOIN companies co2 ON co2.id = jp.company_id AND co2.assigned_executive_id = u.id
+                    WHERE oo.created_at >= NOW() - ${interval} AND oo.deleted_at IS NULL) AS offers_facilitated,
+                (SELECT COUNT(*) FROM applications aa2
+                    JOIN job_postings jp2 ON jp2.id = aa2.job_id
+                    JOIN companies co3 ON co3.id = jp2.company_id AND co3.assigned_executive_id = u.id
+                    WHERE aa2.status = 'hired' AND aa2.updated_at >= NOW() - ${interval} AND aa2.deleted_at IS NULL) AS hires_closed,
+                (SELECT COUNT(*) FROM tasks t
+                    WHERE t.assigned_by = u.id AND t.created_at >= NOW() - ${interval} AND t.deleted_at IS NULL) AS tasks_assigned,
+                (SELECT COUNT(*) FROM tasks t2
+                    WHERE t2.assigned_to = u.id AND t2.status = 'completed' AND t2.updated_at >= NOW() - ${interval} AND t2.deleted_at IS NULL) AS tasks_completed,
+                (SELECT COUNT(*) FROM outreach_campaigns oc
+                    WHERE oc.created_by = e.id AND oc.created_at >= NOW() - ${interval} AND oc.deleted_at IS NULL) AS campaigns_run,
+                (SELECT COALESCE(SUM(oc2.sent_count),0) FROM outreach_campaigns oc2
+                    WHERE oc2.created_by = e.id AND oc2.created_at >= NOW() - ${interval} AND oc2.deleted_at IS NULL) AS messages_sent,
+                (SELECT COALESCE(SUM(inv.amount),0) FROM invoices inv
+                    WHERE inv.raised_by = u.id AND inv.status IN ('paid','partial')
+                    AND inv.updated_at >= NOW() - ${interval} AND inv.deleted_at IS NULL) AS fees_collected
+            FROM employees e
+            JOIN users u ON u.id = e.user_id AND u.deleted_at IS NULL
+            WHERE e.deleted_at IS NULL
+            ORDER BY hires_closed DESC, leads_converted DESC, calls_made DESC
+        `);
+
+        // ── 3. Daily trend (for sparklines) — last trendDays days ────────────
+        const [trend] = await db.query(`
+            SELECT
+                DATE(d.day) AS date,
+                COALESCE((SELECT COUNT(*) FROM applications WHERE DATE(created_at) = DATE(d.day) AND deleted_at IS NULL), 0) AS applications,
+                COALESCE((SELECT COUNT(*) FROM leads WHERE DATE(created_at) = DATE(d.day) AND deleted_at IS NULL), 0) AS leads,
+                COALESCE((SELECT COUNT(*) FROM interview_slots WHERE DATE(created_at) = DATE(d.day) AND deleted_at IS NULL), 0) AS interviews,
+                COALESCE((SELECT COUNT(*) FROM offers WHERE DATE(created_at) = DATE(d.day) AND deleted_at IS NULL), 0) AS offers,
+                COALESCE((SELECT COUNT(*) FROM applications WHERE status = 'hired' AND DATE(updated_at) = DATE(d.day) AND deleted_at IS NULL), 0) AS hires
+            FROM (
+                SELECT DATE(NOW()) - INTERVAL (a.a + (10 * b.a)) DAY AS day
+                FROM (SELECT 0 AS a UNION SELECT 1 UNION SELECT 2 UNION SELECT 3 UNION SELECT 4 UNION SELECT 5 UNION SELECT 6 UNION SELECT 7 UNION SELECT 8 UNION SELECT 9) AS a
+                CROSS JOIN (SELECT 0 AS a UNION SELECT 1 UNION SELECT 2 UNION SELECT 3) AS b
+                WHERE a.a + (10 * b.a) < ?
+            ) d
+            ORDER BY d.day ASC
+        `, [trendDays]);
+
+        // ── 4. Top performers ────────────────────────────────────────────────
+        const [topPerformers] = await db.query(`
+            SELECT u.name, e.designation,
+                   COUNT(DISTINCT l.id) AS leads,
+                   COALESCE(SUM(l.stage='converted'),0) AS converted,
+                   COUNT(DISTINCT cl.id) AS calls
+            FROM employees e
+            JOIN users u ON u.id = e.user_id AND u.deleted_at IS NULL
+            LEFT JOIN leads l ON l.assigned_to = e.id AND l.created_at >= NOW() - ${interval} AND l.deleted_at IS NULL
+            LEFT JOIN call_logs cl ON cl.employee_id = e.id AND cl.created_at >= NOW() - ${interval} AND cl.deleted_at IS NULL
+            WHERE e.deleted_at IS NULL
+            GROUP BY e.id, u.name, e.designation
+            ORDER BY converted DESC, calls DESC
+            LIMIT 5
+        `);
+
+        res.json({ success: true, data: { period, platform, executives, trend, topPerformers } });
+    } catch (err) {
+        console.error('getMIS:', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch MIS data.' });
+    }
+};

@@ -51,6 +51,7 @@ export const adminAnalyticsAPI = {
     getMonthly: () => api.get('/admin/analytics/monthly'),
     getConversion: () => api.get('/admin/analytics/conversion'),
     getExecutivePerformance: () => api.get('/admin/analytics/executive-performance'),
+    getMIS: (period) => api.get(`/admin/analytics/mis?period=${period}`),
 };
 
 export const adminAuditAPI = {

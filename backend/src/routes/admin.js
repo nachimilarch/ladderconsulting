@@ -61,6 +61,7 @@ router.get('/analytics/summary',                 ...admin, ctrl.getAnalyticsSumm
 router.get('/analytics/monthly',                 ...admin, ctrl.getMonthlyAnalytics);
 router.get('/analytics/conversion',              ...admin, ctrl.getConversionFunnel);
 router.get('/analytics/executive-performance',   ...admin, ctrl.getExecutivePerformance);
+router.get('/analytics/mis',                     ...admin, ctrl.getMIS);
 
 // AI Matching admin
 router.post('/resumes/reparse-skills',     ...admin, ctrl.reparseResumeSkills);
