@@ -1745,7 +1745,7 @@ exports.getMIS = async (req, res) => {
                 (SELECT COALESCE(SUM(sent_count),0) FROM outreach_campaigns WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS outreach_messages_sent,
                 (SELECT COUNT(*) FROM tasks WHERE created_at >= NOW() - ${interval} AND deleted_at IS NULL) AS tasks_created,
                 (SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS tasks_completed,
-                (SELECT COALESCE(SUM(amount),0) FROM invoices WHERE status IN ('paid','partial') AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS revenue_collected
+                (SELECT COALESCE(SUM(amount),0) FROM invoices WHERE status IN ('paid','partially_paid') AND updated_at >= NOW() - ${interval} AND deleted_at IS NULL) AS revenue_collected
         `);
 
         // ── 2. Per-executive breakdown ───────────────────────────────────────
@@ -1763,8 +1763,11 @@ exports.getMIS = async (req, res) => {
                     WHERE cl.employee_id = e.id AND cl.created_at >= NOW() - ${interval} AND cl.deleted_at IS NULL) AS calls_made,
                 (SELECT COUNT(*) FROM applications a
                     WHERE a.sourced_by = u.id AND a.source = 'executive' AND a.created_at >= NOW() - ${interval} AND a.deleted_at IS NULL) AS candidates_sourced,
-                (SELECT COUNT(*) FROM interview_request_logs irl
-                    WHERE irl.reviewed_by = u.id AND irl.created_at >= NOW() - ${interval}) AS interviews_approved,
+                (SELECT COUNT(*) FROM interview_slots isl
+                    JOIN applications ap ON ap.id = isl.application_id
+                    JOIN job_postings jp0 ON jp0.id = ap.job_id
+                    JOIN companies co0 ON co0.id = jp0.company_id AND co0.assigned_executive_id = u.id
+                    WHERE isl.created_at >= NOW() - ${interval} AND isl.deleted_at IS NULL) AS interviews_approved,
                 (SELECT COUNT(*) FROM offers oo
                     JOIN applications aa ON aa.id = oo.application_id
                     JOIN job_postings jp ON jp.id = aa.job_id
@@ -1783,7 +1786,7 @@ exports.getMIS = async (req, res) => {
                 (SELECT COALESCE(SUM(oc2.sent_count),0) FROM outreach_campaigns oc2
                     WHERE oc2.created_by = e.id AND oc2.created_at >= NOW() - ${interval} AND oc2.deleted_at IS NULL) AS messages_sent,
                 (SELECT COALESCE(SUM(inv.amount),0) FROM invoices inv
-                    WHERE inv.raised_by = u.id AND inv.status IN ('paid','partial')
+                    WHERE inv.raised_by = u.id AND inv.status IN ('paid','partially_paid')
                     AND inv.updated_at >= NOW() - ${interval} AND inv.deleted_at IS NULL) AS fees_collected
             FROM employees e
             JOIN users u ON u.id = e.user_id AND u.deleted_at IS NULL
