@@ -105,6 +105,13 @@ const TEMPLATES = [
         body:     'Hi {{1}}, there is an update on your application for {{2}} at {{3}}.\n\nStatus: {{4}}\n\nLog in to LadderStep for details: https://theladderconsulting.com/login\n\n- Team LadderStep',
         variables: 4,
     },
+    {
+        name:     'ladderstep_jd_reminder',
+        category: 'UTILITY',
+        language: 'en',
+        body:     'Hi {{1}}, this is a reminder from LadderStep Human Consulting. Your company account {{2}} is active, but no job openings have been posted yet.\n\nPlease log in to your Company Portal and post your open positions so we can start sourcing the right candidates for you.\n\nPost Jobs Now: https://theladderconsulting.com/company/jobs\n\n- Team LadderStep',
+        variables: 2,
+    },
 ];
 
 // ── Seed templates into local DB + attempt Vaartabot submission ──────────────
