@@ -109,3 +109,7 @@ exports.notifyOfferLetterReadyCand = (phone, candidateName, jobTitle, companyNam
 /** Candidate: application status updated */
 exports.notifyAppStatusCand = (phone, candidateName, jobTitle, companyName, status) =>
     sendWANotification(phone, 'ladderstep_app_status_update1', [candidateName, jobTitle, companyName, status]);
+
+/** Company: reminder to post job descriptions */
+exports.notifyJDReminder = (phone, contactName, companyName) =>
+    sendWANotification(phone, 'ladderstep_jd_reminder1', [contactName, companyName]);

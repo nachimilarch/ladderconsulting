@@ -79,7 +79,7 @@ exports.updateProfile = async (req, res) => {
 exports.sendJDReminder = async (req, res) => {
     try {
         const [[company]] = await db.query(
-            `SELECT co.id, co.company_name, u.id AS user_id, u.email, u.name AS contact_name
+            `SELECT co.id, co.company_name, u.id AS user_id, u.email, u.name AS contact_name, u.phone
              FROM companies co
              JOIN users u ON u.id = co.user_id
              WHERE co.id = ? AND co.is_approved = 1 AND co.deleted_at IS NULL`,
@@ -105,6 +105,12 @@ exports.sendJDReminder = async (req, res) => {
                 'Your company profile is ready. Please log in and post your open positions so LadderStep Human Consulting can start sourcing candidates for you.',
             ]
         );
+
+        // WhatsApp
+        if (company.phone) {
+            const { notifyJDReminder } = require('../utils/whatsappNotify');
+            notifyJDReminder(company.phone, company.contact_name || 'there', company.company_name);
+        }
 
         // Email
         if (company.email) {
