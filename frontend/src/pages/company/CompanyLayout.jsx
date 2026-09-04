@@ -4,6 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
 import { companyAPI } from '../../api/company';
 import toast from 'react-hot-toast';
+import CompanyTour from '../../components/company/CompanyTour';
 
 const INDUSTRIES = [
     'Technology', 'Finance', 'Banking', 'Healthcare', 'Education', 'Manufacturing',
@@ -13,16 +14,17 @@ const INDUSTRIES = [
 const SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
 
 const navItems = [
-    { label: 'Dashboard',   to: '/company',            icon: '📊', exact: true },
-    { label: 'Talent Pool', to: '/company/talent',     icon: '👥' },
-    { label: 'Job Postings',to: '/company/jobs',        icon: '💼' },
-    { label: 'Shortlist',   to: '/company/shortlist',   icon: '⭐' },
-    { label: 'Interviews',  to: '/company/interviews',  icon: '🗓' },
-    { label: 'Offers',      to: '/company/offers',      icon: '📨' },
-    { label: 'Payments',    to: '/company/payments',    icon: '💳' },
-    { label: 'Training',    to: '/company/training',    icon: '🎓' },
-    { label: 'Requests',    to: '/company/requests',    icon: '📩' },
-    { label: 'Profile',     to: '/company/profile',     icon: '🏢' },
+    { label: 'Dashboard',   to: '/company',            icon: '📊', exact: true,  tour: 'dashboard'    },
+    { label: 'Talent Pool', to: '/company/talent',     icon: '👥', tour: 'talent-pool'   },
+    { label: 'Job Postings',to: '/company/jobs',       icon: '💼', tour: 'job-postings'  },
+    { label: 'Shortlist',   to: '/company/shortlist',  icon: '⭐', tour: 'shortlist'     },
+    { label: 'Interviews',  to: '/company/interviews', icon: '🗓', tour: 'interviews'    },
+    { label: 'Offers',      to: '/company/offers',     icon: '📨', tour: 'offers'        },
+    { label: 'Payments',    to: '/company/payments',   icon: '💳', tour: 'payments'      },
+    { label: 'Training',    to: '/company/training',   icon: '🎓'                        },
+    { label: 'Requests',    to: '/company/requests',   icon: '📩'                        },
+    { label: 'Profile',     to: '/company/profile',    icon: '🏢'                        },
+    { label: 'How to Use',  to: '/company/help',       icon: '❓', tour: 'help'          },
 ];
 
 export default function CompanyLayout() {
@@ -88,7 +90,7 @@ export default function CompanyLayout() {
                 <div className="flex items-center gap-3">
                     <img src="/logo-icon.png" alt="LadderStep" className="w-9 h-9 object-contain shrink-0" />
                     <div>
-                        <div className="text-sm font-bold text-gray-900 leading-none">LadderStep <span className="text-brand-600">Human Consulting</span></div>
+                        <div className="text-sm font-bold text-gray-500 leading-none">LadderStep <span className="text-indigo-400">Human Consulting</span></div>
                         <div className="text-xs text-gray-400 mt-0.5">Company Portal</div>
                     </div>
                 </div>
@@ -100,6 +102,14 @@ export default function CompanyLayout() {
                         ☰
                     </button>
                     <NotificationBell />
+                    <Link
+                        to="/company/help"
+                        title="How to Use"
+                        className="hidden md:flex items-center gap-1.5 text-sm text-indigo-600 font-medium hover:text-indigo-800 transition"
+                    >
+                        <span className="text-base">❓</span>
+                        <span>Help</span>
+                    </Link>
                     <span className="hidden md:block text-sm text-gray-600">{user?.name}</span>
                     <button onClick={logout} className="hidden md:block text-sm text-red-500 hover:underline">
                         Logout
@@ -114,6 +124,7 @@ export default function CompanyLayout() {
                         <Link
                             key={item.to}
                             to={item.to}
+                            data-tour={item.tour}
                             className={`flex items-center gap-3 px-5 py-2.5 text-sm font-medium transition-all duration-150 ${
                                 isActive(item)
                                     ? 'text-indigo-700 bg-indigo-50 border-r-2 border-indigo-600'
@@ -273,6 +284,9 @@ export default function CompanyLayout() {
                     </div>
                 </div>
             )}
+
+            {/* Product tour */}
+            <CompanyTour />
         </div>
     );
 }

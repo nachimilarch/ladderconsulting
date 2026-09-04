@@ -19,6 +19,7 @@ export default function EmailCampaignDetail() {
     const navigate   = useNavigate();
     const [campaign, setCampaign]   = useState(null);
     const [replies, setReplies]     = useState([]);
+    const [failedLogs, setFailedLogs] = useState([]);
     const [tab, setTab]             = useState('overview');
     const [loading, setLoading]     = useState(true);
 
@@ -29,6 +30,9 @@ export default function EmailCampaignDetail() {
             .finally(() => setLoading(false));
         replyAPI.getAll({ campaign_id: id })
             .then(r => setReplies(r.data.data || []))
+            .catch(() => {});
+        emailCampaignAPI.failedLogs(id)
+            .then(r => setFailedLogs(r.data.data || []))
             .catch(() => {});
     };
 
@@ -109,10 +113,12 @@ export default function EmailCampaignDetail() {
 
             {/* Tabs */}
             <div className="flex gap-4 border-b border-gray-100 mb-4">
-                {['overview','replies'].map(t => (
+                {['overview','replies','failed'].map(t => (
                     <button key={t} onClick={() => setTab(t)}
                         className={`text-sm font-medium pb-2 capitalize ${tab === t ? 'text-green-700 border-b-2 border-green-600' : 'text-gray-400'}`}>
-                        {t} {t === 'replies' && replies.length > 0 && `(${replies.length})`}
+                        {t === 'replies' && replies.length > 0 ? `Replies (${replies.length})` :
+                         t === 'failed' && failedLogs.length > 0 ? `Failed (${failedLogs.length})` :
+                         t.charAt(0).toUpperCase() + t.slice(1)}
                     </button>
                 ))}
             </div>
@@ -129,6 +135,35 @@ export default function EmailCampaignDetail() {
                             {campaign.message_body}
                         </div>
                     </div>
+                </div>
+            )}
+
+            {tab === 'failed' && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+                    {failedLogs.length === 0 ? (
+                        <p className="text-center py-8 text-gray-400 text-sm">No failed sends.</p>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                                <tr>
+                                    <th className="px-4 py-3 text-left">Name</th>
+                                    <th className="px-4 py-3 text-left">Email</th>
+                                    <th className="px-4 py-3 text-left">Company</th>
+                                    <th className="px-4 py-3 text-left">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {failedLogs.map(f => (
+                                    <tr key={f.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 text-gray-700">{f.full_name || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-600">{f.email || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-500">{f.company_name || '—'}</td>
+                                        <td className="px-4 py-3 text-red-500 text-xs">{f.error_message || 'Unknown error'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
                 </div>
             )}
 

@@ -39,10 +39,14 @@ router.delete('/contact-lists/:id',            contactCtrl.deleteList);
 router.patch('/contacts/:id/unsubscribe',      contactCtrl.unsubscribeContact);
 router.get('/contacts/:id/call-history',       contactCtrl.getContactCallHistory);
 
+// ── Email Templates (read-only for campaign picker) ──────────────────────────
+router.get('/email-templates',                 campaignCtrl.listEmailTemplatesForOutreach);
+
 // ── Email Campaigns ──────────────────────────────────────────────────────────
 router.post('/email-campaigns',                campaignCtrl.createEmailCampaign);
 router.get('/email-campaigns',                 campaignCtrl.listEmailCampaigns);
 router.get('/email-campaigns/:id',             campaignCtrl.getEmailCampaign);
+router.get('/email-campaigns/:id/failed',      campaignCtrl.getFailedLogs);
 router.put('/email-campaigns/:id',             campaignCtrl.updateEmailCampaign);
 router.post('/email-campaigns/:id/send',       campaignCtrl.sendEmailCampaign);
 router.post('/email-campaigns/:id/pause',      campaignCtrl.pauseEmailCampaign);
@@ -78,6 +82,7 @@ router.delete('/whatsapp/auto-replies/:id',        whatsappCtrl.deleteAutoReplyF
 router.post('/whatsapp-campaigns',             whatsappCtrl.createWACampaign);
 router.get('/whatsapp-campaigns',              whatsappCtrl.listWACampaigns);
 router.get('/whatsapp-campaigns/:id',          whatsappCtrl.getWACampaign);
+router.get('/whatsapp-campaigns/:id/failed',   campaignCtrl.getWAFailedLogs);
 router.post('/whatsapp-campaigns/:id/send',    whatsappCtrl.sendWACampaign);
 
 // ── Email Auto-Replies ───────────────────────────────────────────────────────

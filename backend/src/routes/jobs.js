@@ -50,6 +50,9 @@ router.get('/matched', authenticateToken, authorizeRole('candidate'), async (req
     }
 });
 
+// ── HR / Admin: post a job on behalf of a company ────────────────────────────
+router.post('/for-company', authenticateToken, authorizeRole('hr_staff', 'admin'), jobCtrl.createJobForCompany);
+
 // ── Company: job CRUD ─────────────────────────────────────────────────────────
 router.get('/',    authenticateToken, authorizeRole('company'), jobCtrl.listCompanyJobs);
 router.post('/',   authenticateToken, authorizeRole('company'), jobCtrl.createJob);

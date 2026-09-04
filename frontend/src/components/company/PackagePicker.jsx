@@ -20,6 +20,7 @@ const loadCashfreeSDK = () => new Promise((resolve, reject) => {
 export default function PackagePicker({ onSelected, title = 'Resume Unlock Package', subtitle }) {
     const [loading, setLoading] = useState(true);
     const [platinum, setPlatinum] = useState(false);
+    const [hasPackage, setHasPackage] = useState(false);
     const [packCredits, setPackCredits] = useState(0);
     const [buying, setBuying] = useState(null); // 'single' | 'pack_4' | null
     const [note, setNote] = useState('');
@@ -31,6 +32,7 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
         talentPoolAPI.packageStatus()
             .then(({ data }) => {
                 setPlatinum(!!data?.platinum);
+                setHasPackage(!!data?.has_package);
                 onSelected?.(!!data?.has_package);
             })
             .catch(() => {})
@@ -74,7 +76,9 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h2 className="text-base font-semibold text-gray-900 mb-1">{title}</h2>
             <p className="text-xs text-gray-500 mb-4">
-                {subtitle || 'Get full profile detail and downloadable resumes for candidates in the Talent Pool.'}
+                {subtitle || (hasPackage
+                    ? 'Top up your credits or upgrade to Platinum for unlimited access.'
+                    : 'Start with the 5-Resume Pack to unlock full candidate profiles and resumes.')}
             </p>
 
             {loading ? (
@@ -92,23 +96,28 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
                     )}
 
                     <div className="flex flex-col gap-3">
-                        <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
-                            <div>
-                                <p className="text-sm font-semibold text-gray-900">Single Resume Unlock <span className="text-gray-400 font-normal">— ₹999 (incl. GST)</span></p>
-                                <p className="text-xs text-gray-400">1 credit — pick a candidate anytime, no expiry. No placement fee on hire.</p>
+                        {hasPackage && (
+                            <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
+                                <div>
+                                    <p className="text-sm font-semibold text-gray-900">Single Resume Unlock <span className="text-gray-400 font-normal">— ₹999 (incl. GST)</span></p>
+                                    <p className="text-xs text-gray-400">1 credit — pick a candidate anytime, no expiry. No placement fee on hire.</p>
+                                </div>
+                                <button
+                                    onClick={() => handleBuyPackage('single')}
+                                    disabled={!!buying}
+                                    className="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
+                                >
+                                    {buying === 'single' ? '…' : 'Buy Now'}
+                                </button>
                             </div>
-                            <button
-                                onClick={() => handleBuyPackage('single')}
-                                disabled={!!buying}
-                                className="text-xs bg-white border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
-                            >
-                                {buying === 'single' ? '…' : 'Buy Now'}
-                            </button>
-                        </div>
+                        )}
 
                         <div className="flex items-center justify-between border border-gray-200 rounded-xl px-4 py-3">
                             <div>
-                                <p className="text-sm font-semibold text-gray-900">5-Resume Pack <span className="text-gray-400 font-normal">— ₹3,999 (incl. GST)</span></p>
+                                <p className="text-sm font-semibold text-gray-900">
+                                    5-Resume Pack <span className="text-gray-400 font-normal">— ₹3,999 (incl. GST)</span>
+                                    {!hasPackage && <span className="ml-2 text-[10px] bg-indigo-100 text-indigo-700 px-1.5 py-0.5 rounded-full font-medium align-middle">Start here</span>}
+                                </p>
                                 <p className="text-xs text-gray-400">5 credits — use anytime, no expiry. No placement fee on any hire.</p>
                             </div>
                             <button
@@ -116,7 +125,7 @@ export default function PackagePicker({ onSelected, title = 'Resume Unlock Packa
                                 disabled={!!buying}
                                 className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium whitespace-nowrap"
                             >
-                                {buying === 'pack_4' ? '…' : packCredits > 0 ? 'Buy More' : 'Buy Now'}
+                                {buying === 'pack_4' ? '…' : hasPackage ? 'Buy More' : 'Buy Now'}
                             </button>
                         </div>
 

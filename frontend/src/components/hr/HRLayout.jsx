@@ -39,7 +39,7 @@ export default function HRLayout() {
                         <img src="/logo-icon.png" alt="LadderStep" className="w-9 h-9 object-contain" />
                     </Link>
                     <div>
-                        <div className="text-sm font-bold text-gray-900 leading-none">LadderStep <span className="text-brand-600">Human Consulting</span></div>
+                        <div className="text-sm font-bold text-gray-500 leading-none">LadderStep <span className="text-indigo-400">Human Consulting</span></div>
                         <div className="text-xs text-gray-400 mt-0.5">
                             {isAdmin ? 'Hiring Portal (Admin View)' : 'Hiring Portal'}
                         </div>

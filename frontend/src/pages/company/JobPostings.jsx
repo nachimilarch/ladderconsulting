@@ -12,7 +12,7 @@ const EMPTY_FORM = {
     title: '', description: '', requirements: '', location: '',
     job_type: 'full_time', work_mode: 'onsite',
     salary_min: '', salary_max: '', experience_min: '', experience_max: '',
-    openings: 1, deadline: '', status: 'active',
+    openings: 1, status: 'active',
 };
 
 export default function JobPostings() {
@@ -43,7 +43,7 @@ export default function JobPostings() {
             job_type: job.job_type || 'full_time', work_mode: job.work_mode || 'onsite',
             salary_min: job.salary_min || '', salary_max: job.salary_max || '',
             experience_min: job.experience_min || '', experience_max: job.experience_max || '',
-            openings: job.openings || 1, deadline: job.deadline?.split('T')[0] || '',
+            openings: job.openings || 1,
             status: job.status || 'draft',
         });
         setError('');
@@ -127,12 +127,7 @@ export default function JobPostings() {
                                 <tr key={job.id} className="hover:bg-gray-50">
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-gray-800">{job.title}</div>
-                                        {job.deadline && (
-                                            <div className="text-xs text-gray-400">
-                                                Deadline: {new Date(job.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                            </div>
-                                        )}
-                                    </td>
+                                        </td>
                                     <td className="px-4 py-3 text-gray-600 capitalize">{job.job_type?.replace('_', ' ')}</td>
                                     <td className="px-4 py-3 text-gray-600">{job.location || '—'}</td>
                                     <td className="px-4 py-3 text-gray-600">{job.openings}</td>
@@ -241,12 +236,6 @@ export default function JobPostings() {
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">Max Experience (yrs)</label>
                                     <input type="number" step="0.5" value={form.experience_max} onChange={f('experience_max')}
-                                        className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
-                                </div>
-
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Application Deadline</label>
-                                    <input type="date" value={form.deadline} onChange={f('deadline')}
                                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
                                 </div>
 

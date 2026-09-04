@@ -177,7 +177,7 @@
     }
 
     .navbar-title {
-        @apply text-base font-display font-bold text-gray-900;
+        @apply text-base font-display font-bold text-gray-500;
     }
 
     .navbar-subtitle {

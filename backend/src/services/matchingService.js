@@ -1,9 +1,9 @@
 const db = require('../config/db');
-const { extractSkills, extractJobSkills } = require('../utils/resumeParser');
+const { extractSkills, extractJobSkills, extractSeniority } = require('../utils/resumeParser');
 const { upsertCandidateSkills, replaceJobSkills } = require('../utils/skillTags');
 
-// Label stored in match_results.model_version (no external model in use)
-const getModel = () => 'local-parser-v1';
+// Label stored in match_results.model_version
+const getModel = () => 'local-parser-v3';
 
 // ── Resolve skill_tag ids → names ─────────────────────────────────────────────
 async function idsToNames(ids) {
@@ -14,46 +14,87 @@ async function idsToNames(ids) {
 }
 
 // ── 1. Parse resume text → candidate_skill_vectors ───────────────────────────
-// Offline: skills come from the heuristic dictionary in resumeParser, then a
-// single batched upsert (was an N+1 of 3 queries/skill). The match scorer only
-// uses skill presence, so proficiency/years default safely.
 async function parseResumeToSkills(candidateId, resumeText) {
     const skillNames = extractSkills(resumeText || '');
     return upsertCandidateSkills(candidateId, skillNames, 'resume_parsed');
 }
 
 // ── 2. Parse job description → job_skill_vectors ─────────────────────────────
-// Offline: required vs preferred is inferred from "nice to have" cues in the JD,
-// then replaced in a single batched DELETE + multi-row INSERT.
 async function parseJobToSkills(jobId, jdText) {
     const { required, preferred } = extractJobSkills(jdText || '');
     return replaceJobSkills(jobId, required, preferred);
 }
 
-// ── Pure scoring math (shared by the persisted scorer and the live pool scorer) ─
-// Weighting: required skills 60% · experience 25% · education 15%.
-function scoreVectors(jobSkills, candidateSet, exp, expMin, eduCnt) {
+// ── Experience range scoring (0 → weight) ─────────────────────────────────────
+// Rewards candidates who fall inside the JD's min–max band.
+// Under-qualified: scales linearly from 0 to weight as exp → expMin.
+// Over-qualified: gradual degradation (6% penalty per year over max, capped at 50%).
+function calcExpScore(exp, expMin, expMax, weight) {
+    const min = parseFloat(expMin) || 0;
+    const max = parseFloat(expMax) || 0;
+    if (min === 0 && max === 0) return weight;
+    const effectiveMax = max > 0 ? max : min + 5;
+    if (exp >= min && exp <= effectiveMax) return weight;
+    if (exp > effectiveMax) {
+        const overshoot = exp - effectiveMax;
+        const factor = Math.max(0.5, 1 - overshoot * 0.06);
+        return Math.round(weight * factor);
+    }
+    if (min === 0) return weight;
+    return Math.min(weight, Math.round((exp / min) * weight));
+}
+
+// ── Seniority level scoring (0 → weight) ─────────────────────────────────────
+// Compares the seniority tier inferred from the JD title vs the candidate's
+// headline/most-recent title. A 10-year veteran applying to a fresh "Executive"
+// role loses points here rather than scoring a full 10%.
+function calcSeniorityScore(jobLevel, candidateLevel, weight) {
+    const diff = Math.abs(jobLevel - candidateLevel);
+    if (diff === 0) return weight;
+    if (diff === 1) return Math.round(weight * 0.7);
+    if (diff === 2) return Math.round(weight * 0.3);
+    return 0;
+}
+
+// ── Pure scoring math ─────────────────────────────────────────────────────────
+// Weights (v3): mandatory skills 55% · preferred bonus 10% · experience 20%
+//               seniority 10% · education 15%. Capped at 100.
+function scoreVectors(jobSkills, candidateSet, opts = {}) {
+    const { exp = 0, expMin = 0, expMax = 0, eduCnt = 0, jobSeniority = 1, candidateSeniority = 1 } = opts;
+
     const mandatory = jobSkills.filter(s => s.is_mandatory);
     const optional  = jobSkills.filter(s => !s.is_mandatory);
-
     const matchedMandatory = mandatory.filter(s => candidateSet.has(s.skill_tag_id));
     const missingMandatory = mandatory.filter(s => !candidateSet.has(s.skill_tag_id));
     const matchedOptional  = optional.filter(s => candidateSet.has(s.skill_tag_id));
 
-    const skillScore = mandatory.length > 0
-        ? (matchedMandatory.length / mandatory.length) * 60
-        : 30; // partial credit when no mandatory skills defined
-    const experienceScore = expMin === 0 ? 25 : Math.min(25, (exp / expMin) * 25);
-    const educationScore  = eduCnt > 0 ? 15 : 0;
+    let skillScore;
+    if (mandatory.length > 0) {
+        skillScore = (matchedMandatory.length / mandatory.length) * 55;
+    } else if (optional.length > 0) {
+        skillScore = 25 + Math.round((matchedOptional.length / optional.length) * 20);
+    } else {
+        skillScore = 35;
+    }
+
+    const optionalBonus = mandatory.length > 0 && optional.length > 0
+        ? Math.round((matchedOptional.length / optional.length) * 10)
+        : 0;
+
+    const expScore       = calcExpScore(exp, expMin, expMax, 20);
+    const seniorityScore = calcSeniorityScore(jobSeniority, candidateSeniority, 10);
+    const educationScore = eduCnt > 0 ? 15 : 0;
 
     return {
-        score: Math.min(100, Math.round(skillScore + experienceScore + educationScore)),
+        score: Math.min(100, Math.round(skillScore + optionalBonus + expScore + seniorityScore + educationScore)),
         matchedIds: [
             ...matchedMandatory.map(s => s.skill_tag_id),
             ...matchedOptional.map(s => s.skill_tag_id),
         ],
         missingIds: missingMandatory.map(s => s.skill_tag_id),
         jobSkillCount: jobSkills.length,
+        expScore,
+        seniorityScore,
     };
 }
 
@@ -66,12 +107,14 @@ const parseEduCount = (education) => {
     } catch { return 0; }
 };
 
+const SENIORITY_NAMES = ['Fresher/Trainee', 'Junior/Executive', 'Senior/Lead', 'Manager', 'Director/VP', 'C-Suite'];
+
 // ── 3. Compute and persist match score for a single application ───────────────
 async function calculateMatchScore(applicationId) {
     const [[app]] = await db.query(
         `SELECT a.candidate_id, a.job_id,
-                jp.experience_min, jp.experience_max,
-                cp.total_experience, cp.education
+                jp.title, jp.experience_min, jp.experience_max,
+                cp.total_experience, cp.education, cp.headline
          FROM applications a
          JOIN job_postings jp ON jp.id = a.job_id
          JOIN candidates c ON c.id = a.candidate_id
@@ -90,21 +133,32 @@ async function calculateMatchScore(applicationId) {
         [app.candidate_id]
     );
 
-    // Vectors not ready yet — skip silently
     if (jobSkills.length === 0 || candidateSkills.length === 0) return null;
 
     const candidateSet = new Set(candidateSkills.map(s => s.skill_tag_id));
-    const exp    = parseFloat(app.total_experience) || 0;
-    const expMin = parseFloat(app.experience_min) || 0;
-    const eduCnt = parseEduCount(app.education);
+    const jobSeniority       = extractSeniority(app.title);
+    const candidateSeniority = extractSeniority(app.headline);
 
-    const { score: totalScore, matchedIds, missingIds } =
-        scoreVectors(jobSkills, candidateSet, exp, expMin, eduCnt);
+    const { score: totalScore, matchedIds, missingIds, expScore, seniorityScore } =
+        scoreVectors(jobSkills, candidateSet, {
+            exp:              parseFloat(app.total_experience) || 0,
+            expMin:           parseFloat(app.experience_min)  || 0,
+            expMax:           parseFloat(app.experience_max)  || 0,
+            eduCnt:           parseEduCount(app.education),
+            jobSeniority,
+            candidateSeniority,
+        });
 
     const matchedNames = await idsToNames(matchedIds);
     const missingNames = await idsToNames(missingIds);
 
-    const summary = `${totalScore}% fit — matched ${matchedNames.length} of ${jobSkills.length} skills.`;
+    const seniorityNote = Math.abs(jobSeniority - candidateSeniority) >= 2
+        ? ` Level mismatch: role is ${SENIORITY_NAMES[jobSeniority]}, candidate is ${SENIORITY_NAMES[candidateSeniority]}.`
+        : '';
+
+    const summary = missingNames.length > 0
+        ? `${totalScore}% fit — ${matchedNames.length}/${jobSkills.length} skills matched. Missing: ${missingNames.slice(0, 5).join(', ')}${missingNames.length > 5 ? '…' : ''}.${seniorityNote}`
+        : `${totalScore}% fit — all ${matchedNames.length} required skills matched.${seniorityNote}`;
 
     await db.query(
         `INSERT INTO match_results
@@ -147,15 +201,12 @@ async function triggerCandidateMatching(candidateId, resumeText) {
 
 // ── 5. After job create/update: parse vectors + score all applicants ──────────
 async function triggerJobMatching(jobId, jdText) {
-    // AI extraction: deletes old vectors and replaces with AI-extracted ones.
-    // If this fails (e.g. no API key), keyword vectors placed by jobController remain.
     try {
         await parseJobToSkills(jobId, jdText);
     } catch (err) {
         console.error(`[AI] parseJobToSkills failed for job ${jobId}:`, err.message);
     }
 
-    // Always score existing applicants regardless of whether AI extraction succeeded
     const [apps] = await db.query(
         'SELECT id FROM applications WHERE job_id = ? AND deleted_at IS NULL',
         [jobId]
@@ -171,12 +222,6 @@ async function triggerJobMatching(jobId, jdText) {
 }
 
 // ── 6. Live (non-persisted) scoring of many pool candidates against one job ────
-// Used by the Talent Pool (company + executive) so a match % can be shown for a
-// selected JD even for candidates who have not applied. Fully batched: one query
-// for the job's skill vectors, one for every candidate's profile, one for every
-// candidate's skill vectors, one to resolve skill names. Returns
-//   Map<candidateId, { score, matched_skills, missing_skills } | null>
-// (null = candidate has no parsed skills yet, so no meaningful score).
 async function scorePoolAgainstJob(jobId, candidateIds) {
     const out = new Map();
     const ids = [...new Set((candidateIds || []).map(Number).filter(Boolean))];
@@ -185,14 +230,18 @@ async function scorePoolAgainstJob(jobId, candidateIds) {
     const [jobSkills] = await db.query(
         'SELECT skill_tag_id, is_mandatory FROM job_skill_vectors WHERE job_id = ?', [jobId]
     );
-    if (jobSkills.length === 0) return out; // JD has no skill vectors → cannot score
+    if (jobSkills.length === 0) return out;
 
-    const [[job]] = await db.query('SELECT experience_min FROM job_postings WHERE id = ?', [jobId]);
-    const expMin = parseFloat(job?.experience_min) || 0;
+    const [[job]] = await db.query(
+        'SELECT title, experience_min, experience_max FROM job_postings WHERE id = ?', [jobId]
+    );
+    const expMin      = parseFloat(job?.experience_min) || 0;
+    const expMax      = parseFloat(job?.experience_max) || 0;
+    const jobSeniority = extractSeniority(job?.title);
 
     const ph = ids.map(() => '?').join(',');
     const [profiles] = await db.query(
-        `SELECT candidate_id, total_experience, education FROM candidate_profiles WHERE candidate_id IN (${ph})`, ids
+        `SELECT candidate_id, total_experience, education, headline FROM candidate_profiles WHERE candidate_id IN (${ph})`, ids
     );
     const profById = new Map(profiles.map(p => [p.candidate_id, p]));
 
@@ -211,7 +260,14 @@ async function scorePoolAgainstJob(jobId, candidateIds) {
         const set = skillsById.get(id);
         if (!set || set.size === 0) { out.set(id, null); continue; }
         const prof = profById.get(id) || {};
-        const r = scoreVectors(jobSkills, set, parseFloat(prof.total_experience) || 0, expMin, parseEduCount(prof.education));
+        const r = scoreVectors(jobSkills, set, {
+            exp:              parseFloat(prof.total_experience) || 0,
+            expMin,
+            expMax,
+            eduCnt:           parseEduCount(prof.education),
+            jobSeniority,
+            candidateSeniority: extractSeniority(prof.headline),
+        });
         r.matchedIds.forEach(i => allSkillIds.add(i));
         r.missingIds.forEach(i => allSkillIds.add(i));
         prelim.push({ id, r });

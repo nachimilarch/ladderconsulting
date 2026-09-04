@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { companyJobAPI, candidateResumeAPI, talentPoolAPI, companyAPI } from '../../api/company';
+import PackagePicker from '../../components/company/PackagePicker';
 
 // ── Candidate profile drawer (masked unless contact_unlocked) ─────────────────
 function CandidateProfileDrawer({ candidateId, contactUnlocked, onClose }) {
@@ -143,8 +144,11 @@ export default function ShortlistView() {
     const [downloadingResume, setDownloadingResume] = useState(null);
     const [profileDrawer, setProfileDrawer] = useState(null); // { candidateId, contactUnlocked }
     const [isPlatinum, setIsPlatinum] = useState(false);
+    const [packCredits, setPackCredits] = useState(0);
     const [unlockRequested, setUnlockRequested] = useState({}); // candidateId -> true (pending/submitted)
     const [requestingUnlock, setRequestingUnlock] = useState(null); // candidateId
+    const [unlockingId, setUnlockingId] = useState(null); // candidateId currently being unlocked
+    const [pkgModalOpen, setPkgModalOpen] = useState(false); // package picker modal
 
     useEffect(() => {
         companyJobAPI.list()
@@ -154,9 +158,12 @@ export default function ShortlistView() {
             })
             .catch(console.error)
             .finally(() => setLoadingJobs(false));
-        // Detect Platinum status for profile-unlock button
+        // Detect Platinum status + remaining pack credits
         talentPoolAPI.packageStatus()
             .then(r => setIsPlatinum(!!r.data?.platinum))
+            .catch(() => {});
+        talentPoolAPI.unlockStatus()
+            .then(r => setPackCredits(r.data?.pack_credits_remaining || 0))
             .catch(() => {});
     }, []);
 
@@ -182,7 +189,13 @@ export default function ShortlistView() {
             await companyJobAPI.shortlist(selectedJob, appId, {});
             loadApps();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to shortlist candidate.');
+            const code = err.response?.data?.code;
+            if (code === 'UNLOCK_REQUIRED') {
+                toast.error('Unlock this candidate\'s profile before shortlisting.');
+                setPkgModalOpen(packCredits === 0 && !isPlatinum);
+            } else {
+                toast.error(err.response?.data?.message || 'Failed to shortlist candidate.');
+            }
         } finally {
             setActionLoading(null);
         }
@@ -225,12 +238,18 @@ export default function ShortlistView() {
         }
     };
 
-    const handleStatusChange = async (appId, status) => {
+    const handleStatusChange = async (appId, status, candidateId) => {
         try {
             await companyJobAPI.updateAppStatus(selectedJob, appId, status);
             loadApps();
         } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to update status.');
+            const code = err.response?.data?.code;
+            if (code === 'UNLOCK_REQUIRED') {
+                toast.error('Unlock this candidate\'s profile before changing their status.');
+                setPkgModalOpen(packCredits === 0 && !isPlatinum);
+            } else {
+                toast.error(err.response?.data?.message || 'Failed to update status.');
+            }
         }
     };
 
@@ -253,6 +272,26 @@ export default function ShortlistView() {
         }
     };
 
+    const handleUnlock = async (app) => {
+        if (packCredits > 0) {
+            setUnlockingId(app.candidate_id);
+            try {
+                const { data } = await talentPoolAPI.unlock(app.candidate_id);
+                if (data?.unlocked) {
+                    if (data.via === 'pack') setPackCredits(c => Math.max(0, c - 1));
+                    toast.success('Profile unlocked — full contact details now visible.');
+                    loadApps();
+                }
+            } catch (err) {
+                toast.error(err.response?.data?.message || 'Failed to unlock profile.');
+            } finally {
+                setUnlockingId(null);
+            }
+            return;
+        }
+        setPkgModalOpen(true);
+    };
+
     const filtered = statusFilter
         ? applications.filter(a => a.status === statusFilter)
         : applications;
@@ -262,6 +301,24 @@ export default function ShortlistView() {
 
     return (
         <div className="max-w-6xl mx-auto">
+            {/* Package picker modal */}
+            {pkgModalOpen && (
+                <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                        <div className="flex items-center justify-between px-6 pt-5 pb-3 border-b border-gray-100">
+                            <h2 className="font-semibold text-gray-900">Unlock Candidate Profiles</h2>
+                            <button onClick={() => setPkgModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+                        </div>
+                        <div className="p-6">
+                            <PackagePicker
+                                title="Unlock Candidate Profiles"
+                                subtitle="Start with the 5-Resume Pack to access full contact details and download resumes. Once active, you can top up with a Single credit anytime."
+                            />
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {profileDrawer && (
                 <CandidateProfileDrawer
                     candidateId={profileDrawer.candidateId}
@@ -271,15 +328,32 @@ export default function ShortlistView() {
             )}
             <h1 className="text-2xl font-bold text-gray-900 mb-4">Applications & Shortlist</h1>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-6 flex items-start gap-2">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4 flex items-start gap-2">
                 <span className="text-blue-500 text-lg mt-0.5">&#128274;</span>
                 <div>
                     <p className="text-sm font-semibold text-blue-700">Contact details are protected</p>
                     <p className="text-xs text-blue-600">
-                        To connect with a candidate, please contact LadderStep Human Consulting. Direct hiring bypasses our agreement terms.
+                        Unlock a candidate using a credit or purchase a package to reveal their full contact info, download the original resume, and shortlist them for hire.
                     </p>
                 </div>
             </div>
+
+            {/* Credits / package status strip */}
+            {isPlatinum ? (
+                <div className="bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 mb-4 flex items-center gap-2 text-sm text-green-700 font-medium">
+                    <span>⭐</span> Platinum — unlimited unlocks under your placement agreement
+                </div>
+            ) : packCredits > 0 ? (
+                <div className="bg-indigo-50 border border-indigo-200 rounded-lg px-4 py-2.5 mb-4 flex items-center justify-between">
+                    <span className="text-sm text-indigo-700 font-medium">🔓 {packCredits} unlock credit{packCredits !== 1 ? 's' : ''} available</span>
+                    <button onClick={() => setPkgModalOpen(true)} className="text-xs text-indigo-600 hover:underline">Buy more →</button>
+                </div>
+            ) : (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2.5 mb-4 flex items-center justify-between">
+                    <span className="text-sm text-amber-700 font-medium">🔒 No unlock credits — buy a package to reveal candidate details</span>
+                    <button onClick={() => setPkgModalOpen(true)} className="text-xs font-semibold text-amber-700 hover:underline">Get Package →</button>
+                </div>
+            )}
 
             {/* Job selector + filter */}
             <div className="flex gap-3 mb-6 flex-wrap">
@@ -447,8 +521,9 @@ export default function ShortlistView() {
                                         {/* Status update */}
                                         <select
                                             value={app.status}
-                                            onChange={e => handleStatusChange(app.id, e.target.value)}
-                                            disabled={isLocked}
+                                            onChange={e => handleStatusChange(app.id, e.target.value, app.candidate_id)}
+                                            disabled={isLocked || (!app.contact_unlocked && !isPlatinum)}
+                                            title={!app.contact_unlocked && !isPlatinum ? 'Unlock profile to change status' : undefined}
                                             className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed"
                                         >
                                             <option value="under_review">Under Review</option>
@@ -482,6 +557,26 @@ export default function ShortlistView() {
                                             </button>
                                         )}
 
+                                        {/* Single / Pack: Unlock directly with a credit */}
+                                        {!isPlatinum && !app.contact_unlocked && !isLocked && (
+                                            packCredits > 0 ? (
+                                                <button
+                                                    onClick={() => handleUnlock(app)}
+                                                    disabled={unlockingId === app.candidate_id}
+                                                    className="text-xs bg-indigo-600 text-white rounded-lg px-3 py-1.5 hover:bg-indigo-700 disabled:opacity-50 transition whitespace-nowrap"
+                                                >
+                                                    {unlockingId === app.candidate_id ? '…' : '🔓 Unlock Profile'}
+                                                </button>
+                                            ) : (
+                                                <button
+                                                    onClick={() => setPkgModalOpen(true)}
+                                                    className="text-xs bg-amber-50 text-amber-700 border border-amber-200 rounded-lg px-3 py-1.5 hover:bg-amber-100 transition whitespace-nowrap"
+                                                >
+                                                    🔒 Buy Package
+                                                </button>
+                                            )
+                                        )}
+
                                         {/* Platinum: Request Full Profile for shortlisted candidates */}
                                         {isPlatinum && isShortlisted && !app.contact_unlocked && !isLocked && (
                                             unlockRequested[app.candidate_id] ? (
@@ -510,7 +605,7 @@ export default function ShortlistView() {
                                             </button>
                                             {!app.contact_unlocked && (
                                                 <span className="text-[10px] text-gray-400 italic">
-                                                    Contact info redacted
+                                                    Masked — unlock to get original
                                                 </span>
                                             )}
                                         </div>

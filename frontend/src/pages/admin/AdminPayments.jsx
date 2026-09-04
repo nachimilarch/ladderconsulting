@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import toast from 'react-hot-toast';
 import { adminInvoiceAPI } from '../../api/payments';
 import { adminOfferRequestAPI } from '../../api/admin';
 
@@ -25,6 +26,7 @@ const Kpi = ({ label, value, sub, accent = '' }) => (
 
 export default function AdminPayments() {
     const [tab, setTab] = useState('invoices');
+    const [markingId, setMarkingId] = useState(null);
 
     // ── Invoices ──────────────────────────────────────────────────────────────
     const [invoices,   setInvoices]   = useState([]);
@@ -66,6 +68,54 @@ export default function AdminPayments() {
             .finally(() => { if (live) setFeeLoading(false); });
         return () => { live = false; setFeeLoading(true); };
     }, [feeStatus]);
+
+    const reloadInvoices = () => {
+        setInvLoading(true);
+        Promise.all([
+            adminInvoiceAPI.list(invFilter ? { status: invFilter } : {}),
+            adminInvoiceAPI.summary(),
+        ]).then(([l, s]) => {
+            setInvoices(l.data?.invoices || l.data?.data || []);
+            setInvSummary(s.data?.summary || s.data?.data || null);
+        }).catch(console.error).finally(() => setInvLoading(false));
+    };
+
+    const reloadFees = () => {
+        setFeeLoading(true);
+        adminOfferRequestAPI.listFees(feeStatus ? { status: feeStatus } : {})
+            .then(r => {
+                setFees(r.data?.fees || r.data?.data || []);
+                setFeeSummary(r.data?.summary || null);
+            }).catch(console.error).finally(() => setFeeLoading(false));
+    };
+
+    const handleMarkPaid = async (id) => {
+        if (!window.confirm('Mark this invoice as fully paid?')) return;
+        setMarkingId(id);
+        try {
+            await adminInvoiceAPI.markPaid(id);
+            toast.success('Invoice marked as paid');
+            reloadInvoices();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to mark paid');
+        } finally {
+            setMarkingId(null);
+        }
+    };
+
+    const handleMarkFeePaid = async (id) => {
+        if (!window.confirm('Mark this placement fee as paid?')) return;
+        setMarkingId(id);
+        try {
+            await adminInvoiceAPI.markFeePaid(id);
+            toast.success('Placement fee marked as paid');
+            reloadFees();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to mark paid');
+        } finally {
+            setMarkingId(null);
+        }
+    };
 
     return (
         <div className="p-8">
@@ -158,12 +208,13 @@ export default function AdminPayments() {
                                         <th className="px-4 py-3 text-left">Status</th>
                                         <th className="px-4 py-3 text-left">Due</th>
                                         <th className="px-4 py-3 text-left">Executive</th>
+                                        <th className="px-4 py-3 text-left">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {invoices.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="text-center py-12 text-gray-400">No invoices found.</td>
+                                            <td colSpan={9} className="text-center py-12 text-gray-400">No invoices found.</td>
                                         </tr>
                                     ) : invoices.map(inv => (
                                         <tr key={inv.id} className="hover:bg-gray-50 transition-colors">
@@ -179,6 +230,17 @@ export default function AdminPayments() {
                                             </td>
                                             <td className="px-4 py-3 text-gray-500">{fmtDate(inv.due_date)}</td>
                                             <td className="px-4 py-3 text-gray-500">{inv.raised_by_name || '—'}</td>
+                                            <td className="px-4 py-3">
+                                                {['pending','overdue','partially_paid'].includes(inv.status) && (
+                                                    <button
+                                                        onClick={() => handleMarkPaid(inv.id)}
+                                                        disabled={markingId === inv.id}
+                                                        className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-lg hover:bg-green-700 disabled:opacity-50 transition whitespace-nowrap"
+                                                    >
+                                                        {markingId === inv.id ? '…' : 'Mark Paid'}
+                                                    </button>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>
@@ -227,12 +289,13 @@ export default function AdminPayments() {
                                         <th className="px-4 py-3 text-left">Status</th>
                                         <th className="px-4 py-3 text-left">Executive</th>
                                         <th className="px-4 py-3 text-left">Date</th>
+                                        <th className="px-4 py-3 text-left">Action</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-gray-100">
                                     {fees.length === 0 ? (
                                         <tr>
-                                            <td colSpan={8} className="text-center py-12 text-gray-400">No placement fees found.</td>
+                                            <td colSpan={9} className="text-center py-12 text-gray-400">No placement fees found.</td>
                                         </tr>
                                     ) : fees.map(fee => (
                                         <tr key={fee.id} className="hover:bg-gray-50 transition-colors">
@@ -248,6 +311,17 @@ export default function AdminPayments() {
                                             </td>
                                             <td className="px-4 py-3 text-gray-500">{fee.executive_name || '—'}</td>
                                             <td className="px-4 py-3 text-gray-500">{fmtDate(fee.created_at)}</td>
+                                            <td className="px-4 py-3">
+                                                {['pending','overdue'].includes(fee.status) && (
+                                                    <button
+                                                        onClick={() => handleMarkFeePaid(fee.id)}
+                                                        disabled={markingId === fee.id}
+                                                        className="text-xs bg-green-600 text-white px-2.5 py-1 rounded-lg hover:bg-green-700 disabled:opacity-50 transition whitespace-nowrap"
+                                                    >
+                                                        {markingId === fee.id ? '…' : 'Mark Paid'}
+                                                    </button>
+                                                )}
+                                            </td>
                                         </tr>
                                     ))}
                                 </tbody>

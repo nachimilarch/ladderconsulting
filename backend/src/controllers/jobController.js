@@ -341,6 +341,15 @@ exports.shortlistApplication = async (req, res) => {
         );
         if (!check.length) return res.status(404).json({ message: 'Application not found.' });
 
+        // Company must have unlocked this candidate before shortlisting
+        const [[unlockRow]] = await db.query(
+            `SELECT id FROM resume_unlocks WHERE company_id=? AND candidate_id=? AND granted_via IN ('single','pack','platinum_approved') LIMIT 1`,
+            [companyId, check[0].candidate_id]
+        );
+        if (!unlockRow) {
+            return res.status(403).json({ message: 'Unlock this candidate\'s profile first to shortlist them.', code: 'UNLOCK_REQUIRED' });
+        }
+
         // A candidate hired through Ladder is off the market — block shortlisting
         if (await isCandidateHired(check[0].candidate_id)) {
             return res.status(409).json({ message: 'This candidate has already been hired and is no longer available.' });
@@ -435,6 +444,19 @@ exports.updateApplicationStatus = async (req, res) => {
         );
         if (!check.length) return res.status(404).json({ message: 'Application not found.' });
 
+        // Company must have unlocked this candidate before changing status
+        // 'rejected' and 'under_review' are allowed without unlock (housekeeping moves only)
+        const GATED = ['shortlisted', 'interview_scheduled', 'interviewed', 'offer_sent'];
+        if (GATED.includes(status)) {
+            const [[unlockRow]] = await db.query(
+                `SELECT id FROM resume_unlocks WHERE company_id=? AND candidate_id=? AND granted_via IN ('single','pack','platinum_approved') LIMIT 1`,
+                [companyId, check[0].candidate_id]
+            );
+            if (!unlockRow) {
+                return res.status(403).json({ message: 'Unlock this candidate\'s profile first to update their status.', code: 'UNLOCK_REQUIRED' });
+            }
+        }
+
         // Once hired through Ladder, a candidate cannot be advanced by another company.
         // 'rejected' is still allowed so a company can close out its own pipeline.
         const FORWARD = ['shortlisted', 'interview_scheduled', 'interviewed', 'offer_sent'];
@@ -456,9 +478,10 @@ exports.updateApplicationStatus = async (req, res) => {
             );
         }
 
-        // WA notification to candidate
+        // WA + email notifications to candidate
         db.query(
-            `SELECT u.phone, cp.full_name, jp.title AS job_title, c.company_name
+            `SELECT u.phone, u.email AS candidate_email,
+                    cp.full_name, jp.title AS job_title, c.company_name
              FROM applications a
              JOIN candidates cand ON cand.id = a.candidate_id
              JOIN users u ON u.id = cand.user_id
@@ -468,16 +491,29 @@ exports.updateApplicationStatus = async (req, res) => {
              WHERE a.id = ? AND a.deleted_at IS NULL`,
             [req.params.appId]
         ).then(([[row]]) => {
-            if (row) {
-                const label = {
-                    under_review:        'Under Review',
-                    shortlisted:         'Shortlisted',
-                    interview_scheduled: 'Interview Scheduled',
-                    interviewed:         'Interviewed',
-                    offer_sent:          'Offer Sent',
-                    rejected:            'Not Selected',
-                }[status] || status;
-                wa.notifyAppStatusCand(row.phone, row.full_name, row.job_title, row.company_name, label);
+            if (!row) return;
+            const label = {
+                under_review:        'Under Review',
+                shortlisted:         'Shortlisted',
+                interview_scheduled: 'Interview Scheduled',
+                interviewed:         'Interviewed',
+                offer_sent:          'Offer Sent',
+                rejected:            'Not Selected',
+            }[status] || status;
+            wa.notifyAppStatusCand(row.phone, row.full_name, row.job_title, row.company_name, label);
+            // Email candidate when rejected
+            if (status === 'rejected' && row.candidate_email) {
+                safeEmail({
+                    to: row.candidate_email,
+                    subject: `Application Update — ${row.job_title}`,
+                    html: `
+                        <p>Hi ${row.full_name || 'there'},</p>
+                        <p>Thank you for your interest in the <strong>${row.job_title}</strong> position at <strong>${row.company_name}</strong>.</p>
+                        <p>After careful consideration, we regret to inform you that your application has not been selected to move forward at this time.</p>
+                        <p>We encourage you to continue applying for other opportunities that match your profile on the LadderStep portal.</p>
+                        <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                    `,
+                });
             }
         }).catch(() => {});
 
@@ -485,5 +521,50 @@ exports.updateApplicationStatus = async (req, res) => {
     } catch (err) {
         console.error('updateApplicationStatus error:', err);
         res.status(500).json({ message: 'Failed to update status.' });
+    }
+};
+
+// ── POST /api/jobs/for-company (hr_staff, admin) ──────────────────────────────
+exports.createJobForCompany = async (req, res) => {
+    const {
+        company_id, title, description, requirements, location,
+        job_type, work_mode, salary_min, salary_max,
+        experience_min, experience_max, openings, status,
+    } = req.body;
+
+    if (!company_id) return res.status(400).json({ message: 'company_id is required.' });
+    if (!title || !description) return res.status(400).json({ message: 'title and description are required.' });
+
+    try {
+        const [[company]] = await db.query(
+            'SELECT id, company_name FROM companies WHERE id = ? AND is_approved = 1 AND deleted_at IS NULL',
+            [company_id]
+        );
+        if (!company) return res.status(404).json({ message: 'Company not found or not approved.' });
+
+        const [result] = await db.query(
+            `INSERT INTO job_postings
+             (company_id, posted_by, title, description, requirements, location,
+              job_type, work_mode, salary_min, salary_max, experience_min,
+              experience_max, openings, status)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [company_id, req.user.id, title, description, requirements || null,
+             location || null, job_type || 'full_time', work_mode || 'onsite',
+             salary_min || null, salary_max || null, experience_min || 0,
+             experience_max || null, openings || 1, status || 'active']
+        );
+
+        const jobId = result.insertId;
+        res.status(201).json({ success: true, message: 'Job posted.', id: jobId });
+
+        const jdText = `${description || ''}\n\n${requirements || ''}`;
+        setImmediate(async () => {
+            try { await extractAndSaveJobSkills(jobId, { title, description, requirements }, db); }
+            catch (e) { console.error('[Keyword] createJobForCompany:', e.message); }
+            matchingService.triggerJobMatching(jobId, jdText).catch(() => {});
+        });
+    } catch (err) {
+        console.error('[createJobForCompany]', err);
+        res.status(500).json({ message: 'Failed to create job.' });
     }
 };

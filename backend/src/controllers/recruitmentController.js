@@ -473,7 +473,7 @@ exports.getBatchDetail = async (req, res) => {
         const [items] = await db.query(
             `SELECT id, file_name, status, error_message, candidate_id, application_id,
                     extracted_name, extracted_email, fit_score
-             FROM resume_upload_items WHERE batch_id = ? ORDER BY id`,
+             FROM resume_upload_items WHERE batch_id = ? ORDER BY COALESCE(fit_score, -1) DESC, id`,
             [req.params.id]
         );
         res.json({ success: true, data: { ...batch, items } });
@@ -655,10 +655,15 @@ exports.listTalentPoolExec = async (req, res) => {
                ${searchClause}
                ${expClause}
                ${skillClause}
-             ORDER BY cp.total_experience DESC, c.id DESC
+             ORDER BY ${jobIdInt ? `COALESCE(
+                 (SELECT mr.fit_score FROM applications a_ord
+                  JOIN match_results mr ON mr.application_id = a_ord.id
+                  WHERE a_ord.candidate_id = c.id AND a_ord.job_id = ? AND a_ord.deleted_at IS NULL
+                  ORDER BY mr.computed_at DESC LIMIT 1), -1) DESC,` : ''}
+             cp.total_experience DESC, c.id DESC
              LIMIT ? OFFSET ?`,
             jobIdInt
-                ? [jobIdInt, jobIdInt, ...params, limit, offset]
+                ? [jobIdInt, jobIdInt, jobIdInt, ...params, limit, offset]
                 : [...params, limit, offset]
         );
 
@@ -697,12 +702,16 @@ exports.listTalentPoolExec = async (req, res) => {
                     catch { return []; }
                 })(),
                 already_applied: !!row.already_applied,
-                // Prefer the persisted score for applied candidates; otherwise the live one.
                 fit_score: row.fit_score ?? (live ? live.score : null),
                 matched_skills: live ? live.matched_skills : [],
                 missing_skills: live ? live.missing_skills : [],
             };
         });
+
+        // When a JD filter is active, surface best-fit candidates first
+        if (jobIdInt) {
+            candidates.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
+        }
 
         res.json({ success: true, data: candidates, total: countRows[0].total, page: parseInt(page), limit });
     } catch (err) {

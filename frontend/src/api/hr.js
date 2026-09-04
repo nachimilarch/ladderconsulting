@@ -56,4 +56,5 @@ export const packageRequestAPI = {
 
 export const hrCompanyAPI = {
     list: () => api.get('/hr/companies'),
+    sendJDReminder: (id) => api.post(`/hr/companies/${id}/remind-jd`),
 };

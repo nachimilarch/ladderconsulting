@@ -21,6 +21,8 @@ export const companyInvoiceAPI = {
 export const adminInvoiceAPI = {
     list: (params) => api.get('/admin/invoices', { params }),
     summary: () => api.get('/admin/invoices/summary'),
+    markPaid: (id) => api.patch(`/admin/invoices/${id}/mark-paid`),
+    markFeePaid: (id) => api.patch(`/admin/invoices/fees/${id}/mark-paid`),
 };
 
 export const paymentAPI = {

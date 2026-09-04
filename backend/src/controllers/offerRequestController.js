@@ -408,7 +408,9 @@ exports.approveRequest = async (req, res) => {
             `SELECT cr.id, cr.company_id, cr.application_id, cr.candidate_id,
                     cr.invoice_id, cr.status,
                     co.company_name,
-                    cand_u.name AS candidate_name, co_u.id AS company_user_id, co_u.email AS company_email,
+                    cand_u.id AS candidate_user_id, cand_u.name AS candidate_name,
+                    cand_u.email AS candidate_email,
+                    co_u.id AS company_user_id, co_u.email AS company_email,
                     jp.id AS job_id, jp.title AS job_title,
                     pfi.placement_fee_amount, pfi.offered_ctc, pfi.status AS pfi_status
              FROM company_requests cr
@@ -562,6 +564,29 @@ exports.approveRequest = async (req, res) => {
                     <p>Please complete the payment via <strong>Company Portal → Payments</strong> — partial or full payments via Cashfree are accepted.</p>
                     `}
                     <p>You can generate the offer letter right away from <strong>Company Portal → Interviews</strong>.</p>
+                    <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                `,
+            });
+        }
+
+        // Notify candidate — they have a pending offer to review
+        if (cr.candidate_user_id) {
+            notify(
+                cr.candidate_user_id,
+                'offer_pending',
+                `You Have a Job Offer — ${cr.job_title}`,
+                `${cr.company_name} has extended a job offer for ${cr.job_title}. Log in to Candidate Portal → Applications to review and respond.`,
+                { application_id: cr.application_id }
+            );
+        }
+        if (cr.candidate_email) {
+            safeEmail({
+                to: cr.candidate_email,
+                subject: `You Have a Job Offer — ${cr.job_title} at ${cr.company_name}`,
+                html: `
+                    <p>Hi ${cr.candidate_name},</p>
+                    <p>Congratulations! <strong>${cr.company_name}</strong> has extended a job offer to you for the position of <strong>${cr.job_title}</strong>.</p>
+                    <p>Please log in to your <strong>Candidate Portal → My Applications</strong> to review the offer details and submit your response.</p>
                     <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
                 `,
             });

@@ -8,28 +8,116 @@ const { logAction } = require('../utils/auditLog');
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || null;
 
 // ── Column name normalisation for flexible Excel header mapping ───────────────
+
+// Normalise a header string: lowercase, trim, collapse whitespace,
+// replace dots / dashes / underscores / slashes with a single space
+const normHeader = (s) =>
+    String(s).toLowerCase()
+        .replace(/[    ]+/g, ' ') // non-breaking spaces
+        .replace(/[._\-/\\]+/g, ' ')                   // punctuation → space
+        .replace(/\s+/g, ' ')                           // collapse spaces
+        .trim();
+
+// All aliases are already in normalised form (spaces only, no punctuation)
 const COLUMN_MAP = {
-    full_name:      ['full name','name','full_name'],
-    email:          ['email','email id','email address','e-mail','mail'],
-    phone:          ['phone','phone number','mobile','contact number','mobile number','contact'],
-    whatsapp_number:['whatsapp','whatsapp number','wa number'],
-    company_name:   ['company','company name','organisation','organization','org'],
-    designation:    ['designation','title','role','job title','position'],
-    city:           ['city','location','place'],
+    full_name: [
+        'full name','name','contact name','person name',
+        'customer name','client name','contact person','candidate name',
+    ],
+    email: [
+        'email','email id','email address','e mail','mail','emailid',
+    ],
+    phone: [
+        // generic
+        'phone','phone number','phone no','ph','ph no','ph number',
+        // mobile variants
+        'mobile','mobile number','mobile no','mob','mob no','mob number',
+        // cell / tel
+        'cell','cell number','cell no','cell phone',
+        'tel','telephone','telephone number','tel no',
+        // contact
+        'contact','contact number','contact no','contact phone','contact mobile',
+        // numbered / role-qualified
+        'phone 1','phone1','mobile 1','mobile1',
+        'primary phone','primary mobile','work phone','home phone','office phone',
+        'number','numbers',
+    ],
+    whatsapp_number: [
+        'whatsapp','whatsapp number','whatsapp no','wa number','wa no',
+        'whatsapp mobile','watsapp','wp number','wp no',
+    ],
+    company_name: [
+        'company','company name','organisation','organization','org',
+        'firm','employer','org name',
+    ],
+    designation: [
+        'designation','title','role','job title','position','job role',
+        'dept','department','function',
+    ],
+    city: ['city','location','place','region','area','district','state'],
 };
 
 const normaliseHeaders = (headers) => {
     const map = {};
+
+    // Pass 1 — normalised exact alias match
     headers.forEach((h, i) => {
-        const lower = String(h).toLowerCase().trim();
+        const norm = normHeader(h);
         for (const [field, aliases] of Object.entries(COLUMN_MAP)) {
-            if (aliases.includes(lower)) {
+            if (map[field] === undefined && aliases.includes(norm)) {
                 map[field] = i;
+            }
+        }
+    });
+
+    // Pass 2 — substring keyword match for any still-unmapped column
+    const FUZZY = {
+        phone:           ['phone','mobile','mob','cell','tel'],
+        whatsapp_number: ['whatsapp','watsapp'],
+        email:           ['email','mail'],
+        full_name:       ['name'],
+        company_name:    ['company','org','firm'],
+        city:            ['city','location'],
+        designation:     ['designation','title','role','position'],
+    };
+    const assignedIdx = new Set(Object.values(map));
+    headers.forEach((h, i) => {
+        if (assignedIdx.has(i)) return;
+        const norm = normHeader(h);
+        for (const [field, keywords] of Object.entries(FUZZY)) {
+            if (map[field] === undefined && keywords.some(kw => norm.includes(kw))) {
+                map[field] = i;
+                assignedIdx.add(i);
                 break;
             }
         }
     });
+
+    console.log('[outreach:import] column map:', map, '| headers:', headers.map(normHeader));
     return map;
+};
+
+// ── Split a cell that may hold multiple phone numbers ─────────────────────────
+// Handles separators: comma, semicolon, pipe, slash, ampersand, newline, tab,
+// and 2+ consecutive spaces (e.g. "9898989898  9090909090").
+// Returns only valid phone-length digit strings (7–15 chars).
+const splitPhones = (raw) => {
+    if (!raw) return [];
+    const segmented = String(raw)
+        .replace(/[,;|&\n\r\t]/g, '§')  // explicit delimiters
+        .replace(/\//g, '§')             // forward slash
+        .replace(/\s{2,}/g, '§')        // 2+ consecutive spaces → delimiter
+        .replace(/\s*§\s*/g, '§');      // trim spaces around delimiter
+
+    return segmented.split('§')
+        .map(seg => seg.replace(/[^\d]/g, ''))   // extract digits only
+        .filter(d => d.length >= 7 && d.length <= 15);  // valid phone range
+};
+
+// Return the first valid phone number from a potentially multi-value cell
+const firstPhone = (raw) => {
+    const nums = splitPhones(raw);
+    return nums.length > 0 ? nums[0] : null;
 };
 
 // ── POST /outreach/contact-lists/upload ───────────────────────────────────────
@@ -116,15 +204,24 @@ async function importContacts(listId, buffer, uploadedBy) {
         const row = dataRows[i];
         const get = (field) => {
             const idx = colMap[field];
-            return idx !== undefined ? String(row[idx] || '').trim() : '';
+            if (idx === undefined) return '';
+            const val = row[idx];
+            // xlsx returns numeric cells as JS numbers; convert carefully to avoid
+            // scientific notation on large integers (phone numbers etc.)
+            if (typeof val === 'number') return Number.isInteger(val) ? String(val) : val.toFixed(0);
+            return String(val || '').trim();
         };
 
-        const email       = get('email').toLowerCase() || null;
-        const phone       = get('phone') || null;
-        const whatsapp    = get('whatsapp_number') || null;
+        const email     = get('email').toLowerCase() || null;
+        const whatsapp  = firstPhone(get('whatsapp_number')) || null;
+        const phones    = splitPhones(get('phone'));
+        const fullName  = get('full_name')    || null;
+        const company   = get('company_name') || null;
+        const desig     = get('designation')  || null;
+        const city      = get('city')         || null;
 
-        // Skip rows missing both email and phone/whatsapp
-        if (!email && !phone && !whatsapp) {
+        // Skip rows missing email and all phone/whatsapp info
+        if (!email && phones.length === 0 && !whatsapp) {
             errors.push({ row: i + 2, reason: 'Missing email and phone' });
             continue;
         }
@@ -136,17 +233,27 @@ async function importContacts(listId, buffer, uploadedBy) {
         }
         if (email) seenEmails.add(email);
 
+        // Primary row — first phone number
         toInsert.push([
-            listId,
-            uploadedBy,
-            get('full_name')    || null,
+            listId, uploadedBy,
+            fullName,
             email,
-            phone,
+            phones[0] || null,
             whatsapp,
-            get('company_name') || null,
-            get('designation')  || null,
-            get('city')         || null,
+            company, desig, city,
         ]);
+
+        // Extra rows for additional phone numbers — email null to avoid dedup collision
+        for (let p = 1; p < phones.length; p++) {
+            toInsert.push([
+                listId, uploadedBy,
+                fullName,
+                null,
+                phones[p],
+                whatsapp,
+                company, desig, city,
+            ]);
+        }
     }
 
     // Batch insert

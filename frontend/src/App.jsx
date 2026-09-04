@@ -43,6 +43,7 @@ import CandidateJobs from './pages/candidate/CandidateJobs';
 import CandidateApplications from './pages/candidate/CandidateApplications';
 import CandidateInterviews from './pages/candidate/CandidateInterviews';
 import CandidateDocuments from './pages/candidate/CandidateDocuments';
+import CandidateHelp from './pages/candidate/CandidateHelp';
 
 // Company training
 import CompanyTraining from './pages/company/CompanyTraining';
@@ -108,6 +109,7 @@ import AdminJobPostings from './pages/admin/AdminJobPostings';
 
 // Company requests page
 import CompanyRequestsPage from './pages/company/CompanyRequestsPage';
+import CompanyHelp from './pages/company/CompanyHelp';
 
 const RoleRedirect = () => {
   const { user } = useAuth();
@@ -194,6 +196,7 @@ export default function App() {
           <Route path="applications" element={<CandidateApplications />} />
           <Route path="interviews" element={<CandidateInterviews />} />
           <Route path="documents" element={<CandidateDocuments />} />
+          <Route path="help" element={<CandidateHelp />} />
         </Route>
 
         {/* ── Company Module ─────────────────────────── */}
@@ -215,6 +218,7 @@ export default function App() {
           <Route path="payments/:invoiceId" element={<CompanyPayments />} />
           <Route path="payments/:invoiceId/callback" element={<PaymentCallback />} />
           <Route path="talent/unlock-callback" element={<ResumeUnlockCallback />} />
+          <Route path="help" element={<CompanyHelp />} />
         </Route>
 
         {/* ── Admin Module ───────────────────────────── */}

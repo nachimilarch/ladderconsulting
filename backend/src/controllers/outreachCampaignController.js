@@ -209,8 +209,8 @@ async function sendEmailBatch(campaign, contacts, senderUserId) {
     const transporter = getTransporter();
     const domain      = getDomain();
     const replyToAddr = buildReplyToAddress(campaign.id, senderUserId);
-    const BATCH_SIZE  = 20;
-    const BATCH_DELAY = 1000; // ms
+    const BATCH_SIZE  = 4;    // Graph API throttles ~4 concurrent sendMail per user
+    const BATCH_DELAY = 2500; // ms between batches (~1.6 emails/sec, well within Graph limits)
 
     let sent = 0, failed = 0;
 
@@ -345,6 +345,79 @@ exports.deleteEmailCampaign = async (req, res) => {
         res.json({ success: true, message: 'Campaign deleted.' });
     } catch (err) {
         console.error('[outreachCampaign.delete]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── GET /outreach/email-templates — read-only list for hr_staff/admin ─────────
+exports.listEmailTemplatesForOutreach = async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            `SELECT id, name, description, subject, body_html
+             FROM email_templates
+             WHERE is_active = 1 AND deleted_at IS NULL
+             ORDER BY name ASC`
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        console.error('[outreachCampaign.listEmailTemplates]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+
+// ── GET /outreach/whatsapp-campaigns/:id/failed ────────────────────────────────
+exports.getWAFailedLogs = async (req, res) => {
+    try {
+        const [[camp]] = await db.query(
+            'SELECT id, created_by FROM outreach_campaigns WHERE id = ? AND campaign_type = ? AND deleted_at IS NULL',
+            [req.params.id, 'whatsapp']
+        );
+        if (!camp) return res.status(404).json({ success: false, message: 'Campaign not found.' });
+        if (req.user.role === 'hr_staff' && camp.created_by !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'Access denied.' });
+        }
+
+        const [rows] = await db.query(
+            `SELECT cl.id, cl.contact_id, cl.error_message, cl.sent_at,
+                    c.full_name, c.phone, c.whatsapp_number, c.company_name
+             FROM outreach_campaign_logs cl
+             JOIN outreach_contacts c ON c.id = cl.contact_id
+             WHERE cl.campaign_id = ? AND cl.status = 'failed' AND cl.channel = 'whatsapp'
+             ORDER BY cl.id ASC`,
+            [req.params.id]
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        console.error('[getWAFailedLogs]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── GET /outreach/email-campaigns/:id/failed — failed send log ────────────────
+exports.getFailedLogs = async (req, res) => {
+    try {
+        const [[camp]] = await db.query(
+            'SELECT id, created_by FROM outreach_campaigns WHERE id = ? AND campaign_type = ? AND deleted_at IS NULL',
+            [req.params.id, 'email']
+        );
+        if (!camp) return res.status(404).json({ success: false, message: 'Campaign not found.' });
+        if (req.user.role === 'hr_staff' && camp.created_by !== req.user.id) {
+            return res.status(403).json({ success: false, message: 'Access denied.' });
+        }
+
+        const [rows] = await db.query(
+            `SELECT cl.id, cl.contact_id, cl.error_message, cl.sent_at,
+                    c.full_name, c.email, c.company_name
+             FROM outreach_campaign_logs cl
+             JOIN outreach_contacts c ON c.id = cl.contact_id
+             WHERE cl.campaign_id = ? AND cl.status = 'failed'
+             ORDER BY cl.id ASC`,
+            [req.params.id]
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        console.error('[getFailedLogs]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };

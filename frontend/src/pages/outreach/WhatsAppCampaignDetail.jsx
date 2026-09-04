@@ -11,14 +11,19 @@ const STATUS_COLORS = {
 
 export default function WhatsAppCampaignDetail() {
     const { id } = useParams();
-    const [campaign, setCampaign] = useState(null);
-    const [loading, setLoading]   = useState(true);
+    const [campaign, setCampaign]   = useState(null);
+    const [failedLogs, setFailedLogs] = useState([]);
+    const [tab, setTab]             = useState('overview');
+    const [loading, setLoading]     = useState(true);
 
     const fetch = () => {
         waCampaignAPI.getOne(id)
             .then(r => setCampaign(r.data.data))
             .catch(() => toast.error('Failed to load campaign'))
             .finally(() => setLoading(false));
+        waCampaignAPI.failedLogs(id)
+            .then(r => setFailedLogs(r.data.data || []))
+            .catch(() => {});
     };
 
     useEffect(() => { fetch(); }, [id]);
@@ -71,14 +76,57 @@ export default function WhatsAppCampaignDetail() {
                 ))}
             </div>
 
-            <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3 text-sm">
-                <div><span className="text-xs text-gray-400">List:</span> {campaign.list_name}</div>
-                <div><span className="text-xs text-gray-400">Template:</span> {campaign.template_name}</div>
-                {campaign.template_body && (
-                    <div className="bg-gray-50 rounded-xl p-3 text-gray-700">{campaign.template_body}</div>
-                )}
-                {campaign.sent_at && <div><span className="text-xs text-gray-400">Sent:</span> {new Date(campaign.sent_at).toLocaleString('en-IN')}</div>}
+            {/* Tabs */}
+            <div className="flex gap-4 border-b border-gray-100 mb-4">
+                {['overview', 'failed'].map(t => (
+                    <button key={t} onClick={() => setTab(t)}
+                        className={`text-sm font-medium pb-2 capitalize ${tab === t ? 'text-green-700 border-b-2 border-green-600' : 'text-gray-400'}`}>
+                        {t === 'failed' && failedLogs.length > 0 ? `Failed (${failedLogs.length})` : t.charAt(0).toUpperCase() + t.slice(1)}
+                    </button>
+                ))}
             </div>
+
+            {tab === 'overview' && (
+                <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm space-y-3 text-sm">
+                    <div><span className="text-xs text-gray-400 mr-2">List:</span>{campaign.list_name}</div>
+                    <div><span className="text-xs text-gray-400 mr-2">Template:</span>{campaign.template_name}</div>
+                    {campaign.template_body && (
+                        <div className="bg-gray-50 rounded-xl p-3 text-gray-700">{campaign.template_body}</div>
+                    )}
+                    {campaign.sent_at && (
+                        <div><span className="text-xs text-gray-400 mr-2">Sent:</span>{new Date(campaign.sent_at).toLocaleString('en-IN')}</div>
+                    )}
+                </div>
+            )}
+
+            {tab === 'failed' && (
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+                    {failedLogs.length === 0 ? (
+                        <p className="text-center py-8 text-gray-400 text-sm">No failed sends.</p>
+                    ) : (
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
+                                <tr>
+                                    <th className="px-4 py-3 text-left">Name</th>
+                                    <th className="px-4 py-3 text-left">Phone</th>
+                                    <th className="px-4 py-3 text-left">Company</th>
+                                    <th className="px-4 py-3 text-left">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                                {failedLogs.map(f => (
+                                    <tr key={f.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3 text-gray-700">{f.full_name || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-600">{f.whatsapp_number || f.phone || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-500">{f.company_name || '—'}</td>
+                                        <td className="px-4 py-3 text-red-500 text-xs">{f.error_message || 'Unknown error'}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
         </div>
     );
 }

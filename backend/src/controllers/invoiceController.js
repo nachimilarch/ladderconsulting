@@ -672,3 +672,30 @@ exports.downloadCompanyInvoicePDF = async (req, res) => {
         res.status(500).json({ message: 'Failed to generate invoice PDF.' });
     }
 };
+
+// ── PATCH /api/admin/invoices/:id/mark-paid ───────────────────────────────────
+// Reuses markPaid logic — admin always bypasses company check there.
+exports.adminMarkPaid = exports.markPaid;
+
+// ── PATCH /api/admin/invoices/fees/:id/mark-paid ─────────────────────────────
+exports.adminMarkFeePaid = async (req, res) => {
+    const { payment_method = 'bank_transfer', payment_note } = req.body;
+    try {
+        const [[fee]] = await db.query(
+            'SELECT id, status FROM placement_fee_invoices WHERE id = ? AND deleted_at IS NULL',
+            [req.params.id]
+        );
+        if (!fee) return res.status(404).json({ success: false, message: 'Fee invoice not found.' });
+        if (fee.status === 'paid' || fee.status === 'waived')
+            return res.status(409).json({ success: false, message: `Already ${fee.status}.` });
+
+        await db.query(
+            `UPDATE placement_fee_invoices SET status = 'paid', paid_at = NOW() WHERE id = ?`,
+            [req.params.id]
+        );
+        res.json({ success: true, message: 'Placement fee marked as paid.' });
+    } catch (err) {
+        console.error('[adminMarkFeePaid]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};

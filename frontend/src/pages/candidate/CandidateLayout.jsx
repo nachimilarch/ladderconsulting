@@ -3,12 +3,13 @@ import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
 const navItems = [
-    { label: 'Dashboard', to: '/candidate', icon: '📊', exact: true },
-    { label: 'My Profile', to: '/candidate/profile', icon: '👤' },
-    { label: 'Browse Jobs', to: '/candidate/jobs', icon: '💼' },
+    { label: 'Dashboard',    to: '/candidate',              icon: '📊', exact: true },
+    { label: 'My Profile',   to: '/candidate/profile',      icon: '👤' },
+    { label: 'Browse Jobs',  to: '/candidate/jobs',         icon: '💼' },
     { label: 'Applications', to: '/candidate/applications', icon: '📋' },
-    { label: 'Interviews', to: '/candidate/interviews', icon: '🗓' },
-    { label: 'Documents', to: '/candidate/documents', icon: '📁' },
+    { label: 'Interviews',   to: '/candidate/interviews',   icon: '🗓' },
+    { label: 'Documents',    to: '/candidate/documents',    icon: '📁' },
+    { label: 'How to Use',   to: '/candidate/help',         icon: '❓' },
 ];
 
 export default function CandidateLayout() {
@@ -28,7 +29,7 @@ export default function CandidateLayout() {
                 <div className="navbar-brand">
                     <img src="/logo-icon.png" alt="LadderStep" className="w-9 h-9 object-contain shrink-0" />
                     <div>
-                        <div className="navbar-title">LadderStep <span className="text-brand-600">Human Consulting</span></div>
+                        <div className="navbar-title">LadderStep <span className="text-indigo-400">Human Consulting</span></div>
                         <div className="navbar-subtitle">Candidate Portal</div>
                     </div>
                 </div>
@@ -40,6 +41,14 @@ export default function CandidateLayout() {
                     >
                         ☰
                     </button>
+                    <Link
+                        to="/candidate/help"
+                        title="How to Use"
+                        className="hidden md:flex items-center gap-1.5 text-sm text-indigo-600 font-medium hover:text-indigo-800 transition"
+                    >
+                        <span className="text-base">❓</span>
+                        <span>Help</span>
+                    </Link>
                     <span className="navbar-user hidden md:inline">{user?.name}</span>
                     <button onClick={logout} className="navbar-logout hidden md:inline">
                         Logout

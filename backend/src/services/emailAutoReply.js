@@ -25,7 +25,7 @@ function matchesKeywords(text, keywords, matchType) {
 
 async function hasEmailedBefore(fromEmail) {
     const [[row]] = await db.query(
-        `SELECT id FROM outreach_campaign_logs ocl
+        `SELECT ocl.id FROM outreach_campaign_logs ocl
          JOIN outreach_contacts c ON c.id = ocl.contact_id
          WHERE c.email = ? AND ocl.channel = 'email' LIMIT 1`,
         [fromEmail]

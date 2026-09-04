@@ -106,11 +106,30 @@ const sendGraphMail = async ({
     }
     if (extraHeaders.length > 0) message.internetMessageHeaders = extraHeaders;
 
-    await axios.post(
+    const send = async (tok) => axios.post(
         `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(senderAddr)}/sendMail`,
         { message, saveToSentItems: saveToSent },
-        { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' } }
+        { headers: { Authorization: `Bearer ${tok}`, 'Content-Type': 'application/json' } }
     );
+
+    try {
+        await send(token);
+    } catch (err) {
+        if (err.response?.status === 429) {
+            const retryAfter = parseInt(err.response.headers['retry-after'] || '10', 10);
+            await new Promise(r => setTimeout(r, retryAfter * 1000));
+            // Refresh token in case it expired during wait
+            const freshToken = await getGraphToken();
+            await send(freshToken);
+        } else if (err.response?.status === 401) {
+            // Token expired mid-flight — force refresh and retry once
+            _token = null;
+            const freshToken = await getGraphToken();
+            await send(freshToken);
+        } else {
+            throw err;
+        }
+    }
 };
 
 module.exports = { getGraphToken, sendGraphMail };

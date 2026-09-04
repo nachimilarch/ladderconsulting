@@ -75,6 +75,66 @@ exports.updateProfile = async (req, res) => {
 
 // ── GET /api/hr/companies ─────────────────────────────────────────────────────
 // Executive sees their assigned companies; admin sees all approved companies.
+// ── POST /api/hr/companies/:id/remind-jd ─────────────────────────────────────
+exports.sendJDReminder = async (req, res) => {
+    try {
+        const [[company]] = await db.query(
+            `SELECT co.id, co.company_name, u.id AS user_id, u.email, u.name AS contact_name
+             FROM companies co
+             JOIN users u ON u.id = co.user_id
+             WHERE co.id = ? AND co.is_approved = 1 AND co.deleted_at IS NULL`,
+            [req.params.id]
+        );
+        if (!company) return res.status(404).json({ success: false, message: 'Company not found.' });
+
+        const [[jobCount]] = await db.query(
+            'SELECT COUNT(*) AS cnt FROM job_postings WHERE company_id = ? AND deleted_at IS NULL',
+            [company.id]
+        );
+        if (jobCount.cnt > 0) {
+            return res.status(400).json({ success: false, message: 'Company already has job postings.' });
+        }
+
+        // In-app notification
+        await db.query(
+            'INSERT INTO notifications (user_id, type, title, body) VALUES (?, ?, ?, ?)',
+            [
+                company.user_id,
+                'jd_reminder',
+                'Action Required: Post Your Job Openings',
+                'Your company profile is ready. Please log in and post your open positions so LadderStep Human Consulting can start sourcing candidates for you.',
+            ]
+        );
+
+        // Email
+        if (company.email) {
+            const { sendEmail } = require('../utils/email');
+            sendEmail({
+                to: company.email,
+                subject: `Action Required: Post Your Job Openings — ${company.company_name}`,
+                html: `
+                    <p>Hi ${company.contact_name || 'there'},</p>
+                    <p>Your company profile on <strong>LadderStep Human Consulting</strong> is active and ready to go!</p>
+                    <p>To start receiving shortlisted candidates, please <strong>log in to your Company Portal and post your open job positions</strong>.</p>
+                    <p>Our team is ready to source and match the best candidates as soon as your job descriptions are live.</p>
+                    <p>
+                        <a href="${process.env.FRONTEND_URL}/company/jobs"
+                           style="display:inline-block;background:#6a47d4;color:#fff;padding:10px 22px;border-radius:8px;text-decoration:none;font-weight:600;">
+                            Post Jobs Now
+                        </a>
+                    </p>
+                    <br/><p>Best regards,<br/>LadderStep Human Consulting Team</p>
+                `,
+            }).catch(e => console.error('[sendJDReminder email]', e.message));
+        }
+
+        res.json({ success: true, message: 'Reminder sent.' });
+    } catch (err) {
+        console.error('[sendJDReminder]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
 exports.getMyCompanies = async (req, res) => {
     try {
         let rows;

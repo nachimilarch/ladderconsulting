@@ -679,14 +679,16 @@ exports.getRecruitmentPipeline = async (req, res) => {
             `SELECT a.id AS application_id, a.status AS pipeline_stage, a.applied_at,
                     u.name AS candidate_name,
                     jp.title AS job_title,
-                    co.company_name
+                    co.company_name,
+                    mr.fit_score
              FROM applications a
              JOIN candidates c ON c.id = a.candidate_id
              JOIN users u ON u.id = c.user_id
              JOIN job_postings jp ON jp.id = a.job_id
              JOIN companies co ON co.id = jp.company_id
+             LEFT JOIN match_results mr ON mr.application_id = a.id
              WHERE a.deleted_at IS NULL
-             ORDER BY a.applied_at DESC
+             ORDER BY COALESCE(mr.fit_score, 0) DESC, a.applied_at DESC
              LIMIT 100`
         );
         res.json({ success: true, data: pipeline });
@@ -946,10 +948,14 @@ exports.reparseResumeSkills = async (req, res) => {
 
 exports.recomputeMatchScores = async (req, res) => {
     try {
+        // ?force=true rescores ALL applications; default only fills gaps
+        const forceAll = req.query.force === 'true';
         const [apps] = await db.query(
-            `SELECT a.id FROM applications a
-             WHERE a.deleted_at IS NULL
-               AND NOT EXISTS (SELECT 1 FROM match_results mr WHERE mr.application_id = a.id)`
+            forceAll
+                ? `SELECT a.id FROM applications a WHERE a.deleted_at IS NULL`
+                : `SELECT a.id FROM applications a
+                   WHERE a.deleted_at IS NULL
+                     AND NOT EXISTS (SELECT 1 FROM match_results mr WHERE mr.application_id = a.id)`
         );
 
         res.json({ message: `Recomputing scores for ${apps.length} applications. Running in background.` });
@@ -1755,9 +1761,11 @@ exports.getMIS = async (req, res) => {
                 NULL AS employee_id, NULL AS department, NULL AS designation,
                 (SELECT COUNT(*) FROM companies co
                     WHERE co.assigned_executive_id = u.id AND co.deleted_at IS NULL) AS companies_assigned,
-                /* Hiring pipeline */
-                (SELECT COUNT(*) FROM applications a
-                    WHERE a.sourced_by = u.id AND a.created_at >= NOW() - ${interval} AND a.deleted_at IS NULL) AS candidates_sourced,
+                /* Hiring pipeline — count all candidates uploaded via batch (free-pool + JD-targeted) */
+                (SELECT COUNT(DISTINCT ri.candidate_id)
+                    FROM resume_upload_batches rb
+                    JOIN resume_upload_items ri ON ri.batch_id = rb.id AND ri.status = 'done' AND ri.candidate_id IS NOT NULL
+                    WHERE rb.uploaded_by = u.id AND rb.created_at >= NOW() - ${interval} AND rb.deleted_at IS NULL) AS candidates_sourced,
                 (SELECT COUNT(*) FROM interview_slots isl
                     JOIN applications ap ON ap.id = isl.application_id
                     JOIN job_postings jp0 ON jp0.id = ap.job_id
@@ -1823,13 +1831,15 @@ exports.getMIS = async (req, res) => {
         // ── 4. Top performers ────────────────────────────────────────────────
         const [topPerformers] = await db.query(`
             SELECT u.name,
-                   COUNT(DISTINCT a.id) AS sourced,
+                   (SELECT COUNT(DISTINCT ri.candidate_id)
+                    FROM resume_upload_batches rb
+                    JOIN resume_upload_items ri ON ri.batch_id = rb.id AND ri.status = 'done' AND ri.candidate_id IS NOT NULL
+                    WHERE rb.uploaded_by = u.id AND rb.created_at >= NOW() - ${interval} AND rb.deleted_at IS NULL) AS sourced,
                    COUNT(DISTINCT oc.id) AS campaigns,
                    COALESCE(SUM(oc.sent_count),0) AS messages,
                    COUNT(DISTINCT ocl.id) AS calls
             FROM users u
             JOIN roles r ON r.id = u.role_id AND r.name IN ('hr_staff','admin')
-            LEFT JOIN applications a ON a.sourced_by = u.id AND a.created_at >= NOW() - ${interval} AND a.deleted_at IS NULL
             LEFT JOIN outreach_campaigns oc ON oc.created_by = u.id AND oc.created_at >= NOW() - ${interval} AND oc.deleted_at IS NULL
             LEFT JOIN outreach_call_logs ocl ON ocl.called_by = u.id AND ocl.created_at >= NOW() - ${interval}
             WHERE u.deleted_at IS NULL

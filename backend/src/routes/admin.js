@@ -75,8 +75,10 @@ router.get('/placement-fees',              ...admin, offerReqCtrl.adminListFees)
 
 // General invoices (admin oversight)
 const invCtrl = require('../controllers/invoiceController');
-router.get('/invoices/summary',            ...admin, invCtrl.adminInvoiceSummary);
-router.get('/invoices',                    ...admin, invCtrl.adminListInvoices);
+router.get('/invoices/summary',                ...admin, invCtrl.adminInvoiceSummary);
+router.get('/invoices',                        ...admin, invCtrl.adminListInvoices);
+router.patch('/invoices/:id/mark-paid',        ...admin, invCtrl.adminMarkPaid);
+router.patch('/invoices/fees/:id/mark-paid',   ...admin, invCtrl.adminMarkFeePaid);
 
 // Interview requests (admin oversight)
 const intReqCtrl = require('../controllers/interviewRequestController');

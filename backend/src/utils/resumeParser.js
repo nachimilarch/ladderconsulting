@@ -269,6 +269,159 @@ const SKILLS = {
     'quality management': ['quality management', 'quality assurance', 'qa', 'quality control', 'qc', 'iso'],
     'inventory management': ['inventory management', 'inventory control', 'warehouse management'],
 
+    // ── Engineering / CAD / Infrastructure ────────────────────────────────────
+    'autocad': ['autocad', 'auto cad'],
+    'revit': ['revit', 'revit architecture', 'revit structure', 'revit mep', 'autodesk revit'],
+    'staad pro': ['staad\\.pro', 'staad pro', 'staadpro'],
+    'etabs': ['etabs'],
+    'bim': ['bim', 'building information model', 'building information modelling'],
+    'structural engineering': ['structural engineering', 'structural design', 'structural analysis', 'structural detailing'],
+    'civil engineering': ['civil engineering', 'civil construction', 'civil works'],
+    'site management': ['site management', 'site supervision', 'site engineering', 'site execution'],
+    'quantity surveying': ['quantity survey', 'quantity estimation', 'bill of quantities', 'boq', 'quantity takeoff', 'bar bending schedule'],
+    'mep engineering': ['mep engineering', 'mechanical electrical plumbing'],
+    'autocad civil 3d': ['civil 3d', 'autocad civil 3d'],
+
+    // ── Embedded / Firmware / Hardware ────────────────────────────────────────
+    'embedded c': ['embedded c', 'embedded-c', 'embedded c programming'],
+    'embedded systems': ['embedded systems', 'embedded system', 'embedded programming', 'embedded software', 'embedded development', 'embedded firmware'],
+    'embedded linux': ['embedded linux'],
+    'firmware': ['firmware', 'firmware development', 'firmware programming'],
+    'autosar': ['autosar'],
+    'rtos': ['rtos', 'real-time os', 'real-time operating system', 'real time os'],
+    'freertos': ['freertos', 'free rtos'],
+    'arm': ['arm cortex', 'arm microcontroller', 'arm processor'],
+    'microcontroller': ['microcontroller', 'microcontrollers'],
+    'iot': ['iot', 'internet of things', 'iot development', 'iot solutions'],
+    'mqtt': ['mqtt'],
+    'can bus': ['can bus', 'can protocol', 'controller area network'],
+    'uart': ['uart'],
+    'iso 26262': ['iso.26262', 'iso26262', 'automotive functional safety', 'asil'],
+    'pcb design': ['pcb design', 'pcb layout', 'eagle pcb', 'altium designer', 'kicad'],
+    'fpga': ['fpga', 'vhdl', 'verilog'],
+    'plc': ['plc programming', 'plc', 'scada', 'hmi'],
+
+    // ── Java / JVM Ecosystem ──────────────────────────────────────────────────
+    'hibernate': ['hibernate', 'hibernate orm'],
+    'jpa': ['java persistence api', 'spring data jpa', 'jakarta persistence'],
+    'jdbc': ['jdbc', 'java database connectivity'],
+    'maven': ['maven', 'apache maven'],
+    'gradle': ['gradle'],
+    'testng': ['testng'],
+    'mockito': ['mockito'],
+    'j2ee': ['j2ee', 'java ee', 'jakarta ee', 'jsp', 'servlets', 'java servlets'],
+    'spring mvc': ['spring mvc', 'spring framework'],
+    'spring security': ['spring security'],
+    'spring cloud': ['spring cloud', 'microservices spring'],
+    'intellij': ['intellij', 'intellij idea'],
+
+    // ── Sales & Business Development ──────────────────────────────────────────
+    'lead generation': ['lead generation', 'lead gen', 'lead sourcing', 'generating leads'],
+    'cold calling': ['cold calling', 'cold call', 'outbound calling', 'outbound dialing', 'outbound sales'],
+    'upselling': ['upselling', 'up-selling', 'upsell'],
+    'cross-selling': ['cross-selling', 'cross selling', 'cross-sell'],
+    'territory management': ['territory management', 'territory development', 'territory planning'],
+    'telesales': ['telesales', 'tele-sales', 'telephone sales', 'telecalling', 'tele-calling'],
+    'customer acquisition': ['customer acquisition', 'client acquisition', 'new client development'],
+    'target achievement': ['target achievement', 'revenue achievement', 'sales target', 'quota achievement', 'target oriented'],
+    'funnel management': ['funnel management', 'pipeline management', 'sales funnel'],
+    'product demonstration': ['product demonstration', 'product demo', 'product presentations'],
+    'channel sales': ['channel sales', 'dealer management', 'distributor management', 'channel management'],
+    'retail management': ['retail management', 'store management', 'retail operations'],
+
+    // ── Collections / Recovery / BFSI ─────────────────────────────────────────
+    'debt recovery': ['debt recovery', 'debt collection', 'dra certif', 'dra certified', 'recovery agent', 'loan recovery', 'financial recovery', 'outstanding recovery', 'overdue recovery'],
+    'collections': ['collections executive', 'collections team', 'collection target', 'loan collections', 'emi collections'],
+    'banking': ['banking', 'retail banking', 'corporate banking', 'banking operations', 'branch banking'],
+    'insurance': ['insurance', 'life insurance', 'general insurance', 'insurance sales', 'insurance operations', 'underwriting'],
+    'credit management': ['credit management', 'credit control', 'credit analysis', 'credit appraisal', 'credit underwriting'],
+    'nbfc': ['nbfc', 'non-banking financial', 'non banking finance'],
+    'rbi compliance': ['rbi compliance', 'rbi guidelines', 'rbi regulations', 'banking compliance', 'sebi compliance', 'regulatory compliance'],
+    'mutual funds': ['mutual funds', 'ams', 'portfolio management', 'wealth management', 'investment advisory'],
+    'stock market': ['stock market', 'equity research', 'capital markets', 'equity trading', 'derivatives'],
+
+    // ── BPO / Contact Centre / Support ────────────────────────────────────────
+    'bpo': ['bpo', 'business process outsourcing', 'call centre', 'call center', 'contact centre', 'contact center'],
+    'kpo': ['kpo', 'knowledge process outsourcing'],
+    'voice process': ['voice process', 'voice support', 'inbound process', 'inbound calling', 'blended process'],
+    'non-voice process': ['non-voice process', 'non voice', 'backend process', 'back office process'],
+    'data entry': ['data entry', 'data processing', 'data management'],
+    'chat support': ['chat support', 'email support', 'ticket management', 'helpdesk'],
+    'technical support': ['technical support', 'tech support', 'it helpdesk', 'l1 support', 'l2 support'],
+
+    // ── Digital Marketing — Additional ────────────────────────────────────────
+    'meta ads': ['meta ads', 'facebook ads', 'instagram ads', 'fb ads', 'meta advertising'],
+    'affiliate marketing': ['affiliate marketing', 'affiliate program', 'affiliate campaigns'],
+    'influencer marketing': ['influencer marketing', 'influencer management', 'creator marketing'],
+    'google tag manager': ['google tag manager', 'gtm'],
+    'marketing automation': ['marketing automation', 'marketo', 'pardot', 'crm automation'],
+    'conversion rate optimization': ['conversion rate optim', 'landing page optim', 'cro specialist'],
+    'video editing': ['video editing', 'video production', 'adobe premiere', 'final cut pro', 'davinci resolve'],
+    'e-commerce': ['e-commerce', 'ecommerce', 'shopify', 'woocommerce', 'amazon seller', 'flipkart seller', 'd2c'],
+
+    // ── HR — Additional ───────────────────────────────────────────────────────
+    'campus hiring': ['campus hiring', 'campus recruitment', 'campus placement'],
+    'lateral hiring': ['lateral hiring', 'lateral recruitment'],
+    'executive search': ['executive search', 'headhunting', 'head hunting'],
+    'bulk hiring': ['bulk hiring', 'mass hiring', 'volume hiring'],
+    'contract staffing': ['contract staffing', 'staffing solutions', 'contract hiring', 'temp staffing'],
+    'hr generalist': ['hr generalist', 'generalist hr', 'hr generalist role'],
+    'hrbp': ['hrbp', 'hr business partner'],
+    'job portals': ['naukri', 'monster jobs', 'indeed', 'shine\\.com', 'timesjobs', 'job portals'],
+    'posh compliance': ['posh', 'posh compliance', 'prevention of sexual harassment'],
+    'labour law': ['labour law', 'labor law', 'employment law', 'industrial relations', 'ir'],
+    'expatriate management': ['expatriate management', 'expat management', 'global mobility'],
+
+    // ── Finance / Accounting — Additional ─────────────────────────────────────
+    'direct tax': ['direct tax', 'itr filing', 'income tax filing', 'tax returns'],
+    'indirect tax': ['indirect tax', 'gst filing', 'gst compliance', 'gst returns', 'gst reconciliation'],
+    'zoho books': ['zoho books', 'zoho accounting'],
+    'accounts management': ['account management', 'accounts management', 'client account management'],
+    'mis reporting': ['mis reporting', 'mis report', 'management information system report'],
+    'internal control': ['internal control', 'internal controls', 'sox compliance', 'sox'],
+    'cash flow': ['cash flow', 'cash flow management', 'treasury'],
+    'fund accounting': ['fund accounting', 'hedge fund', 'private equity accounting'],
+
+    // ── Design — Additional ───────────────────────────────────────────────────
+    'adobe xd': ['adobe xd'],
+    'zeplin': ['zeplin'],
+    'invision': ['invision'],
+    'prototyping': ['prototyping', 'wireframing', 'wireframe', 'lo-fi prototype', 'hi-fi prototype'],
+    'motion graphics': ['motion graphics', 'after effects', 'adobe after effects', 'animation'],
+    '3d modeling': ['3d modeling', '3ds max', '3d max', 'blender', 'cinema 4d', 'zbrush'],
+    'brand design': ['brand design', 'brand identity', 'visual identity', 'logo design'],
+
+    // ── Data / Analytics — Additional ────────────────────────────────────────
+    'alteryx': ['alteryx'],
+    'dbt': ['dbt', 'data build tool'],
+    'databricks': ['databricks'],
+    'azure synapse': ['azure synapse', 'synapse analytics'],
+    'aws redshift': ['redshift', 'amazon redshift'],
+    'metabase': ['metabase'],
+    'grafana': ['grafana'],
+    'matplotlib': ['matplotlib', 'seaborn', 'plotly'],
+    'scikit-learn': ['scikit-learn', 'sklearn'],
+    'data warehousing': ['data warehousing', 'data warehouse', 'data lake', 'lakehouse'],
+    'etl': ['etl', 'elt', 'data pipeline', 'data ingestion'],
+    'a/b testing': ['a/b testing', 'ab testing', 'hypothesis testing', 'statistical testing'],
+    'sql server reporting': ['ssrs', 'ssas', 'ssis', 'sql server reporting'],
+
+    // ── Project / Collaboration Tools — Additional ────────────────────────────
+    'notion': ['notion'],
+    'clickup': ['clickup', 'click up'],
+    'smartsheet': ['smartsheet'],
+    'ms visio': ['ms visio', 'microsoft visio', 'visio'],
+    'g suite': ['g suite', 'google workspace', 'google docs', 'google sheets', 'google slides'],
+
+    // ── Cloud / DevOps — Additional ───────────────────────────────────────────
+    'azure devops': ['azure devops', 'azure boards', 'azure pipelines'],
+    'aws lambda': ['aws lambda', 'serverless', 'serverless framework'],
+    'github actions': ['github actions', 'ci github actions'],
+    'sonarqube': ['sonarqube', 'sonar'],
+    'prometheus': ['prometheus'],
+    'elk stack': ['elk stack', 'logstash', 'kibana'],
+    'vault': ['hashicorp vault', 'secrets management'],
+
     // ── Soft skills ───────────────────────────────────────────────────────────
     'communication': ['communication', 'verbal communication', 'written communication'],
     'leadership': ['leadership', 'team leadership', 'people management'],
@@ -280,6 +433,10 @@ const SKILLS = {
     'stakeholder management': ['stakeholder management', 'stakeholder engagement'],
     'project management': ['project management', 'program management'],
     'product management': ['product management', 'product manager'],
+    'mentoring': ['mentoring', 'coaching', 'mentorship', 'training delivery'],
+    'conflict resolution': ['conflict resolution', 'dispute resolution', 'grievance resolution'],
+    'multitasking': ['multitasking', 'multi-tasking'],
+    'attention to detail': ['attention to detail'],
 };
 
 const escapeRegex = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -1077,6 +1234,29 @@ function parseResumeText(text) {
     };
 }
 
+// ── Seniority hierarchy extraction ────────────────────────────────────────────
+// Returns a level 0–5 representing where a job title sits in the org hierarchy.
+// Tiers are checked highest→lowest; the title is space-padded so that short
+// abbreviations like " cto " cannot match inside longer words like "director".
+const SENIORITY_TIERS = [
+    { level: 5, keywords: ['chief executive', 'chief financial', 'chief technology', 'chief operating', 'chief information', 'chief ', ' ceo ', ' cto ', ' coo ', ' cfo ', ' ciso ', 'managing director', 'managing partner', ' president', 'founder', 'co-founder', 'co founder', 'proprietor'] },
+    { level: 4, keywords: ['senior manager', 'sr. manager', 'sr manager', 'associate director', 'assistant vice president', 'asstt vice president', 'deputy general manager', 'deputy director', 'general manager', 'director', 'vice president', ' vp ', ' avp ', ' svp ', ' evp ', ' dgm ', ' agm ', ' nsm ', 'national head', 'business head', 'practice head'] },
+    { level: 3, keywords: ['area manager', 'branch manager', 'regional manager', 'zonal manager', 'territory manager', 'key account manager', 'department head', 'section head', 'head of ', 'team manager', ' bdm ', ' kam ', ' rsm ', ' zsm ', ' tsm ', 'asst. manager', 'asst manager', 'assistant manager', 'manager', ' head ', 'supervisor', 'superintendent', 'incharge', 'in-charge', 'plant head', 'project head', 'site head'] },
+    { level: 2, keywords: ['team lead', 'tech lead', 'technical lead', 'senior specialist', 'senior consultant', 'senior analyst', 'senior associate', 'senior executive', 'senior officer', 'senior engineer', 'senior developer', 'senior ', ' sr.', 'lead ', 'principal', 'specialist', 'consultant', 'subject matter expert', ' sme '] },
+    { level: 1, keywords: ['executive', 'associate', 'junior', ' jr.', ' jr ', 'coordinator', 'representative', 'officer', 'analyst', 'agent', 'advisor', 'assistant', 'technician', 'developer', 'engineer', 'programmer', 'designer', 'writer', 'recruiter', 'researcher', 'accountant', 'support', ' kae ', ' bde ', ' asm '] },
+    { level: 0, keywords: ['management trainee', 'graduate trainee', 'executive trainee', 'trainee', 'internship', 'intern ', 'apprentice', 'fresher', 'entry level', 'entry-level', 'campus hire'] },
+];
+
+function extractSeniority(titleText) {
+    if (!titleText) return 1;
+    // Pad with spaces so leading/trailing space-padded keywords match correctly
+    const t = ' ' + titleText.toLowerCase().trim() + ' ';
+    for (const { level, keywords } of SENIORITY_TIERS) {
+        if (keywords.some(kw => t.includes(kw))) return level;
+    }
+    return 1;
+}
+
 module.exports = {
     parseFullProfile,
     parseResumeText,
@@ -1085,4 +1265,5 @@ module.exports = {
     parseRecruiterFilename,
     isNoiseName,
     chooseName,
+    extractSeniority,
 };

@@ -10,14 +10,19 @@ export const contactListAPI = {
     callHistory:    (id)       => api.get(`/outreach/contacts/${id}/call-history`),
 };
 
+export const emailTemplateAPI = {
+    getAll: () => api.get('/outreach/email-templates'),
+};
+
 export const emailCampaignAPI = {
-    create:  (data)     => api.post('/outreach/email-campaigns', data),
-    getAll:  (params)   => api.get('/outreach/email-campaigns', { params }),
-    getOne:  (id)       => api.get(`/outreach/email-campaigns/${id}`),
-    update:  (id, data) => api.put(`/outreach/email-campaigns/${id}`, data),
-    send:    (id)       => api.post(`/outreach/email-campaigns/${id}/send`),
-    pause:   (id)       => api.post(`/outreach/email-campaigns/${id}/pause`),
-    remove:  (id)       => api.delete(`/outreach/email-campaigns/${id}`),
+    create:     (data)     => api.post('/outreach/email-campaigns', data),
+    getAll:     (params)   => api.get('/outreach/email-campaigns', { params }),
+    getOne:     (id)       => api.get(`/outreach/email-campaigns/${id}`),
+    update:     (id, data) => api.put(`/outreach/email-campaigns/${id}`, data),
+    send:       (id)       => api.post(`/outreach/email-campaigns/${id}/send`),
+    pause:      (id)       => api.post(`/outreach/email-campaigns/${id}/pause`),
+    remove:     (id)       => api.delete(`/outreach/email-campaigns/${id}`),
+    failedLogs: (id)       => api.get(`/outreach/email-campaigns/${id}/failed`),
 };
 
 export const replyAPI = {
@@ -30,10 +35,11 @@ export const replyAPI = {
 };
 
 export const waCampaignAPI = {
-    create:    (data)    => api.post('/outreach/whatsapp-campaigns', data),
-    getAll:    (params)  => api.get('/outreach/whatsapp-campaigns', { params }),
-    getOne:    (id)      => api.get(`/outreach/whatsapp-campaigns/${id}`),
-    send:      (id)      => api.post(`/outreach/whatsapp-campaigns/${id}/send`),
+    create:     (data)   => api.post('/outreach/whatsapp-campaigns', data),
+    getAll:     (params) => api.get('/outreach/whatsapp-campaigns', { params }),
+    getOne:     (id)     => api.get(`/outreach/whatsapp-campaigns/${id}`),
+    failedLogs: (id)     => api.get(`/outreach/whatsapp-campaigns/${id}/failed`),
+    send:       (id)     => api.post(`/outreach/whatsapp-campaigns/${id}/send`),
 };
 
 export const vaartabotAPI = {

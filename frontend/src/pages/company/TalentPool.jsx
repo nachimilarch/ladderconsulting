@@ -186,12 +186,11 @@ function PackageRequestModal({ onClose, hasPackage }) {
                 </div>
                 <p className="text-sm text-gray-500 mb-5">
                     {isTopUp
-                        ? 'You have no unlock credits remaining. Request more credits or upgrade to Platinum for unlimited unlocks.'
-                        : 'To see full candidate details and download resumes, select a package below. Your LadderStep executive will activate it for you.'}
+                        ? 'You have no unlock credits remaining. Top up with a Single credit or another 5-Pack, or upgrade to Platinum for unlimited unlocks.'
+                        : 'Start with the 5-Resume Pack to access full candidate profiles and downloadable resumes. Platinum gives you unlimited access with a fee only at hire.'}
                 </p>
                 <PackagePicker
-                    title={isTopUp ? 'Get More Credits' : 'Choose a Package'}
-                    subtitle="Unlock credits let you access full profiles and resumes for any candidate in the pool."
+                    title={isTopUp ? 'Top Up Credits' : 'Get Started'}
                 />
             </div>
         </div>
