@@ -29,3 +29,5 @@ backend/uploads/certificates/*
 backend/uploads/masked_resumes/*
 !backend/uploads/resumes/.gitkeep
 !backend/uploads/certificates/.gitkeep
+ladder-dev-01_codecommit_credentials.csv
+*.csv
