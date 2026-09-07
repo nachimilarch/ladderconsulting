@@ -45,6 +45,10 @@ const getAdminUserId = async () => {
     return row?.id ?? null;
 };
 
+// Addresses and subject patterns that indicate system/bounce/auto-generated mail
+const SYSTEM_ADDR = /^(microsoftexchange|postmaster|mailer-daemon|noreply|no-reply|bounce|delivery|auto-?reply|donotreply|do-not-reply|daemon|mdaemon|mail-daemon)[@+]/i;
+const SYSTEM_SUBJ = ['delivery status notification', 'undeliverable', 'mail delivery failed', 'automatic reply', 'auto-reply', 'auto reply', 'out of office', 'out of the office', 'non-delivery'];
+
 // ── Process one parsed email ──────────────────────────────────────────────────
 // (Identical logic to the former IMAP poller — only the data source changed.)
 const processMail = async (parsed) => {
@@ -56,6 +60,16 @@ const processMail = async (parsed) => {
     const messageId = parsed.messageId || null;
     const inReplyTo = parsed.inReplyTo || null;
     const receivedAt = parsed.date ? new Date(parsed.date) : new Date();
+
+    // Skip system/bounce/auto-generated emails to prevent reply loops
+    if (SYSTEM_ADDR.test(fromAddr)) return;
+    if (SYSTEM_SUBJ.some(s => subject.toLowerCase().includes(s))) return;
+    // Skip Microsoft Exchange NDR/delivery notification addresses in To/CC
+    const isExchangeSystem = [
+        ...(parsed.to?.value  || []),
+        ...(parsed.cc?.value  || []),
+    ].some(a => SYSTEM_ADDR.test(a.address || ''));
+    if (isExchangeSystem) return;
 
     // Deduplicate by message_id
     if (messageId) {

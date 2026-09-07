@@ -53,6 +53,12 @@ const createLeadFromContact = async ({ contactId, source, campaignId, executiveU
         empId = fallback?.id ?? null;
     }
 
+    // Cannot create a lead without an assignee — skip silently
+    if (!empId) {
+        console.warn('[leadConverter] No employee found for lead assignment — skipping lead creation for contact', contactId);
+        return null;
+    }
+
     // Check if a lead already exists for this outreach contact
     const [[existing]] = await db.query(
         'SELECT id, stage FROM leads WHERE outreach_contact_id = ? AND deleted_at IS NULL LIMIT 1',

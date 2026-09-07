@@ -39,8 +39,20 @@ async function hasEmailedBefore(fromEmail) {
  * @param {object} reply  — the just-inserted outreach_email_replies row fields:
  *   { id, from_email, from_name, subject, body_text, campaign_id, message_id }
  */
+const SKIP_ADDR = /^(microsoftexchange|postmaster|mailer-daemon|noreply|no-reply|bounce|delivery|auto-?reply|donotreply|do-not-reply|daemon)[@+]/i;
+
 async function fireEmailAutoReply(reply) {
     try {
+        // Never auto-reply to system/bounce addresses
+        if (!reply.from_email || SKIP_ADDR.test(reply.from_email)) return;
+
+        // Skip if we already sent an auto-reply for this inbound message
+        const [[alreadySent]] = await db.query(
+            'SELECT auto_reply_sent FROM outreach_email_replies WHERE id = ? AND auto_reply_sent = 1 LIMIT 1',
+            [reply.id]
+        );
+        if (alreadySent) return;
+
         const [flows] = await db.query(
             `SELECT * FROM email_auto_reply_flows
              WHERE is_active = 1 AND deleted_at IS NULL

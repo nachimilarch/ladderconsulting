@@ -275,7 +275,19 @@ async function sendEmailBatch(campaign, contacts, senderUserId) {
     );
 }
 
+// Extract the first syntactically valid email from a raw cell that may contain
+// multiple addresses separated by commas, semicolons, spaces, or run together.
+function extractFirstEmail(raw) {
+    if (!raw) return null;
+    // Pull every token that looks like a valid email
+    const matches = String(raw).match(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g);
+    return matches?.[0] ?? null;
+}
+
 async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain, executiveName) {
+    const toEmail = extractFirstEmail(contact.email);
+    if (!toEmail) throw new Error(`No valid email address for contact ${contact.id}: "${contact.email}"`);
+
     const timestamp = Date.now();
     const msgId     = `<lc-${campaign.id}-${contact.id}-${timestamp}@${domain}>`;
 
@@ -284,7 +296,7 @@ async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain,
 
     await transporter.sendMail({
         from:     `"${campaign.from_name}" <${campaign.from_email}>`,
-        to:       contact.email,
+        to:       toEmail,
         subject:  subjectFinal,
         html:     bodyFinal,
         messageId: msgId,
