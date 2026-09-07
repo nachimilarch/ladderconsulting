@@ -3,6 +3,7 @@ const multer   = require('multer');
 const router   = express.Router();
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
+const { uploadCampaignAttachment } = require('../middleware/upload');
 const contactCtrl   = require('../controllers/outreachContactController');
 const campaignCtrl  = require('../controllers/outreachCampaignController');
 const replyCtrl     = require('../controllers/outreachReplyController');
@@ -47,6 +48,9 @@ router.post('/email-campaigns',                campaignCtrl.createEmailCampaign)
 router.get('/email-campaigns',                 campaignCtrl.listEmailCampaigns);
 router.get('/email-campaigns/:id',             campaignCtrl.getEmailCampaign);
 router.get('/email-campaigns/:id/failed',      campaignCtrl.getFailedLogs);
+router.get('/email-campaigns/:id/attachments',                      campaignCtrl.listCampaignAttachments);
+router.post('/email-campaigns/:id/attachments', uploadCampaignAttachment.single('file'), campaignCtrl.uploadCampaignAttachment);
+router.delete('/email-campaigns/:id/attachments/:attId',            campaignCtrl.deleteCampaignAttachment);
 router.put('/email-campaigns/:id',             campaignCtrl.updateEmailCampaign);
 router.post('/email-campaigns/:id/send',       campaignCtrl.sendEmailCampaign);
 router.post('/email-campaigns/:id/pause',      campaignCtrl.pauseEmailCampaign);

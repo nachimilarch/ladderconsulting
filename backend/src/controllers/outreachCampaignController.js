@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const db = require('../config/db');
 const { getTransporter, getDefaultFrom, getDomain, replaceMergeTags, buildReplyToAddress } = require('../utils/outreachEmail');
 const { logAction } = require('../utils/auditLog');
@@ -218,6 +220,19 @@ async function sendEmailBatch(campaign, contacts, senderUserId) {
     const [[execUser]] = await db.query('SELECT name FROM users WHERE id = ? LIMIT 1', [senderUserId]);
     const executiveName = execUser?.name || '';
 
+    // Load attachments once for the whole campaign send
+    const [attachRows] = await db.query(
+        'SELECT file_name, file_path, mime_type FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL',
+        [campaign.id]
+    );
+    const graphAttachments = attachRows
+        .filter(a => fs.existsSync(a.file_path))
+        .map(a => ({
+            name:         a.file_name,
+            contentType:  a.mime_type,
+            contentBytes: fs.readFileSync(a.file_path).toString('base64'),
+        }));
+
     for (let i = 0; i < contacts.length; i += BATCH_SIZE) {
         // Check pause flag
         const [[freshStatus]] = await db.query(
@@ -230,7 +245,7 @@ async function sendEmailBatch(campaign, contacts, senderUserId) {
 
         const batch = contacts.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(contact => sendOneEmail(
-            transporter, campaign, contact, replyToAddr, domain, executiveName
+            transporter, campaign, contact, replyToAddr, domain, executiveName, graphAttachments
         ).then(async (msgId) => {
             sent++;
             await db.query(
@@ -284,7 +299,7 @@ function extractFirstEmail(raw) {
     return matches?.[0] ?? null;
 }
 
-async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain, executiveName) {
+async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain, executiveName, attachments = []) {
     const toEmail = extractFirstEmail(contact.email);
     if (!toEmail) throw new Error(`No valid email address for contact ${contact.id}: "${contact.email}"`);
 
@@ -294,11 +309,16 @@ async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain,
     const subjectFinal = replaceMergeTags(campaign.subject,      contact, executiveName);
     const bodyFinal    = replaceMergeTags(campaign.message_body, contact, executiveName);
 
+    // Preserve plain-text formatting: if the body has no HTML tags, convert
+    // newlines to <br> so the email client renders line breaks correctly.
+    const hasHtml = /<[a-z][^>]*>/i.test(bodyFinal);
+    const htmlBody = hasHtml ? bodyFinal : bodyFinal.replace(/\r?\n/g, '<br>\n');
+
     await transporter.sendMail({
         from:     `"${campaign.from_name}" <${campaign.from_email}>`,
         to:       toEmail,
         subject:  subjectFinal,
-        html:     bodyFinal,
+        html:     htmlBody,
         messageId: msgId,
         replyTo:  replyToAddr,
         headers: {
@@ -307,6 +327,7 @@ async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain,
             'X-LC-Contact-ID':   String(contact.id),
             'List-Unsubscribe':  `<mailto:${campaign.from_email}?subject=unsubscribe>`,
         },
+        attachments,
     });
     return msgId;
 }
@@ -430,6 +451,87 @@ exports.getFailedLogs = async (req, res) => {
         res.json({ success: true, data: rows });
     } catch (err) {
         console.error('[getFailedLogs]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── Campaign Attachment endpoints ─────────────────────────────────────────────
+
+const ATTACH_MIME = {
+    '.pdf':  'application/pdf',
+    '.jpg':  'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png':  'image/png',
+    '.gif':  'image/gif',
+    '.doc':  'application/msword',
+    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+};
+
+async function getCampOrFail(id, userId, role, res) {
+    const [[camp]] = await db.query(
+        'SELECT id, created_by FROM outreach_campaigns WHERE id = ? AND campaign_type = ? AND deleted_at IS NULL',
+        [id, 'email']
+    );
+    if (!camp) { res.status(404).json({ success: false, message: 'Campaign not found.' }); return null; }
+    if (role === 'hr_staff' && camp.created_by !== userId) {
+        res.status(403).json({ success: false, message: 'Access denied.' }); return null;
+    }
+    return camp;
+}
+
+exports.listCampaignAttachments = async (req, res) => {
+    try {
+        const camp = await getCampOrFail(req.params.id, req.user.id, req.user.role, res);
+        if (!camp) return;
+        const [rows] = await db.query(
+            'SELECT id, file_name, mime_type, file_size, created_at FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL ORDER BY id ASC',
+            [camp.id]
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        console.error('[listCampaignAttachments]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+exports.uploadCampaignAttachment = async (req, res) => {
+    try {
+        const camp = await getCampOrFail(req.params.id, req.user.id, req.user.role, res);
+        if (!camp) return;
+        if (!req.file) return res.status(422).json({ success: false, message: 'No file uploaded.' });
+
+        const ext      = path.extname(req.file.originalname).toLowerCase();
+        const mimeType = ATTACH_MIME[ext] || req.file.mimetype || 'application/octet-stream';
+
+        const [result] = await db.query(
+            'INSERT INTO outreach_campaign_attachments (campaign_id, file_name, file_path, mime_type, file_size) VALUES (?, ?, ?, ?, ?)',
+            [camp.id, req.file.originalname, req.file.path, mimeType, req.file.size]
+        );
+        res.json({ success: true, data: { id: result.insertId, file_name: req.file.originalname, mime_type: mimeType, file_size: req.file.size } });
+    } catch (err) {
+        console.error('[uploadCampaignAttachment]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+exports.deleteCampaignAttachment = async (req, res) => {
+    try {
+        const camp = await getCampOrFail(req.params.id, req.user.id, req.user.role, res);
+        if (!camp) return;
+
+        const [[att]] = await db.query(
+            'SELECT id, file_path FROM outreach_campaign_attachments WHERE id = ? AND campaign_id = ? AND deleted_at IS NULL',
+            [req.params.attId, camp.id]
+        );
+        if (!att) return res.status(404).json({ success: false, message: 'Attachment not found.' });
+
+        await db.query('UPDATE outreach_campaign_attachments SET deleted_at = NOW() WHERE id = ?', [att.id]);
+        // Delete file from disk
+        try { if (fs.existsSync(att.file_path)) fs.unlinkSync(att.file_path); } catch {}
+
+        res.json({ success: true, message: 'Attachment removed.' });
+    } catch (err) {
+        console.error('[deleteCampaignAttachment]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };

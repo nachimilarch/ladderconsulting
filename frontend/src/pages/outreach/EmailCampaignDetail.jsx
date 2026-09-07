@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { emailCampaignAPI, replyAPI } from '../../api/outreach';
@@ -13,6 +13,109 @@ const REPLY_STATUS_COLORS = {
     replied:'bg-blue-100 text-blue-700', converted:'bg-green-100 text-green-700',
     ignored:'bg-red-50 text-red-400',
 };
+
+const FILE_ICON = {
+    'application/pdf': '📄',
+    'image/jpeg': '🖼️',
+    'image/png': '🖼️',
+    'image/gif': '🖼️',
+    'application/msword': '📝',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': '📝',
+};
+
+function AttachmentsPanel({ campaignId, editable }) {
+    const [attachments, setAttachments] = useState([]);
+    const [uploading, setUploading]     = useState(false);
+    const fileInputRef                  = useRef(null);
+
+    const load = () => emailCampaignAPI.attachments(campaignId)
+        .then(r => setAttachments(r.data.data || []))
+        .catch(() => {});
+
+    useEffect(() => { load(); }, [campaignId]);
+
+    const handleFileChange = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        setUploading(true);
+        try {
+            await emailCampaignAPI.uploadAttachment(campaignId, fd);
+            toast.success('Attachment added');
+            load();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Upload failed');
+        } finally {
+            setUploading(false);
+            e.target.value = '';
+        }
+    };
+
+    const handleRemove = async (attId, name) => {
+        if (!confirm(`Remove "${name}"?`)) return;
+        try {
+            await emailCampaignAPI.removeAttachment(campaignId, attId);
+            toast.success('Removed');
+            load();
+        } catch {
+            toast.error('Remove failed');
+        }
+    };
+
+    const formatSize = (bytes) => {
+        if (bytes < 1024) return `${bytes} B`;
+        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+    };
+
+    return (
+        <div className="pt-3 border-t border-gray-50">
+            <div className="flex items-center justify-between mb-2">
+                <p className="text-xs text-gray-400 font-medium">Attachments (sent with every email)</p>
+                {editable && (
+                    <>
+                        <button
+                            type="button"
+                            onClick={() => fileInputRef.current?.click()}
+                            disabled={uploading}
+                            className="text-xs bg-green-50 border border-green-200 text-green-700 px-2.5 py-1 rounded-lg hover:bg-green-100 transition disabled:opacity-50"
+                        >
+                            {uploading ? 'Uploading…' : '+ Add File'}
+                        </button>
+                        <input
+                            ref={fileInputRef}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx"
+                            className="hidden"
+                            onChange={handleFileChange}
+                        />
+                    </>
+                )}
+            </div>
+            {attachments.length === 0 ? (
+                <p className="text-xs text-gray-300 italic">{editable ? 'No attachments yet — click "+ Add File" to attach a PDF or image.' : 'No attachments.'}</p>
+            ) : (
+                <ul className="space-y-1.5">
+                    {attachments.map(a => (
+                        <li key={a.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                            <span className="text-sm">{FILE_ICON[a.mime_type] || '📎'}</span>
+                            <span className="text-xs text-gray-700 flex-1 truncate">{a.file_name}</span>
+                            <span className="text-xs text-gray-400 shrink-0">{formatSize(a.file_size)}</span>
+                            {editable && (
+                                <button
+                                    onClick={() => handleRemove(a.id, a.file_name)}
+                                    className="text-xs text-red-400 hover:text-red-600 ml-1 shrink-0"
+                                    title="Remove"
+                                >✕</button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
+    );
+}
 
 export default function EmailCampaignDetail() {
     const { id }     = useParams();
@@ -131,10 +234,21 @@ export default function EmailCampaignDetail() {
                     {campaign.sent_at && <div><span className="text-xs text-gray-400 mr-2">Sent:</span>{new Date(campaign.sent_at).toLocaleString('en-IN')}</div>}
                     <div className="pt-3 border-t border-gray-50">
                         <p className="text-xs text-gray-400 mb-2">Email Body Preview:</p>
-                        <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto font-mono">
-                            {campaign.message_body}
-                        </div>
+                        {/<[a-z][^>]*>/i.test(campaign.message_body) ? (
+                            <div
+                                className="bg-gray-50 rounded-xl p-4 text-xs text-gray-700 max-h-72 overflow-y-auto"
+                                dangerouslySetInnerHTML={{ __html: campaign.message_body }}
+                            />
+                        ) : (
+                            <div className="bg-gray-50 rounded-xl p-4 text-xs text-gray-700 whitespace-pre-wrap max-h-72 overflow-y-auto">
+                                {campaign.message_body}
+                            </div>
+                        )}
                     </div>
+                    <AttachmentsPanel
+                        campaignId={id}
+                        editable={['draft', 'scheduled', 'paused'].includes(campaign.status)}
+                    />
                 </div>
             )}
 

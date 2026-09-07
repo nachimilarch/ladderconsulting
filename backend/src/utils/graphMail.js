@@ -49,6 +49,7 @@ const sendGraphMail = async ({
     replyTo, headers,
     inReplyTo, references,
     saveToSent = false,
+    attachments = [],
 }) => {
     const token = await getGraphToken();
 
@@ -105,6 +106,15 @@ const sendGraphMail = async ({
         extraHeaders.push({ name: 'X-References', value: refs });
     }
     if (extraHeaders.length > 0) message.internetMessageHeaders = extraHeaders;
+
+    if (attachments.length > 0) {
+        message.attachments = attachments.map(a => ({
+            '@odata.type': '#microsoft.graph.fileAttachment',
+            name:         a.name || a.filename,
+            contentType:  a.contentType,
+            contentBytes: a.contentBytes,
+        }));
+    }
 
     const send = async (tok) => axios.post(
         `https://graph.microsoft.com/v1.0/users/${encodeURIComponent(senderAddr)}/sendMail`,

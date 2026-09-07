@@ -52,4 +52,29 @@ const uploadDocument = multer({
     limits: { fileSize: 10 * 1024 * 1024 },
 });
 
-module.exports = { uploadResume, uploadDocument };
+// ── Campaign attachment uploads (PDF + images, 10MB) ──────────────────────────
+const attachDir = path.join(process.cwd(), 'uploads', 'campaign-attachments');
+if (!fs.existsSync(attachDir)) fs.mkdirSync(attachDir, { recursive: true });
+
+const attachStorage = multer.diskStorage({
+    destination: (req, file, cb) => cb(null, attachDir),
+    filename: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, `att_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`);
+    },
+});
+
+const attachFilter = (req, file, cb) => {
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.doc', '.docx'];
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (allowed.includes(ext)) cb(null, true);
+    else cb(new Error('Only PDF, images (JPG, PNG, GIF), and Word documents are allowed'), false);
+};
+
+const uploadCampaignAttachment = multer({
+    storage: attachStorage,
+    fileFilter: attachFilter,
+    limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+module.exports = { uploadResume, uploadDocument, uploadCampaignAttachment };

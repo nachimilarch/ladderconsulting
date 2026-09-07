@@ -15,14 +15,17 @@ export const emailTemplateAPI = {
 };
 
 export const emailCampaignAPI = {
-    create:     (data)     => api.post('/outreach/email-campaigns', data),
-    getAll:     (params)   => api.get('/outreach/email-campaigns', { params }),
-    getOne:     (id)       => api.get(`/outreach/email-campaigns/${id}`),
-    update:     (id, data) => api.put(`/outreach/email-campaigns/${id}`, data),
-    send:       (id)       => api.post(`/outreach/email-campaigns/${id}/send`),
-    pause:      (id)       => api.post(`/outreach/email-campaigns/${id}/pause`),
-    remove:     (id)       => api.delete(`/outreach/email-campaigns/${id}`),
-    failedLogs: (id)       => api.get(`/outreach/email-campaigns/${id}/failed`),
+    create:           (data)         => api.post('/outreach/email-campaigns', data),
+    getAll:           (params)       => api.get('/outreach/email-campaigns', { params }),
+    getOne:           (id)           => api.get(`/outreach/email-campaigns/${id}`),
+    update:           (id, data)     => api.put(`/outreach/email-campaigns/${id}`, data),
+    send:             (id)           => api.post(`/outreach/email-campaigns/${id}/send`),
+    pause:            (id)           => api.post(`/outreach/email-campaigns/${id}/pause`),
+    remove:           (id)           => api.delete(`/outreach/email-campaigns/${id}`),
+    failedLogs:       (id)           => api.get(`/outreach/email-campaigns/${id}/failed`),
+    attachments:      (id)           => api.get(`/outreach/email-campaigns/${id}/attachments`),
+    uploadAttachment: (id, formData) => api.post(`/outreach/email-campaigns/${id}/attachments`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
+    removeAttachment: (id, attId)    => api.delete(`/outreach/email-campaigns/${id}/attachments/${attId}`),
 };
 
 export const replyAPI = {
