@@ -3,6 +3,54 @@ import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { contactListAPI } from '../../api/outreach';
 
+function ImportErrors({ list }) {
+    const [open, setOpen] = useState(false);
+    if (!list || !list.failed_rows || list.failed_rows === 0) return null;
+
+    let errors = [];
+    try {
+        errors = list.import_errors ? JSON.parse(list.import_errors) : [];
+    } catch {
+        errors = [];
+    }
+
+    return (
+        <div className="mb-6 bg-red-50 border border-red-100 rounded-2xl overflow-hidden">
+            <button
+                onClick={() => setOpen(o => !o)}
+                className="w-full flex items-center justify-between px-5 py-3 text-sm font-medium text-red-700 hover:bg-red-100 transition"
+            >
+                <span>{list.failed_rows} row{list.failed_rows !== 1 ? 's' : ''} skipped during import</span>
+                <span className="text-xs text-red-400">{open ? '▲ Hide' : '▼ Show details'}</span>
+            </button>
+            {open && (
+                errors.length === 0 ? (
+                    <p className="px-5 py-4 text-sm text-red-500">No detailed error information available.</p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-xs">
+                            <thead className="bg-red-100 text-red-600 uppercase tracking-wide">
+                                <tr>
+                                    <th className="px-4 py-2 text-left w-20">Row #</th>
+                                    <th className="px-4 py-2 text-left">Reason</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-red-50">
+                                {errors.map((e, i) => (
+                                    <tr key={i} className="hover:bg-red-50">
+                                        <td className="px-4 py-2 font-mono text-red-500">{e.row}</td>
+                                        <td className="px-4 py-2 text-red-700">{e.reason}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )
+            )}
+        </div>
+    );
+}
+
 export default function ContactListDetail() {
     const { id } = useParams();
     const [list, setList]       = useState(null);
@@ -54,12 +102,18 @@ export default function ContactListDetail() {
             </div>
 
             {list && (
-                <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-6 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div><p className="text-xs text-gray-400">Total Contacts</p><p className="font-bold text-gray-800">{list.imported_contacts}</p></div>
-                    <div><p className="text-xs text-gray-400">Failed Rows</p><p className="font-bold text-gray-800">{list.failed_rows}</p></div>
-                    <div><p className="text-xs text-gray-400">Status</p><p className="font-bold text-gray-800 capitalize">{list.import_status}</p></div>
-                    <div><p className="text-xs text-gray-400">File</p><p className="font-bold text-gray-800 truncate">{list.file_name || '—'}</p></div>
-                </div>
+                <>
+                    <div className="bg-white rounded-2xl border border-gray-100 p-5 mb-4 shadow-sm grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div><p className="text-xs text-gray-400">Total Contacts</p><p className="font-bold text-gray-800">{list.imported_contacts}</p></div>
+                        <div>
+                            <p className="text-xs text-gray-400">Failed Rows</p>
+                            <p className={`font-bold ${list.failed_rows > 0 ? 'text-red-600' : 'text-gray-800'}`}>{list.failed_rows}</p>
+                        </div>
+                        <div><p className="text-xs text-gray-400">Status</p><p className="font-bold text-gray-800 capitalize">{list.import_status}</p></div>
+                        <div><p className="text-xs text-gray-400">File</p><p className="font-bold text-gray-800 truncate">{list.file_name || '—'}</p></div>
+                    </div>
+                    <ImportErrors list={list} />
+                </>
             )}
 
             <form onSubmit={handleSearch} className="flex gap-3 mb-4">
