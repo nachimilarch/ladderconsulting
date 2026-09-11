@@ -51,19 +51,8 @@ export const companyRequestAPI = {
 };
 
 export const talentPoolAPI = {
-    list:            (params)           => api.get('/companies/talent', { params }),
-    expressInterest: (candidateId, data) => api.post(`/companies/talent/${candidateId}/interest`, data),
-
-    unlockStatus: (candidateIds = [])   => api.get('/companies/talent/unlock-status', { params: candidateIds.length ? { candidateIds: candidateIds.join(',') } : {} }),
-    unlock:       (candidateId, tier)   => api.post(`/companies/talent/${candidateId}/unlock`, tier ? { tier } : {}),
-    fullProfile:    (candidateId)         => api.get(`/companies/talent/${candidateId}/profile`),
-    previewProfile: (candidateId)         => api.get(`/companies/talent/${candidateId}/preview`),
-    downloadResume: (candidateId)         => api.get(`/companies/talent/${candidateId}/resume`, { responseType: 'blob' }),
-    applyToPipeline: (candidateId, jobId) => api.post(`/companies/talent/${candidateId}/apply`, { job_id: jobId }),
-    requestProfileUnlock: (candidateId, data) => api.post(`/companies/talent/${candidateId}/profile-unlock-request`, data),
-
-    packageStatus:   ()                 => api.get('/companies/package-status'),
-    buyPack:         (tier = 'pack_4')   => api.post('/companies/talent/buy-pack', { tier }),
-    requestPlatinum: (note)             => api.post('/companies/platinum-request', note ? { note } : {}),
-    requestPackage:  (tier, note)       => api.post('/companies/package-request', { tier, ...(note ? { note } : {}) }),
+    list:             (params)            => api.get('/companies/talent', { params }),
+    expressInterest:  (candidateId, data) => api.post(`/companies/talent/${candidateId}/interest`, data),
+    activationStatus: ()                  => api.get('/companies/activation-status'),
+    payListingFee:    ()                  => api.post('/companies/pay-listing-fee'),
 };

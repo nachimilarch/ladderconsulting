@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { companyJobAPI } from '../../api/company';
 
 const STATUS_COLORS = {
@@ -63,7 +64,12 @@ export default function JobPostings() {
             setShowModal(false);
             load();
         } catch (err) {
-            setError(err.response?.data?.message || 'Failed to save job.');
+            const code = err.response?.data?.code;
+            if (code === 'ACTIVATION_REQUIRED') {
+                setError('Your account needs to be activated before posting jobs. Go to Talent Pool to pay the one-time ₹3,999 listing fee.');
+            } else {
+                setError(err.response?.data?.message || 'Failed to save job.');
+            }
         } finally {
             setSaving(false);
         }

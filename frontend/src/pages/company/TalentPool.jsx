@@ -1,6 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { talentPoolAPI, companyJobAPI } from '../../api/company';
-import PackagePicker from '../../components/company/PackagePicker';
 import toast from 'react-hot-toast';
 
 const EXP_RANGES = [
@@ -25,22 +24,13 @@ function SkillChip({ label }) {
 
 const SCORE_COLOR_CLS = (s) => s >= 70 ? 'text-green-700 bg-green-50 border-green-200' : s >= 40 ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-600 bg-red-50 border-red-200';
 
-function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, onPreview, onDownload, downloading, onMoveToPipeline, isPlatinum }) {
+function CandidateCard({ cand, activated, onInterest }) {
     const skills = Array.isArray(cand.skills) ? cand.skills.filter(Boolean) : [];
     const shown = skills.slice(0, 5);
     const extra = skills.length - shown.length;
-    const unlocked = !!unlockInfo?.unlocked;
-    const via = unlockInfo?.via;
-    const approvalStatus = unlockInfo?.approval_status;
-    // platinum_approved: exec approved full access
-    const isPlatinumApproved = unlocked && via === 'platinum_approved';
-    // In pipeline, awaiting exec approval of profile unlock request
-    const isPlatinumInPipeline = !isPlatinumApproved && (approvalStatus === 'pending' || approvalStatus === 'in_progress');
-    // Prepaid (single or pack) unlock — full contact info revealed
-    const isPaidUnlock = unlocked && (via === 'single' || via === 'pack');
 
     return (
-        <div className={`bg-white rounded-2xl border shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow ${isPlatinumApproved || isPaidUnlock ? 'border-green-200' : isPlatinumInPipeline ? 'border-yellow-200' : 'border-gray-100'}`}>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -67,25 +57,17 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                             {parseFloat(cand.total_experience).toFixed(1)} yrs
                         </span>
                     )}
-                    {unlocked && (
-                        <span className="text-[10px] font-medium text-green-700 bg-green-50 px-2 py-0.5 rounded-full">
-                            🔓 Unlocked
-                        </span>
-                    )}
                 </div>
             </div>
 
-            {/* Headline */}
             {cand.headline && (
                 <p className="text-xs font-medium text-gray-700 leading-snug">{cand.headline}</p>
             )}
 
-            {/* Summary excerpt */}
             {cand.summary && (
                 <p className="text-xs text-gray-500 leading-relaxed line-clamp-2">{cand.summary}</p>
             )}
 
-            {/* Skills */}
             {shown.length > 0 && (
                 <div className="flex flex-wrap gap-1">
                     {shown.map(s => <SkillChip key={s} label={s} />)}
@@ -95,7 +77,6 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                 </div>
             )}
 
-            {/* Footer */}
             <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50 gap-2">
                 <div className="flex gap-3 text-[11px] text-gray-400">
                     {cand.notice_period_days != null && cand.notice_period_days > 0 && (
@@ -105,66 +86,31 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
                         <span>{fmtINR(cand.expected_salary)}/yr</span>
                     )}
                 </div>
-                <div className="flex gap-2 shrink-0 flex-wrap justify-end">
-                    {isPlatinumApproved ? (
-                        // Exec approved full access
+                <div className="flex gap-2 shrink-0">
+                    {activated ? (
                         <>
-                            <button onClick={() => onViewProfile(cand)} className="text-xs border border-indigo-200 text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
-                                Full Profile
-                            </button>
-                            <button onClick={() => onDownload(cand)} disabled={downloading === cand.candidate_id} className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium">
-                                {downloading === cand.candidate_id ? '…' : 'Resume'}
-                            </button>
-                            <button onClick={() => onMoveToPipeline(cand)} className="text-xs border border-green-200 text-green-700 px-2.5 py-1.5 rounded-lg hover:bg-green-50 transition font-medium whitespace-nowrap">
-                                → Pipeline
-                            </button>
-                        </>
-                    ) : isPlatinumInPipeline ? (
-                        // Platinum — shortlisted & unlock request submitted, awaiting exec approval
-                        <>
-                            <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
-                                Preview
-                            </button>
-                            <span className="text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-200 px-2.5 py-1.5 rounded-lg whitespace-nowrap">
-                                ⏳ Pending Approval
-                            </span>
-                        </>
-                    ) : isPaidUnlock ? (
-                        // Single / 4-Pack paid unlock
-                        <>
-                            <button onClick={() => onViewProfile(cand)} className="text-xs border border-indigo-200 text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
-                                Full Profile
-                            </button>
-                            <button onClick={() => onDownload(cand)} disabled={downloading === cand.candidate_id} title="Original resume file" className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition font-medium">
-                                {downloading === cand.candidate_id ? '…' : 'Resume'}
-                            </button>
-                            <button onClick={() => onMoveToPipeline(cand)} className="text-xs border border-green-200 text-green-700 px-2.5 py-1.5 rounded-lg hover:bg-green-50 transition font-medium whitespace-nowrap">
-                                → Pipeline
-                            </button>
-                        </>
-                    ) : isPlatinum ? (
-                        // Platinum company — not yet shortlisted; one button does both
-                        <>
-                            <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
-                                Preview
-                            </button>
-                            <button onClick={() => onMoveToPipeline(cand)} className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 transition font-medium whitespace-nowrap">
-                                Shortlist &amp; Unlock
+                            {activated && cand.candidate_email && (
+                                <a
+                                    href={`mailto:${cand.candidate_email}`}
+                                    className="text-xs border border-indigo-200 text-indigo-700 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium"
+                                >
+                                    Contact
+                                </a>
+                            )}
+                            <button
+                                onClick={() => onInterest(cand)}
+                                className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 transition font-medium whitespace-nowrap"
+                            >
+                                → Add to Pipeline
                             </button>
                         </>
                     ) : (
-                        // Non-platinum, not unlocked
-                        <>
-                            <button onClick={() => onPreview(cand)} className="text-xs border border-indigo-200 text-indigo-600 px-2.5 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium">
-                                Preview
-                            </button>
-                            <button onClick={() => onInterest(cand)} className="text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium">
-                                Interest
-                            </button>
-                            <button onClick={() => onUnlock(cand)} className="text-xs bg-indigo-600 text-white px-2.5 py-1.5 rounded-lg hover:bg-indigo-700 transition font-medium whitespace-nowrap">
-                                🔓 Unlock
-                            </button>
-                        </>
+                        <button
+                            onClick={() => onInterest(cand)}
+                            className="text-xs border border-gray-200 text-gray-600 px-2.5 py-1.5 rounded-lg hover:bg-gray-50 transition font-medium"
+                        >
+                            Express Interest
+                        </button>
                     )}
                 </div>
             </div>
@@ -172,187 +118,28 @@ function CandidateCard({ cand, onInterest, unlockInfo, onUnlock, onViewProfile, 
     );
 }
 
-// ── Package request modal (shown when company has no credits/platinum) ────────
-function PackageRequestModal({ onClose, hasPackage }) {
-    const isTopUp = hasPackage; // already bought before, just out of credits
+// ── Payment wall shown when account is not yet activated ──────────────────────
+function ActivationWall({ onPay, paying }) {
     return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg p-6">
-                <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-semibold text-gray-900">
-                        {isTopUp ? 'Top Up Resume Credits' : 'Request a Resume Unlock Package'}
-                    </h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
-                </div>
-                <p className="text-sm text-gray-500 mb-5">
-                    {isTopUp
-                        ? 'You have no unlock credits remaining. Top up with a Single credit or another 5-Pack, or upgrade to Platinum for unlimited unlocks.'
-                        : 'Start with the 5-Resume Pack to access full candidate profiles and downloadable resumes. Platinum gives you unlimited access with a fee only at hire.'}
-                </p>
-                <PackagePicker
-                    title={isTopUp ? 'Top Up Credits' : 'Get Started'}
-                />
-            </div>
-        </div>
-    );
-}
-
-// ── Full unlocked profile detail ──────────────────────────────────────────────
-function FullProfileModal({ candidateId, candidateName, onClose }) {
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        talentPoolAPI.fullProfile(candidateId)
-            .then(r => setProfile(r.data?.data || null))
-            .catch(() => toast.error('Failed to load full profile.'))
-            .finally(() => setLoading(false));
-    }, [candidateId]);
-
-    const education = (() => {
-        try { return Array.isArray(profile?.education) ? profile.education : JSON.parse(profile?.education || '[]'); }
-        catch { return []; }
-    })();
-
-    return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h2 className="font-semibold text-gray-900">{candidateName}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
-                </div>
-
-                {loading ? (
-                    <p className="text-sm text-gray-400 py-8 text-center">Loading…</p>
-                ) : !profile ? (
-                    <p className="text-sm text-gray-400 py-8 text-center">Could not load profile.</p>
-                ) : (
-                    <div className="flex flex-col gap-4">
-                        {profile.headline && <p className="text-sm font-medium text-gray-700">{profile.headline}</p>}
-                        {profile.summary && <p className="text-sm text-gray-600 leading-relaxed">{profile.summary}</p>}
-
-                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
-                            {profile.total_experience != null && <span>💼 {parseFloat(profile.total_experience).toFixed(1)} yrs experience</span>}
-                            {profile.current_location && <span>📍 {profile.current_location}</span>}
-                            {profile.notice_period_days != null && <span>🕐 {profile.notice_period_days}d notice period</span>}
-                            {profile.expected_salary && <span>💰 {fmtINR(profile.expected_salary)}/yr expected</span>}
-                            {profile.linkedin_url && <a href={profile.linkedin_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">LinkedIn ↗</a>}
-                            {profile.portfolio_url && <a href={profile.portfolio_url} target="_blank" rel="noreferrer" className="text-indigo-600 hover:underline">Portfolio ↗</a>}
-                        </div>
-
-                        {profile.skills?.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Skills</h3>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {profile.skills.map(s => (
-                                        <span key={s.name} className="bg-indigo-50 text-indigo-700 text-[11px] px-2 py-1 rounded-full border border-indigo-100">
-                                            {s.name}{s.years_exp ? ` · ${s.years_exp}y` : ''}{s.proficiency ? ` · ${s.proficiency}` : ''}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {education.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Education</h3>
-                                <div className="flex flex-col gap-2">
-                                    {education.map((e, i) => (
-                                        <div key={i} className="text-sm text-gray-700">
-                                            <p className="font-medium">{e.degree}{e.field ? ` in ${e.field}` : ''}</p>
-                                            <p className="text-xs text-gray-400">{e.institution}{e.end_year ? ` · ${e.end_year}` : ''}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-}
-
-// ── Masked preview for non-unlocked candidates ────────────────────────────────
-function PreviewProfileModal({ candidateId, onClose }) {
-    const [profile, setProfile] = useState(null);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
-        talentPoolAPI.previewProfile(candidateId)
-            .then(r => setProfile(r.data?.data || null))
-            .catch(() => toast.error('Failed to load profile.'))
-            .finally(() => setLoading(false));
-    }, [candidateId]);
-
-    const education = (() => {
-        try { return Array.isArray(profile?.education) ? profile.education : JSON.parse(profile?.education || '[]'); }
-        catch { return []; }
-    })();
-
-    return (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg max-h-[85vh] overflow-y-auto">
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 sticky top-0 bg-white">
-                    <div>
-                        <h2 className="font-semibold text-gray-900">
-                            {loading ? 'Loading…' : profile?.candidate_name || 'Candidate Profile'}
-                        </h2>
-                        <p className="text-xs text-gray-400 mt-0.5">🔒 Contact details hidden — unlock to reveal</p>
-                    </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
-                </div>
-
-                {loading ? (
-                    <p className="text-sm text-gray-400 py-12 text-center">Loading…</p>
-                ) : !profile ? (
-                    <p className="text-sm text-gray-400 py-12 text-center">Could not load profile.</p>
-                ) : (
-                    <div className="px-6 py-4 flex flex-col gap-5">
-                        {profile.headline && <p className="text-sm font-medium text-gray-700">{profile.headline}</p>}
-                        {profile.summary  && <p className="text-sm text-gray-600 leading-relaxed">{profile.summary}</p>}
-
-                        <div className="grid grid-cols-2 gap-2 text-xs text-gray-500">
-                            {profile.total_experience != null && <span>💼 {parseFloat(profile.total_experience).toFixed(1)} yrs experience</span>}
-                            {profile.current_location && <span>📍 {profile.current_location}</span>}
-                            {profile.notice_period_days != null && <span>🕐 {profile.notice_period_days}d notice</span>}
-                            {profile.expected_salary && <span>💰 {fmtINR(profile.expected_salary)}/yr expected</span>}
-                        </div>
-
-                        {profile.skills?.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Skills</h3>
-                                <div className="flex flex-wrap gap-1.5">
-                                    {profile.skills.map(s => (
-                                        <span key={s.name} className="bg-indigo-50 text-indigo-700 text-[11px] px-2 py-1 rounded-full border border-indigo-100 capitalize">
-                                            {s.name}{s.years_exp ? ` · ${s.years_exp}y` : ''}
-                                        </span>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {education.length > 0 && (
-                            <div>
-                                <h3 className="text-xs font-semibold text-gray-500 uppercase mb-2">Education</h3>
-                                <div className="flex flex-col gap-2">
-                                    {education.map((e, i) => (
-                                        <div key={i} className="text-sm text-gray-700">
-                                            <p className="font-medium">{e.degree}{e.field ? ` in ${e.field}` : ''}</p>
-                                            <p className="text-xs text-gray-400">{e.institution}{e.end_year ? ` · ${e.end_year}` : ''}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 text-xs text-amber-700">
-                            <p className="font-semibold mb-1">Contact details are hidden</p>
-                            <p>Unlock this candidate (Single credit or 4-Pack) to see their name, email, phone, and download their resume — or express interest and your LadderStep executive will facilitate an introduction.</p>
-                        </div>
-                    </div>
-                )}
-            </div>
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-8 text-center max-w-lg mx-auto mt-10">
+            <div className="text-5xl mb-4">🔒</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Activate Your Hiring Account</h2>
+            <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                Pay a one-time listing fee of <strong>₹3,999</strong> to unlock full access:
+            </p>
+            <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 max-w-xs mx-auto">
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Post job descriptions and upload JDs</li>
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Search all candidates — full unmasked profiles</li>
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Shortlist and contact candidates directly</li>
+            </ul>
+            <p className="text-xs text-gray-400 mb-5">One-time fee · No recurring charges</p>
+            <button
+                onClick={onPay}
+                disabled={paying}
+                className="bg-indigo-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition text-sm"
+            >
+                {paying ? 'Processing…' : 'Pay ₹3,999 & Activate'}
+            </button>
         </div>
     );
 }
@@ -362,49 +149,28 @@ export default function TalentPool() {
     const [total, setTotal] = useState(0);
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
+    const [activated, setActivated] = useState(false);
+    const [activationChecked, setActivationChecked] = useState(false);
+    const [paying, setPaying] = useState(false);
 
     const [search, setSearch] = useState('');
     const [skill, setSkill] = useState('');
-    const [expRange, setExpRange] = useState(0); // index into EXP_RANGES
+    const [expRange, setExpRange] = useState(0);
     const searchTimer = useRef(null);
 
     const [jobs, setJobs] = useState([]);
-    const [modal, setModal] = useState(null); // candidate object
+    const [modal, setModal] = useState(null);
     const [selectedJob, setSelectedJob] = useState('');
     const [notes, setNotes] = useState('');
     const [submitting, setSubmitting] = useState(false);
-
-    // Unlock state
-    const [unlockMap, setUnlockMap] = useState({}); // candidateId -> { unlocked, via }
-    const [platinum, setPlatinum] = useState(false);
-    const [packCredits, setPackCredits] = useState(0);
-    const [pkgRequestModal, setPkgRequestModal] = useState(false); // request-a-package modal
-    const [profileModal, setProfileModal] = useState(null); // candidate object (full profile view)
-    const [downloading, setDownloading] = useState(null); // candidateId while downloading
-    const [hasPackage, setHasPackage] = useState(false); // banner only — browsing is always allowed
-
-    // Preview profile modal (non-unlocked candidates)
-    const [previewModal, setPreviewModal] = useState(null); // candidate object
-
-    // Move-to-pipeline (paid-unlock candidates only)
-    const [pipelineModal, setPipelineModal] = useState(null); // candidate object
-    const [pipelineJob, setPipelineJob] = useState('');
-    const [applyingToPipeline, setApplyingToPipeline] = useState(false);
-
-    // "Match against this JD" — show a live fit % per candidate for a chosen job
     const [matchJob, setMatchJob] = useState('');
     const matchJobRef = useRef('');
 
-    const fetchUnlockStatus = useCallback((rows) => {
-        const ids = rows.map(c => c.candidate_id).filter(Boolean);
-        if (!ids.length) return;
-        talentPoolAPI.unlockStatus(ids)
-            .then(r => {
-                setPlatinum(!!r.data?.platinum);
-                setPackCredits(r.data?.pack_credits_remaining || 0);
-                setUnlockMap(prev => ({ ...prev, ...(r.data?.statuses || {}) }));
-            })
-            .catch(() => {});
+    useEffect(() => {
+        talentPoolAPI.activationStatus()
+            .then(r => setActivated(!!r.data?.activated))
+            .catch(() => {})
+            .finally(() => setActivationChecked(true));
     }, []);
 
     const fetchCandidates = useCallback(async (p = 1, s = search, sk = skill, exp = expRange) => {
@@ -419,12 +185,10 @@ export default function TalentPool() {
                 ...(range.max !== '' ? { experience_max: range.max } : {}),
                 ...(matchJobRef.current ? { jobId: matchJobRef.current } : {}),
             });
-            const rows = data?.data || [];
-            setCandidates(rows);
+            setCandidates(data?.data || []);
             setTotal(data?.total || 0);
-            setHasPackage(!!data?.has_package);
-            fetchUnlockStatus(rows);
-        } catch (err) {
+            if (data?.activated !== undefined) setActivated(!!data.activated);
+        } catch {
             toast.error('Failed to load talent pool.');
         } finally {
             setLoading(false);
@@ -441,6 +205,25 @@ export default function TalentPool() {
             })
             .catch(() => {});
     }, []);
+
+    const handlePay = async () => {
+        setPaying(true);
+        try {
+            const { data } = await talentPoolAPI.payListingFee();
+            if (data?.payment_session_id) {
+                if (window.Cashfree) {
+                    const cf = new window.Cashfree({ mode: 'production' });
+                    cf.checkout({ paymentSessionId: data.payment_session_id });
+                } else {
+                    toast.error('Payment widget not loaded. Please refresh and try again.');
+                }
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
+        } finally {
+            setPaying(false);
+        }
+    };
 
     const handleSearchChange = (val) => {
         setSearch(val);
@@ -496,117 +279,33 @@ export default function TalentPool() {
         }
     };
 
-    // ── Unlock handlers ───────────────────────────────────────────────────────
-    const applyUnlock = (candidateId, via) => {
-        setUnlockMap(prev => ({ ...prev, [candidateId]: { unlocked: true, via } }));
-        if (via === 'pack') setPackCredits(c => Math.max(0, c - 1));
-    };
-
-    const handleUnlockClick = async (cand) => {
-        // Platinum or a spare pack credit → instant free grant, no modal needed.
-        if (platinum || packCredits > 0) {
-            try {
-                const { data } = await talentPoolAPI.unlock(cand.candidate_id);
-                if (data?.unlocked) {
-                    applyUnlock(cand.candidate_id, data.via);
-                    toast.success(data.via === 'platinum' ? 'Unlocked under your Platinum agreement.' : 'Unlocked using a pack credit.');
-                }
-            } catch (err) {
-                toast.error(err.response?.data?.message || 'Failed to unlock.');
-            }
-            return;
-        }
-        // No package yet — show request modal (request flow, no payment gateway needed).
-        setPkgRequestModal(true);
-    };
-
-    const handleViewProfile   = (cand) => setProfileModal(cand);
-    const handlePreviewProfile = (cand) => setPreviewModal(cand);
-
-    const handleDownloadResume = async (cand) => {
-        setDownloading(cand.candidate_id);
-        try {
-            const res = await talentPoolAPI.downloadResume(cand.candidate_id);
-            const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
-            const link = document.createElement('a');
-            link.href = url;
-            link.setAttribute('download', `${cand.candidate_name.replace(/\s+/g, '_')}_resume.pdf`);
-            document.body.appendChild(link);
-            link.click();
-            link.remove();
-            window.URL.revokeObjectURL(url);
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to download resume.');
-        } finally {
-            setDownloading(null);
-        }
-    };
-
-    const openPipelineModal = (cand) => { setPipelineModal(cand); setPipelineJob(''); };
-
-    const handleApplyToPipeline = async (e) => {
-        e.preventDefault();
-        if (!pipelineModal || !pipelineJob) return;
-        setApplyingToPipeline(true);
-        try {
-            const { data } = await talentPoolAPI.applyToPipeline(pipelineModal.candidate_id, pipelineJob);
-            const applicationId = data?.application_id;
-
-            if (platinum && applicationId) {
-                // Immediately submit profile unlock request — exec will approve to reveal full contact info
-                try {
-                    await talentPoolAPI.requestProfileUnlock(pipelineModal.candidate_id, { application_id: applicationId });
-                } catch (unlockErr) {
-                    // If duplicate request, that's fine — still show pending state
-                    if (!unlockErr.response?.data?.message?.toLowerCase().includes('already')) {
-                        console.warn('[requestProfileUnlock]', unlockErr.response?.data?.message);
-                    }
-                }
-                setUnlockMap(prev => ({
-                    ...prev,
-                    [pipelineModal.candidate_id]: { unlocked: false, via: null, requires_approval: true, approval_status: 'pending' },
-                }));
-                toast.success('Candidate shortlisted — profile access request sent to your executive for approval.');
-            } else {
-                toast.success(data?.message || 'Candidate added to your pipeline.');
-            }
-
-            setPipelineModal(null);
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to add candidate to pipeline.');
-        } finally {
-            setApplyingToPipeline(false);
-        }
-    };
-
     const totalPages = Math.ceil(total / 24);
+
+    if (!activationChecked) {
+        return <div className="flex items-center justify-center h-48 text-gray-400 text-sm">Loading…</div>;
+    }
 
     return (
         <div className="max-w-6xl mx-auto">
             {/* Header */}
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-900">Talent Pool</h1>
-                    <p className="text-sm text-gray-500 mt-0.5">
+                <p className="text-sm text-gray-500 mt-0.5">
                     Browse {total > 0 ? `${total} available` : 'available'} candidates sourced by LadderStep Human Consulting.
-                    Unlock a candidate to view full contact details and download their resume.
+                    {activated
+                        ? ' Full profiles and contact details are visible.'
+                        : ' Activate your account to view full profiles.'}
                 </p>
-                {platinum ? (
+                {activated && (
                     <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
-                        ⭐ Platinum — unlimited free resume unlocks
+                        ✓ Account Activated
                     </span>
-                ) : packCredits > 0 ? (
-                    <span className="inline-block mt-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-100 px-2.5 py-1 rounded-full">
-                        🔓 {packCredits} unlock credit{packCredits !== 1 ? 's' : ''} remaining
-                    </span>
-                ) : !hasPackage ? (
-                    <span className="inline-block mt-2 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-100 px-2.5 py-1 rounded-full cursor-pointer hover:bg-amber-100 transition" onClick={() => setPkgRequestModal(true)}>
-                        🔒 Request a package to unlock candidates →
-                    </span>
-                ) : null}
+                )}
             </div>
 
-            <>
-            {/* Filters */}
+            {!activated && <ActivationWall onPay={handlePay} paying={paying} />}
+
+            {/* Filters — always shown so companies can browse masked cards */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-end">
                 <div className="flex-1 min-w-[200px]">
                     <label className="block text-xs text-gray-500 mb-1 font-medium">Search</label>
@@ -640,17 +339,19 @@ export default function TalentPool() {
                         ))}
                     </select>
                 </div>
-                <div className="min-w-[190px]">
-                    <label className="block text-xs text-gray-500 mb-1 font-medium">🎯 Match against job</label>
-                    <select
-                        value={matchJob}
-                        onChange={e => handleMatchJobChange(e.target.value)}
-                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
-                    >
-                        <option value="">— No match scoring —</option>
-                        {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
-                    </select>
-                </div>
+                {activated && (
+                    <div className="min-w-[190px]">
+                        <label className="block text-xs text-gray-500 mb-1 font-medium">🎯 Match against job</label>
+                        <select
+                            value={matchJob}
+                            onChange={e => handleMatchJobChange(e.target.value)}
+                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 bg-white"
+                        >
+                            <option value="">— No match scoring —</option>
+                            {jobs.map(j => <option key={j.id} value={j.id}>{j.title}</option>)}
+                        </select>
+                    </div>
+                )}
                 <button
                     onClick={() => { setSearch(''); setSkill(''); setExpRange(0); setMatchJob(''); matchJobRef.current = ''; setPage(1); fetchCandidates(1, '', '', 0); }}
                     className="text-xs text-gray-400 hover:text-gray-600 px-3 py-2 rounded-xl border border-gray-200 hover:bg-gray-50"
@@ -658,9 +359,10 @@ export default function TalentPool() {
                     Clear
                 </button>
             </div>
-            {matchJob && (
+
+            {matchJob && activated && (
                 <p className="text-xs text-indigo-500 -mt-4 mb-4">
-                    Showing each candidate's live <b>% match</b> against <b>{jobs.find(j => String(j.id) === String(matchJob))?.title}</b>. Candidates with no parsed skills yet won't show a score.
+                    Showing each candidate's live <b>% match</b> against <b>{jobs.find(j => String(j.id) === String(matchJob))?.title}</b>.
                 </p>
             )}
 
@@ -681,20 +383,12 @@ export default function TalentPool() {
                             <CandidateCard
                                 key={c.candidate_id}
                                 cand={c}
+                                activated={activated}
                                 onInterest={openModal}
-                                unlockInfo={unlockMap[c.candidate_id]}
-                                onUnlock={handleUnlockClick}
-                                onViewProfile={handleViewProfile}
-                                onPreview={handlePreviewProfile}
-                                onDownload={handleDownloadResume}
-                                downloading={downloading}
-                                onMoveToPipeline={openPipelineModal}
-                                isPlatinum={platinum}
                             />
                         ))}
                     </div>
 
-                    {/* Pagination */}
                     {totalPages > 1 && (
                         <div className="flex justify-center gap-2">
                             {Array.from({ length: totalPages }, (_, i) => i + 1).map(p => (
@@ -714,29 +408,33 @@ export default function TalentPool() {
                     )}
                 </>
             )}
-            </>
 
-            {/* Interest modal */}
+            {/* Interest / pipeline modal */}
             {modal && (
                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
                     <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <h2 className="font-semibold text-gray-900 mb-1">Express Interest</h2>
+                        <h2 className="font-semibold text-gray-900 mb-1">
+                            {activated ? 'Add to Pipeline' : 'Express Interest'}
+                        </h2>
                         <p className="text-sm text-gray-500 mb-4">
-                            Your executive will contact <strong>{modal.candidate_name}</strong> and facilitate the introduction.
+                            {activated
+                                ? `Link ${modal.candidate_name} to one of your open positions.`
+                                : `Your executive will contact ${modal.candidate_name} and facilitate the introduction.`}
                         </p>
 
                         <form onSubmit={handleSubmitInterest} className="flex flex-col gap-4">
                             {jobs.length > 0 && (
                                 <div>
                                     <label className="block text-xs font-medium text-gray-600 mb-1">
-                                        Link to Job Opening (optional)
+                                        Link to Job Opening {activated ? '(required)' : '(optional)'}
                                     </label>
                                     <select
                                         value={selectedJob}
                                         onChange={e => setSelectedJob(e.target.value)}
                                         className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
+                                        required={activated}
                                     >
-                                        <option value="">— Not linked to a specific job —</option>
+                                        <option value="">— {activated ? 'Select a job' : 'Not linked to a specific job'} —</option>
                                         {jobs.map(j => (
                                             <option key={j.id} value={j.id}>{j.title}</option>
                                         ))}
@@ -745,20 +443,22 @@ export default function TalentPool() {
                             )}
                             <div>
                                 <label className="block text-xs font-medium text-gray-600 mb-1">
-                                    Notes for your executive (optional)
+                                    Notes (optional)
                                 </label>
                                 <textarea
                                     rows={3}
                                     value={notes}
                                     onChange={e => setNotes(e.target.value)}
-                                    placeholder="Any specific requirements, urgency, or context…"
+                                    placeholder="Any specific requirements or context…"
                                     className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                                 />
                             </div>
 
-                            <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700 border border-indigo-100">
-                                Candidate contact details are not shared directly. Your assigned LadderStep Human Consulting executive will co-ordinate the next steps.
-                            </div>
+                            {!activated && (
+                                <div className="bg-indigo-50 rounded-xl p-3 text-xs text-indigo-700 border border-indigo-100">
+                                    Candidate contact details are not shared directly. Your assigned LadderStep Human Consulting executive will co-ordinate the next steps.
+                                </div>
+                            )}
 
                             <div className="flex gap-3">
                                 <button
@@ -766,87 +466,12 @@ export default function TalentPool() {
                                     disabled={submitting}
                                     className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 transition"
                                 >
-                                    {submitting ? 'Submitting…' : 'Submit Interest'}
+                                    {submitting ? 'Submitting…' : activated ? 'Add to Pipeline' : 'Submit Interest'}
                                 </button>
                                 <button
                                     type="button"
                                     onClick={() => setModal(null)}
                                     className="border border-gray-300 text-gray-600 px-4 py-2 rounded-xl text-sm hover:bg-gray-50 transition"
-                                >
-                                    Cancel
-                                </button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-            )}
-
-            {/* Package request modal */}
-            {pkgRequestModal && (
-                <PackageRequestModal onClose={() => setPkgRequestModal(false)} hasPackage={hasPackage} />
-            )}
-
-            {/* Preview profile (non-unlocked, masked) */}
-            {previewModal && (
-                <PreviewProfileModal
-                    candidateId={previewModal.candidate_id}
-                    onClose={() => setPreviewModal(null)}
-                />
-            )}
-
-            {/* Full unlocked profile */}
-            {profileModal && (
-                <FullProfileModal
-                    candidateId={profileModal.candidate_id}
-                    candidateName={profileModal.candidate_name}
-                    onClose={() => setProfileModal(null)}
-                />
-            )}
-
-            {/* Move to hiring pipeline */}
-            {pipelineModal && (
-                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6">
-                        <h2 className="font-semibold text-gray-900 mb-1">
-                            {platinum ? 'Shortlist & Request Profile Access' : 'Add to Hiring Pipeline'}
-                        </h2>
-                        <p className="text-sm text-gray-500 mb-4">
-                            {platinum
-                                ? <>Select a job to shortlist <strong>{pipelineModal.candidate_name}</strong>. A profile access request will be sent to your LadderStep executive automatically. Once approved, full contact details will be revealed.</>
-                                : <>Add <strong>{pipelineModal.candidate_name}</strong> as an applicant to one of your job openings. Interview scheduling and offer release go through your LadderStep executive.</>
-                            }
-                        </p>
-                        <form onSubmit={handleApplyToPipeline} className="flex flex-col gap-4">
-                            <div>
-                                <label className="block text-xs font-medium text-gray-600 mb-1">Job Opening *</label>
-                                <select
-                                    value={pipelineJob}
-                                    onChange={e => setPipelineJob(e.target.value)}
-                                    required
-                                    className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 bg-white"
-                                >
-                                    <option value="">— Select a job —</option>
-                                    {jobs.map(j => (
-                                        <option key={j.id} value={j.id}>{j.title}</option>
-                                    ))}
-                                </select>
-                                {jobs.length === 0 && (
-                                    <p className="text-xs text-amber-600 mt-1">You have no active job postings yet — create one first.</p>
-                                )}
-                            </div>
-                            <div className="flex gap-3">
-                                <button
-                                    type="submit"
-                                    disabled={applyingToPipeline || !pipelineJob}
-                                    className="flex-1 bg-indigo-600 text-white py-2 rounded-xl text-sm font-medium hover:bg-indigo-700 disabled:opacity-60 transition"
-                                >
-                                    {applyingToPipeline ? 'Submitting…' : platinum ? 'Shortlist & Send for Approval' : 'Add to Pipeline'}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => setPipelineModal(null)}
-                                    disabled={applyingToPipeline}
-                                    className="border border-gray-300 text-gray-600 px-4 py-2 rounded-xl text-sm hover:bg-gray-50 transition disabled:opacity-60"
                                 >
                                     Cancel
                                 </button>

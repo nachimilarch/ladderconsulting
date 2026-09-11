@@ -52,6 +52,16 @@ const processSuccessfulPayment = async (txn, paymentId, conn) => {
         catch (e) { console.error('[fulfillResumeUnlockOrder]', e.message); }
     }
 
+    // Listing fee activates the company's account.
+    if (inv.invoice_type === 'listing_fee' && newStatus === 'paid') {
+        try {
+            await c.query(
+                `UPDATE companies SET listing_fee_paid = 1, listing_fee_invoice_id = ? WHERE id = ? AND deleted_at IS NULL`,
+                [inv.id, inv.company_id]
+            );
+        } catch (e) { console.error('[listingFeeActivate]', e.message); }
+    }
+
     // Get executive user_id for notification
     const [[compInfo]] = await c.query(
         `SELECT c.assigned_executive_id, co_u.id AS company_user_id, u_exec.id AS exec_id

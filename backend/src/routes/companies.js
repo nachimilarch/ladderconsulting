@@ -1,7 +1,6 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/companyController');
-const unlockCtrl = require('../controllers/resumeUnlockController');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 
 router.use(authenticateToken, authorizeRole('company'));
@@ -26,28 +25,12 @@ router.get('/candidates/:candidateId/skills',  ctrl.getCandidateSkills);
 router.post('/requests',  ctrl.createRequest);
 router.get('/requests',   ctrl.listRequests);
 
-// Talent pool — browse non-hired candidates
+// Talent pool — browse candidates (full profiles if activated, masked if not)
 router.get('/talent',                        ctrl.getTalentPool);
 router.post('/talent/:candidateId/interest', ctrl.expressInterest);
 
-// Resume unlock — self-serve paid access to a candidate's full resume/profile
-router.get('/talent/unlock-status',           unlockCtrl.getUnlockStatus);
-router.post('/talent/buy-pack',               unlockCtrl.buyPack);
-router.post('/talent/:candidateId/unlock',    unlockCtrl.purchaseUnlock);
-router.get('/talent/:candidateId/profile',    unlockCtrl.getFullProfile);
-router.get('/talent/:candidateId/preview',    unlockCtrl.getPreviewProfile);
-router.get('/talent/:candidateId/resume',     unlockCtrl.downloadUnlockedResume);
-
-// Package selection from the company's own profile page
-router.get('/package-status',                 unlockCtrl.getPackageStatus);
-router.post('/platinum-request',              unlockCtrl.requestPlatinum);
-router.post('/package-request',               unlockCtrl.requestPackage);
-
-// Move an already-unlocked or Platinum candidate into the company's own pipeline.
-router.post('/talent/:candidateId/apply',                      unlockCtrl.applyToPipeline);
-
-// Platinum profile-unlock request: company submits after shortlisting.
-// Exec/admin approves → grants 'platinum_approved' → full profile access.
-router.post('/talent/:candidateId/profile-unlock-request',     unlockCtrl.requestProfileUnlock);
+// Listing fee — one-time ₹3,999 activation
+router.get('/activation-status',  ctrl.getActivationStatus);
+router.post('/pay-listing-fee',   ctrl.payListingFee);
 
 module.exports = router;

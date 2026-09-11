@@ -3,8 +3,12 @@ const matchingService = require('../services/matchingService');
 const { extractAndSaveJobSkills } = require('../services/jobSkillExtractor');
 const { maskCandidateForCompany } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
-const { hasSelectedPackage } = require('./resumeUnlockController');
 const { sendEmail } = require('../utils/email');
+
+const isListingFeePaid = async (companyId) => {
+    const [[row]] = await db.query('SELECT listing_fee_paid FROM companies WHERE id = ? AND deleted_at IS NULL', [companyId]);
+    return !!row?.listing_fee_paid;
+};
 const wa = require('../utils/whatsappNotify');
 
 const safeEmail = (opts) => sendEmail(opts).catch(err => console.error('[Email]', err.message));
@@ -60,6 +64,10 @@ exports.createJob = async (req, res) => {
 
     try {
         const companyId = await getCompanyId(req.user.id);
+
+        if (!await isListingFeePaid(companyId)) {
+            return res.status(402).json({ message: 'Your account is not yet activated. Please pay the ₹3,999 listing fee to post jobs and access candidates.', code: 'ACTIVATION_REQUIRED' });
+        }
 
         const [result] = await db.query(
             `INSERT INTO job_postings
@@ -231,21 +239,7 @@ exports.getJobApplications = async (req, res) => {
         );
         if (!check.length) return res.status(404).json({ message: 'Job not found.' });
 
-        const [[companyRow]] = await db.query(
-            'SELECT placement_fee_percent FROM companies WHERE id = ?', [companyId]
-        );
-        const hasPackage = await hasSelectedPackage(companyId, companyRow?.placement_fee_percent);
-
-        // Candidates this company unlocked via a prepaid per-resume tier (Single/4-Pack)
-        // see their real name + contact info in the shortlist — they already paid Ladder
-        // directly for that candidate, so there's no fee-collection reason to redact it.
-        // 'platinum_approved' (exec-approved Platinum unlock) also gets full contact info.
-        // Plain 'platinum' (shortlisted but pending exec approval) stays masked.
-        const [unlockedRows] = await db.query(
-            `SELECT candidate_id FROM resume_unlocks WHERE company_id = ? AND granted_via IN ('single', 'pack', 'platinum_approved')`,
-            [companyId]
-        );
-        const unlockedCandidateIds = new Set(unlockedRows.map(r => r.candidate_id));
+        const activated = await isListingFeePaid(companyId);
 
         const filters = ['a.job_id=?', 'a.deleted_at IS NULL'];
         const params = [req.params.jobId];
@@ -294,23 +288,19 @@ exports.getJobApplications = async (req, res) => {
                     catch { return []; }
                 })(),
             };
-            // AI match % is a paid-package feature — withhold it server-side
-            // (not just hide in the UI) until the company has selected one.
-            if (!hasPackage) {
+            if (!activated) {
                 parsed.match_score = null;
                 parsed.match_computed = false;
                 parsed.matched_skills = [];
                 parsed.missing_skills = [];
-                parsed.package_required = true;
             }
-            // Single/4-Pack unlocked candidates: real name + contact info, no masking.
-            if (unlockedCandidateIds.has(app.candidate_id)) {
+            if (activated) {
                 parsed.contact_unlocked = true;
                 return parsed;
             }
             return maskCandidateForCompany(parsed);
         });
-        res.json({ applications: result, package_required: !hasPackage });
+        res.json({ applications: result, activation_required: !activated });
     } catch (err) {
         console.error('[GET /jobs/:jobId/applications]', err.message, err.stack);
         res.status(500).json({ message: 'Failed to fetch applications.' });
@@ -341,13 +331,8 @@ exports.shortlistApplication = async (req, res) => {
         );
         if (!check.length) return res.status(404).json({ message: 'Application not found.' });
 
-        // Company must have unlocked this candidate before shortlisting
-        const [[unlockRow]] = await db.query(
-            `SELECT id FROM resume_unlocks WHERE company_id=? AND candidate_id=? AND granted_via IN ('single','pack','platinum_approved') LIMIT 1`,
-            [companyId, check[0].candidate_id]
-        );
-        if (!unlockRow) {
-            return res.status(403).json({ message: 'Unlock this candidate\'s profile first to shortlist them.', code: 'UNLOCK_REQUIRED' });
+        if (!await isListingFeePaid(companyId)) {
+            return res.status(402).json({ message: 'Please activate your account (₹3,999 listing fee) to shortlist candidates.', code: 'ACTIVATION_REQUIRED' });
         }
 
         // A candidate hired through Ladder is off the market — block shortlisting
@@ -444,17 +429,10 @@ exports.updateApplicationStatus = async (req, res) => {
         );
         if (!check.length) return res.status(404).json({ message: 'Application not found.' });
 
-        // Company must have unlocked this candidate before changing status
-        // 'rejected' and 'under_review' are allowed without unlock (housekeeping moves only)
+        // 'rejected' and 'under_review' are allowed without activation (housekeeping moves only)
         const GATED = ['shortlisted', 'interview_scheduled', 'interviewed', 'offer_sent'];
-        if (GATED.includes(status)) {
-            const [[unlockRow]] = await db.query(
-                `SELECT id FROM resume_unlocks WHERE company_id=? AND candidate_id=? AND granted_via IN ('single','pack','platinum_approved') LIMIT 1`,
-                [companyId, check[0].candidate_id]
-            );
-            if (!unlockRow) {
-                return res.status(403).json({ message: 'Unlock this candidate\'s profile first to update their status.', code: 'UNLOCK_REQUIRED' });
-            }
+        if (GATED.includes(status) && !await isListingFeePaid(companyId)) {
+            return res.status(402).json({ message: 'Please activate your account (₹3,999 listing fee) to advance candidates.', code: 'ACTIVATION_REQUIRED' });
         }
 
         // Once hired through Ladder, a candidate cannot be advanced by another company.

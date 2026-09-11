@@ -3,8 +3,9 @@ const path = require('path');
 const fs = require('fs');
 const { maskName, maskCandidateForCompany, maskLocation } = require('../utils/maskPII');
 const { logAction } = require('../utils/auditLog');
-const { hasSelectedPackage } = require('./resumeUnlockController');
 const { scorePoolAgainstJob } = require('../services/matchingService');
+const { nextInvoiceNumber } = require('../utils/placementFee');
+const cashfree = require('../services/cashfreeService');
 const { sendEmail } = require('../utils/email');
 
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
@@ -23,7 +24,7 @@ const notify = async (userId, type, title, body, metadata = null) => {
 // ── Helper: get or create companies row for this user ──────────────────────
 const getOrCreateCompany = async (userId) => {
     const [rows] = await db.query(
-        'SELECT id, company_name, industry, size, website, headquarters, description, is_approved, placement_fee_percent FROM companies WHERE user_id = ? AND deleted_at IS NULL',
+        'SELECT id, company_name, industry, size, website, headquarters, description, is_approved, placement_fee_percent, listing_fee_paid FROM companies WHERE user_id = ? AND deleted_at IS NULL',
         [userId]
     );
     if (rows.length) return rows[0];
@@ -34,7 +35,7 @@ const getOrCreateCompany = async (userId) => {
         'INSERT INTO companies (user_id, company_name, is_approved) VALUES (?, ?, 1)',
         [userId, user.name]
     );
-    const [[newRow]] = await db.query('SELECT id, company_name, industry, size, website, headquarters, description, is_approved, placement_fee_percent FROM companies WHERE id = ?', [result.insertId]);
+    const [[newRow]] = await db.query('SELECT id, company_name, industry, size, website, headquarters, description, is_approved, placement_fee_percent, listing_fee_paid FROM companies WHERE id = ?', [result.insertId]);
     return newRow;
 };
 
@@ -269,25 +270,11 @@ exports.listInterviews = async (req, res) => {
             [company.id]
         );
 
-        // Package A/B companies (non-Platinum with any paid resume_unlock_orders) have
-        // no placement fee on any candidate. Check once at the company level, not per row.
-        const isPackageAB = company.placement_fee_percent == null;
-        let hasPaidPackage = false;
-        if (isPackageAB) {
-            const [[pkgRow]] = await db.query(
-                `SELECT ruo.id FROM resume_unlock_orders ruo
-                 JOIN invoices inv ON inv.id = ruo.invoice_id AND inv.status = 'paid'
-                 WHERE ruo.company_id = ? LIMIT 1`,
-                [company.id]
-            );
-            hasPaidPackage = !!pkgRow;
-        }
-        const prepaidUnlock = isPackageAB && hasPaidPackage;
+        const activated = !!company.listing_fee_paid;
 
         const masked = interviews.map(i => ({
             ...i,
-            candidate_name: prepaidUnlock ? i.candidate_name : maskName(i.candidate_name),
-            prepaid_unlock: prepaidUnlock,
+            candidate_name: activated ? i.candidate_name : maskName(i.candidate_name),
         }));
         res.json({ interviews: masked });
     } catch (err) {
@@ -667,11 +654,7 @@ exports.listRequests = async (req, res) => {
 exports.getTalentPool = async (req, res) => {
     try {
         const company = await getOrCreateCompany(req.user.id);
-        // No package gate — every company can browse masked candidates.
-        // PII (name/email/phone) stays hidden via maskCandidateForCompany until
-        // the specific candidate is unlocked. has_package lets the frontend know
-        // whether to show the credit-spend flow or the request-a-package flow.
-        const companyHasPkg = await hasSelectedPackage(company.id, company.placement_fee_percent);
+        const activated = !!company.listing_fee_paid;
 
         const { search = '', experience_min, experience_max, skill, page = 1, jobId } = req.query;
         const limit = 24;
@@ -793,12 +776,13 @@ exports.getTalentPool = async (req, res) => {
                 catch { return []; }
             })();
             const live = scoreMap.get(row.candidate_id);
-            return maskCandidateForCompany({
+            const candidate = {
                 ...row,
                 skills,
                 current_location: row.current_location,
                 match_score: live ? live.score : null,
-            });
+            };
+            return activated ? candidate : maskCandidateForCompany(candidate);
         });
 
         res.json({
@@ -807,7 +791,7 @@ exports.getTalentPool = async (req, res) => {
             total: countRows[0].total,
             page: parseInt(page),
             limit,
-            has_package: companyHasPkg,
+            activated,
             match_job_id: matchJobId,
         });
     } catch (err) {
@@ -878,5 +862,87 @@ exports.expressInterest = async (req, res) => {
     } catch (err) {
         console.error('[expressInterest]', err.message);
         res.status(500).json({ message: 'Failed to submit interest.' });
+    }
+};
+
+// ── GET /api/companies/activation-status ─────────────────────────────────────
+exports.getActivationStatus = async (req, res) => {
+    try {
+        const company = await getOrCreateCompany(req.user.id);
+        res.json({ success: true, activated: !!company.listing_fee_paid });
+    } catch (err) {
+        console.error('[getActivationStatus]', err.message);
+        res.status(500).json({ message: 'Failed to check activation status.' });
+    }
+};
+
+// ── POST /api/companies/pay-listing-fee ───────────────────────────────────────
+// Creates a ₹3,999 Cashfree order for the flat listing-fee activation.
+exports.payListingFee = async (req, res) => {
+    try {
+        const company = await getOrCreateCompany(req.user.id);
+
+        if (company.listing_fee_paid) {
+            return res.status(409).json({ message: 'Your account is already activated.' });
+        }
+
+        const [[userRow]] = await db.query('SELECT name, email, phone FROM users WHERE id = ?', [req.user.id]);
+        const amount = 3999;
+
+        const conn = await db.getConnection();
+        let invoiceId, invoiceNumber;
+        try {
+            await conn.beginTransaction();
+            invoiceNumber = await nextInvoiceNumber(conn);
+            const [invResult] = await conn.query(
+                `INSERT INTO invoices (invoice_number, company_id, raised_by, invoice_type, amount, status, description, due_date)
+                 VALUES (?, ?, ?, 'listing_fee', ?, 'pending', 'Platform Listing Fee — LadderStep Human Consulting', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+                [invoiceNumber, company.id, req.user.id, amount]
+            );
+            invoiceId = invResult.insertId;
+            await conn.commit();
+        } catch (err) {
+            await conn.rollback();
+            throw err;
+        } finally {
+            conn.release();
+        }
+
+        const orderId = `LC-LF-${Date.now()}-${invoiceId}`;
+        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/^http:\/\//, 'https://');
+        const returnUrl = `${frontendBase}/company/payment-callback?invoiceId=${invoiceId}&txnOrderId=${orderId}`;
+
+        await db.query(
+            `INSERT INTO payment_transactions (invoice_id, company_id, amount, payment_method, cashfree_order_id, status)
+             VALUES (?, ?, ?, 'cashfree', ?, 'initiated')`,
+            [invoiceId, company.id, amount, orderId]
+        );
+
+        const cfOrder = await cashfree.createOrder({
+            orderId,
+            amount,
+            customerName: userRow.name || company.company_name,
+            customerEmail: userRow.email,
+            customerPhone: userRow.phone || '9999999999',
+            orderNote: 'Platform Listing Fee — LadderStep Human Consulting',
+            returnUrl,
+        }).catch(async (cfErr) => {
+            await db.query(`UPDATE payment_transactions SET status = 'failed' WHERE cashfree_order_id = ?`, [orderId]);
+            console.error('[Cashfree] listing fee createOrder failed:', cfErr.response?.data || cfErr.message);
+            throw Object.assign(new Error('Payment gateway unavailable.'), { gatewayError: true });
+        });
+
+        res.json({
+            success: true,
+            payment_session_id: cfOrder.payment_session_id,
+            order_id: orderId,
+            invoice_id: invoiceId,
+            invoice_number: invoiceNumber,
+            amount,
+        });
+    } catch (err) {
+        if (err.gatewayError) return res.status(502).json({ message: err.message });
+        console.error('[payListingFee]', err.message);
+        res.status(500).json({ message: 'Failed to initiate payment.' });
     }
 };
