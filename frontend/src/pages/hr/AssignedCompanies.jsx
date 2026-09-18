@@ -144,7 +144,12 @@ export default function AssignedCompanies() {
                                         {c.company_name?.charAt(0)?.toUpperCase() || '?'}
                                     </div>
                                     <div className="min-w-0">
-                                        <p className="font-semibold text-gray-800 text-sm truncate">{c.company_name}</p>
+                                        <div className="flex items-center gap-1.5">
+                                            <p className="font-semibold text-gray-800 text-sm truncate">{c.company_name}</p>
+                                            {c.company_tier === 'premium' && (
+                                                <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 shrink-0">⭐ Platinum</span>
+                                            )}
+                                        </div>
                                         <p className="text-xs text-gray-400 truncate">{c.contact_email}</p>
                                     </div>
                                     {(c.job_count ?? 0) === 0 && (

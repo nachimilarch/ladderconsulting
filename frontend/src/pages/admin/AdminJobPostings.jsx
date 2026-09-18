@@ -2,9 +2,15 @@ import { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { adminJobAPI } from '../../api/admin';
 
+// Statuses an admin can set. `pending_payment` is system-controlled — a job is
+// created that way when a Standard company hasn't paid its ₹3,999 posting fee
+// yet, and only the fee invoice being paid publishes it.
 const STATUS_OPTIONS = ['active', 'draft', 'paused', 'closed'];
+const FILTER_OPTIONS = [...STATUS_OPTIONS, 'pending_payment'];
+const STATUS_LABEL = (s) => s === 'pending_payment' ? 'Awaiting payment' : s.charAt(0).toUpperCase() + s.slice(1);
 
 const STATUS_COLORS = {
+    pending_payment: 'bg-amber-100 text-amber-700',
     active: 'bg-green-100 text-green-700',
     draft:  'bg-gray-100 text-gray-600',
     paused: 'bg-yellow-100 text-yellow-700',
@@ -83,8 +89,8 @@ export default function AdminJobPostings() {
                     className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 >
                     <option value="">All statuses</option>
-                    {STATUS_OPTIONS.map(s => (
-                        <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                    {FILTER_OPTIONS.map(s => (
+                        <option key={s} value={s}>{STATUS_LABEL(s)}</option>
                     ))}
                 </select>
             </div>
@@ -101,7 +107,7 @@ export default function AdminJobPostings() {
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                             <tr>
-                                {['Job Title', 'Company', 'Type / Mode', 'Location', 'Applicants', 'Status', 'Posted', 'Actions'].map(h => (
+                                {['Job Title', 'Company', 'Type / Mode', 'Location', 'Applicants', 'Posting Fee', 'Status', 'Posted', 'Actions'].map(h => (
                                     <th key={h} className="px-4 py-3 text-left font-semibold">{h}</th>
                                 ))}
                             </tr>
@@ -112,24 +118,52 @@ export default function AdminJobPostings() {
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-gray-800">{job.title}</div>
                                     </td>
-                                    <td className="px-4 py-3 text-gray-700">{job.company_name}</td>
+                                    <td className="px-4 py-3 text-gray-700">
+                                        {job.company_name}
+                                        {job.company_tier === 'premium' && (
+                                            <span className="ml-1.5 text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700">⭐ Platinum</span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3 text-gray-500 capitalize text-xs">
                                         {job.job_type?.replace('_', ' ')}<br />
                                         <span className="text-gray-400">{job.work_mode}</span>
                                     </td>
                                     <td className="px-4 py-3 text-gray-500">{job.location || '—'}</td>
                                     <td className="px-4 py-3 text-gray-600">{job.applicant_count}</td>
+                                    <td className="px-4 py-3 text-xs">
+                                        {job.company_tier === 'premium' ? (
+                                            <span className="text-gray-500">Included</span>
+                                        ) : job.fee_status ? (
+                                            <div>
+                                                <span className={`font-medium ${job.fee_status === 'paid' ? 'text-green-700' : 'text-amber-700'}`}>
+                                                    ₹3,999 · {job.fee_status.replace('_', ' ')}
+                                                </span>
+                                                <p className="font-mono text-[10px] text-gray-400">{job.fee_invoice_number}</p>
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400">—</span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3">
-                                        <select
-                                            value={job.status}
-                                            disabled={updating === job.id}
-                                            onChange={e => handleStatusChange(job, e.target.value)}
-                                            className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-400 ${STATUS_COLORS[job.status]}`}
-                                        >
-                                            {STATUS_OPTIONS.map(s => (
-                                                <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
-                                            ))}
-                                        </select>
+                                        {job.status === 'pending_payment' ? (
+                                            <span
+                                                title="Publishes automatically once the posting fee is paid. To record an offline payment, mark the fee invoice paid in Payments."
+                                                className={`text-xs font-medium px-2 py-1 rounded-lg whitespace-nowrap ${STATUS_COLORS.pending_payment}`}
+                                            >
+                                                Awaiting payment
+                                            </span>
+                                        ) : (
+                                            <select
+                                                value={job.status}
+                                                disabled={updating === job.id}
+                                                onChange={e => handleStatusChange(job, e.target.value)}
+                                                className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-400 ${STATUS_COLORS[job.status]}`}
+                                            >
+                                                {STATUS_OPTIONS.map(s => (
+                                                    <option key={s} value={s}>{STATUS_LABEL(s)}</option>
+                                                ))}
+                                            </select>
+                                        )}
                                     </td>
                                     <td className="px-4 py-3 text-gray-400 text-xs">
                                         {new Date(job.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}

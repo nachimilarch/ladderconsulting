@@ -20,6 +20,7 @@ const parseMeta = (m) => (typeof m === 'string' ? JSON.parse(m) : m) || {};
 // ── GET /api/hr/premium-requests ──────────────────────────────────────────────
 exports.listPremiumRequests = async (req, res) => {
     try {
+        const isAdmin = req.user.role === 'admin';
         const [rows] = await db.query(
             `SELECT n.id, n.type, n.title, n.body, n.is_read, n.metadata, n.created_at,
                     c.id AS company_id, c.company_name, c.company_tier, c.placement_fee_percent,
@@ -28,11 +29,11 @@ exports.listPremiumRequests = async (req, res) => {
              LEFT JOIN companies c
                ON c.id = CAST(JSON_UNQUOTE(JSON_EXTRACT(n.metadata, '$.company_id')) AS UNSIGNED)
                AND c.deleted_at IS NULL
-             WHERE n.user_id = ?
+             WHERE ${isAdmin ? '1 = 1' : 'n.user_id = ?'}
                AND n.type = 'company_premium_request'
                AND n.deleted_at IS NULL
              ORDER BY n.is_read ASC, n.created_at DESC`,
-            [req.user.id]
+            isAdmin ? [] : [req.user.id]
         );
         res.json({ success: true, data: rows });
     } catch (err) {
@@ -49,8 +50,8 @@ exports.approvePremiumRequest = async (req, res) => {
     const notificationId = parseInt(req.params.id);
     try {
         const [[notif]] = await db.query(
-            `SELECT id, type, metadata FROM notifications WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
-            [notificationId, req.user.id]
+            `SELECT id, type, metadata FROM notifications WHERE id = ? AND deleted_at IS NULL${req.user.role === 'admin' ? '' : ' AND user_id = ?'}`,
+            req.user.role === 'admin' ? [notificationId] : [notificationId, req.user.id]
         );
         if (!notif) return res.status(404).json({ message: 'Request not found.' });
         if (notif.type !== 'company_premium_request') {
@@ -103,8 +104,8 @@ exports.dismissPremiumRequest = async (req, res) => {
     const { reason } = req.body;
     try {
         const [[notif]] = await db.query(
-            `SELECT id, type, metadata FROM notifications WHERE id = ? AND user_id = ? AND deleted_at IS NULL`,
-            [notificationId, req.user.id]
+            `SELECT id, type, metadata FROM notifications WHERE id = ? AND deleted_at IS NULL${req.user.role === 'admin' ? '' : ' AND user_id = ?'}`,
+            req.user.role === 'admin' ? [notificationId] : [notificationId, req.user.id]
         );
         if (!notif) return res.status(404).json({ message: 'Request not found.' });
 

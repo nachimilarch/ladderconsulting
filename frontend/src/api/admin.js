@@ -81,3 +81,7 @@ export const adminJobAPI = {
     setStatus: (id, status) => api.patch(`/admin/jobs/${id}/status`, { status }),
     remove:    (id) => api.delete(`/admin/jobs/${id}`),
 };
+
+export const adminAiSubscriptionAPI = {
+    list: (params) => api.get('/admin/ai-subscriptions', { params }),
+};

@@ -9,6 +9,17 @@ const fmtINR = (v) => v != null ? `₹${Number(v).toLocaleString('en-IN', { maxi
 const fmt    = (v) => v != null ? Number(v).toLocaleString('en-IN') : '0';
 const pct    = (n, d) => d > 0 ? `${Math.round((n / d) * 100)}%` : '—';
 
+const STREAM_LABEL = {
+    job_posting_fee: 'Job Posting Fees',
+    premium_profile_fee: 'Candidate Premium',
+    ai_subscription: 'AI Subscriptions',
+    placement_fee: 'Placement Fee Invoices',
+    training_fee: 'Training',
+    service_fee: 'Service Fees',
+    listing_fee: 'Listing Fees (legacy)',
+    resume_unlock: 'Resume Unlocks (legacy)',
+};
+
 const PERIODS = [
     { key: 'daily',   label: 'Today',      desc: 'Last 24 hours' },
     { key: 'weekly',  label: 'This Week',   desc: 'Last 7 days' },
@@ -509,9 +520,46 @@ export default function PlatformAnalytics() {
                         <div className="grid grid-cols-2 gap-3">
                             <SumTile label="Total Invoiced"    desc="Sum of all invoices raised" value={fmtINR(invSum?.total_invoiced)}   accent="border-gray-400" />
                             <SumTile label="Total Collected"   desc="Payments received to date"  value={fmtINR(invSum?.total_collected)}  accent="border-green-500" />
-                            <SumTile label="Outstanding"       desc={`${(invSum?.pending_count || 0) + (invSum?.partial_count || 0)} open invoices`} value={fmtINR(invSum?.total_outstanding)} accent="border-amber-400" />
+                            <SumTile label="Outstanding"       desc={`${(invSum?.pending_count || 0) + (invSum?.partial_count || 0) + (invSum?.overdue_count || 0)} open invoices`} value={fmtINR(invSum?.total_outstanding)} accent="border-amber-400" />
                             <SumTile label="Overdue Invoices"  desc="Past due date, unpaid"       value={invSum?.overdue_count || 0}      accent="border-red-400" />
                         </div>
+                    </Panel>
+                </div>
+
+                {/* Memberships, Premium & AI Assistant */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
+                    <Panel title="Tiers, Premium & AI Assistant" subtitle="Who is on which plan, and what is waiting on the team">
+                        <div className="grid grid-cols-2 gap-3">
+                            <SumTile label="Platinum Companies" desc="No per-job fee · 8.33% per hire" value={summary?.premium_companies} accent="border-yellow-400" />
+                            <SumTile label="Premium Candidates" desc="₹6L+ verified · fee paid" value={summary?.premium_candidates} accent="border-green-400" />
+                            <SumTile label="AI Subscribers" desc="Active or in grace period" value={summary?.active_ai_subscriptions} accent="border-violet-400" />
+                            <SumTile label="Jobs Awaiting Fee" desc="Standard-tier JDs not yet paid" value={summary?.pending_payment_jobs} accent="border-amber-400" />
+                            <SumTile label="Platinum Requests" desc="Waiting for approval" value={summary?.pending_company_premium_requests} accent="border-yellow-400" />
+                            <SumTile label="Premium Verifications" desc="Payslip reviews pending" value={summary?.pending_candidate_premium_requests} accent="border-blue-400" />
+                        </div>
+                        <div className="flex gap-4 mt-4 text-xs">
+                            <button onClick={() => navigate('/hr/premium-requests')} className="text-indigo-600 hover:underline">Platinum requests →</button>
+                            <button onClick={() => navigate('/hr/premium-candidate-requests')} className="text-indigo-600 hover:underline">Premium verification →</button>
+                            <button onClick={() => navigate('/admin/payments')} className="text-indigo-600 hover:underline">Payments →</button>
+                        </div>
+                    </Panel>
+
+                    <Panel title="Revenue by Stream" subtitle="Collected to date, by what was billed">
+                        {(invSum?.by_type || []).filter(t => Number(t.invoice_count) > 0).length === 0 ? (
+                            <p className="text-sm text-gray-400">No invoices yet.</p>
+                        ) : (
+                            <div className="grid grid-cols-2 gap-3">
+                                {invSum.by_type.filter(t => Number(t.invoice_count) > 0).map(t => (
+                                    <SumTile
+                                        key={t.invoice_type}
+                                        label={STREAM_LABEL[t.invoice_type] || t.invoice_type}
+                                        desc={`${t.paid_count || 0} of ${t.invoice_count} invoices paid`}
+                                        value={fmtINR(t.collected)}
+                                        accent="border-green-400"
+                                    />
+                                ))}
+                            </div>
+                        )}
                     </Panel>
                 </div>
 

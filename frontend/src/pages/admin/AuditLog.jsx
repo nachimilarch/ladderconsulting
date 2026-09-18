@@ -4,9 +4,25 @@ import toast from 'react-hot-toast';
 
 const PAGE_SIZE = 25;
 
-const entityIcon = (type) => ({
-    company: '🏢', candidate: '👤', staff: '👥', settings: '⚙️', training: '🎓',
-}[type] || '📋');
+// Keys are the entity_type values actually written to admin_logs.
+const ENTITY_TYPES = {
+    company: { label: 'Company', icon: '🏢' },
+    candidate: { label: 'Candidate', icon: '👤' },
+    user: { label: 'User account', icon: '👥' },
+    employee: { label: 'Employee', icon: '🧑‍💼' },
+    job_posting: { label: 'Job posting', icon: '💼' },
+    company_request: { label: 'Company request', icon: '📨' },
+    service_invoice: { label: 'Service invoice', icon: '🧾' },
+    invoice: { label: 'Invoice / payment', icon: '💳' },
+    platform_settings: { label: 'Settings', icon: '⚙️' },
+    email_template: { label: 'Email template', icon: '✉️' },
+    lead: { label: 'Lead', icon: '🎯' },
+    task: { label: 'Task', icon: '✅' },
+    application: { label: 'Application', icon: '📄' },
+    outreach_campaign: { label: 'Outreach campaign', icon: '📡' },
+    outreach_contact_list: { label: 'Contact list', icon: '📇' },
+};
+const entityIcon = (type) => ENTITY_TYPES[type]?.icon || '📋';
 
 export default function AuditLog() {
     const [logs, setLogs] = useState([]);
@@ -79,11 +95,9 @@ export default function AuditLog() {
                     className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                     <option value="">All entity types</option>
-                    <option value="company">Company</option>
-                    <option value="candidate">Candidate</option>
-                    <option value="staff">Staff</option>
-                    <option value="settings">Settings</option>
-                    <option value="training">Training</option>
+                    {Object.entries(ENTITY_TYPES).map(([key, { label }]) => (
+                        <option key={key} value={key}>{label}</option>
+                    ))}
                 </select>
                 <input
                     type="text"

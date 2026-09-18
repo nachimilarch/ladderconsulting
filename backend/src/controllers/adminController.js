@@ -46,7 +46,10 @@ exports.listCompanies = async (req, res) => {
 
         const [companies] = await db.query(
             `SELECT co.id, co.company_name, co.industry, co.size, co.is_approved, co.created_at,
-                    co.headquarters, co.website,
+                    co.headquarters, co.website, co.company_tier, co.placement_fee_percent,
+                    co.premium_requested_at,
+                    (SELECT s.status FROM ai_subscriptions s
+                       WHERE s.company_id = co.id AND s.deleted_at IS NULL LIMIT 1) AS ai_status,
                     u.id AS user_id, u.name AS contact_name, u.email, u.phone AS contact_phone, u.status,
                     (u.last_login_at IS NULL) AS never_logged_in,
                     COUNT(DISTINCT jp.id) AS job_count,
@@ -62,7 +65,8 @@ exports.listCompanies = async (req, res) => {
              LEFT JOIN hired_employees he ON he.company_id = co.id AND he.deleted_at IS NULL
              WHERE co.deleted_at IS NULL ${statusWhere}
              GROUP BY co.id, co.company_name, co.industry, co.size, co.is_approved, co.created_at,
-                      co.headquarters, co.website, u.id, u.name, u.email, u.phone, u.status, u.last_login_at
+                      co.headquarters, co.website, co.company_tier, co.placement_fee_percent,
+                      co.premium_requested_at, u.id, u.name, u.email, u.phone, u.status, u.last_login_at
              ORDER BY co.created_at DESC`
         );
         res.json({ success: true, data: companies });
@@ -80,6 +84,11 @@ exports.getCompanyDetail = async (req, res) => {
         let [[company]] = await db.query(
             `SELECT co.*, u.name AS contact_name, u.email, u.phone AS contact_phone, u.status,
                     u.id AS user_id, (u.last_login_at IS NULL) AS never_logged_in,
+                    (SELECT COUNT(*) FROM job_postings jp WHERE jp.company_id = co.id AND jp.deleted_at IS NULL) AS job_count,
+                    (SELECT COUNT(*) FROM applications a JOIN job_postings jp2 ON jp2.id = a.job_id
+                       WHERE jp2.company_id = co.id AND a.deleted_at IS NULL) AS application_count,
+                    (SELECT s.status FROM ai_subscriptions s WHERE s.company_id = co.id AND s.deleted_at IS NULL LIMIT 1) AS ai_status,
+                    (SELECT s.current_period_end FROM ai_subscriptions s WHERE s.company_id = co.id AND s.deleted_at IS NULL LIMIT 1) AS ai_period_end,
                     CASE WHEN u.status = 'suspended' THEN 'suspended'
                          WHEN co.is_approved = 1 THEN 'approved' ELSE 'pending'
                     END AS company_status
@@ -344,12 +353,14 @@ exports.deleteCompany = async (req, res) => {
 // ── CANDIDATE MANAGEMENT ──────────────────────────────────────────────────────
 
 exports.listCandidates = async (req, res) => {
-    const { status, location, search, page = 1, limit = 20 } = req.query;
+    const { status, location, search, premium, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     try {
         const where = ['u.deleted_at IS NULL', 'ro.name = ?'];
         const params = ['candidate'];
+
+        if (premium === '1') where.push('c.is_premium = 1');
 
         if (status) { where.push('u.status = ?'); params.push(status); }
         if (location) { where.push('cp.current_location LIKE ?'); params.push(`%${location}%`); }
@@ -360,7 +371,11 @@ exports.listCandidates = async (req, res) => {
 
         const [candidates] = await db.query(
             `SELECT u.id, u.name AS full_name, u.email, u.status, u.created_at,
-                    c.id AS candidate_id,
+                    c.id AS candidate_id, c.is_premium,
+                    (SELECT s.status FROM ai_subscriptions s
+                       WHERE s.candidate_id = c.id AND s.deleted_at IS NULL LIMIT 1) AS ai_status,
+                    (SELECT r.status FROM candidate_premium_requests r
+                       WHERE r.candidate_id = c.id AND r.deleted_at IS NULL ORDER BY r.id DESC LIMIT 1) AS premium_request_status,
                     cp.current_location AS location, cp.total_experience AS experience_years, cp.headline,
                     COUNT(DISTINCT a.id) AS application_count,
                     COUNT(DISTINCT cert.id) AS certificate_count
@@ -372,7 +387,7 @@ exports.listCandidates = async (req, res) => {
              LEFT JOIN hired_employees he ON he.candidate_id = c.id AND he.deleted_at IS NULL
              LEFT JOIN certificates cert ON cert.hired_employee_id = he.id AND cert.deleted_at IS NULL
              WHERE ${where.join(' AND ')}
-             GROUP BY u.id, c.id, u.name, u.email, u.status, u.created_at,
+             GROUP BY u.id, c.id, c.is_premium, u.name, u.email, u.status, u.created_at,
                       cp.current_location, cp.total_experience, cp.headline
              ORDER BY u.created_at DESC
              LIMIT ? OFFSET ?`,
@@ -400,6 +415,7 @@ exports.getCandidateDetail = async (req, res) => {
     try {
         const [[user]] = await db.query(
             `SELECT u.id, u.name AS full_name, u.email, u.phone, u.status, u.created_at,
+                    c.is_premium, c.premium_activated_at,
                     cp.headline, cp.summary,
                     cp.total_experience AS experience_years,
                     cp.current_location AS location,
@@ -414,6 +430,16 @@ exports.getCandidateDetail = async (req, res) => {
         if (!user) return res.status(404).json({ message: 'Candidate not found.' });
 
         const [[cand]] = await db.query('SELECT id FROM candidates WHERE user_id = ?', [req.params.id]);
+
+        const [[premiumRequest]] = cand ? await db.query(
+            `SELECT status, declared_annual_ctc, review_note, reviewed_at, created_at
+             FROM candidate_premium_requests WHERE candidate_id = ? AND deleted_at IS NULL
+             ORDER BY id DESC LIMIT 1`, [cand.id]
+        ) : [[]];
+        const [[aiSubscription]] = cand ? await db.query(
+            `SELECT status, current_period_end FROM ai_subscriptions
+             WHERE candidate_id = ? AND deleted_at IS NULL LIMIT 1`, [cand.id]
+        ) : [[]];
 
         const [applications] = cand ? await db.query(
             `SELECT a.id, a.status, a.applied_at, jp.title AS job_title, co.company_name
@@ -451,7 +477,7 @@ exports.getCandidateDetail = async (req, res) => {
             [cand.id]
         ) : [[]];
 
-        res.json({ success: true, data: { ...user, candidate_id: cand?.id ?? null, applications, skills: skills.map(s => s.name), training, certificates: certs, application_count: applications.length, training_count: training.length, certificate_count: certs.length } });
+        res.json({ success: true, data: { ...user, candidate_id: cand?.id ?? null, premium_request: premiumRequest || null, ai_subscription: aiSubscription || null, applications, skills: skills.map(s => s.name), training, certificates: certs, application_count: applications.length, training_count: training.length, certificate_count: certs.length } });
     } catch (err) {
         console.error('getCandidateDetail:', err);
         res.status(500).json({ success: false, message: 'Failed to fetch candidate detail.' });
@@ -756,7 +782,10 @@ exports.getAnalyticsSummary = async (req, res) => {
                 (SELECT ROUND(AVG(mr.fit_score)) FROM match_results mr)                                    AS avg_match_score,
                 (SELECT COUNT(*) FROM companies WHERE company_tier = 'premium' AND deleted_at IS NULL)     AS premium_companies,
                 (SELECT COUNT(*) FROM candidates WHERE is_premium = 1 AND deleted_at IS NULL)              AS premium_candidates,
-                (SELECT COUNT(*) FROM ai_subscriptions WHERE status IN ('active','grace') AND deleted_at IS NULL) AS active_ai_subscriptions`
+                (SELECT COUNT(*) FROM ai_subscriptions WHERE status IN ('active','grace') AND deleted_at IS NULL) AS active_ai_subscriptions,
+                (SELECT COUNT(*) FROM job_postings WHERE status = 'pending_payment' AND deleted_at IS NULL) AS pending_payment_jobs,
+                (SELECT COUNT(*) FROM notifications WHERE type = 'company_premium_request' AND is_read = 0 AND deleted_at IS NULL) AS pending_company_premium_requests,
+                (SELECT COUNT(*) FROM candidate_premium_requests WHERE status = 'pending' AND deleted_at IS NULL) AS pending_candidate_premium_requests`
         );
         res.json({ success: true, data: { summary } });
     } catch (err) {
@@ -1180,7 +1209,7 @@ exports.setPlacementFeeRate = async (req, res) => {
 
         res.json({
             message: newPercent != null
-                ? `${company.company_name} is now on a ${newPercent}% contracted rate (Platinum — free resume unlocks).`
+                ? `${company.company_name} is now on a ${newPercent}% contracted placement rate.`
                 : `${company.company_name} reverted to the platform default placement fee rate.`,
             placement_fee_percent: newPercent,
             agreement_file_key: newFileKey,
@@ -1511,7 +1540,11 @@ exports.listAllJobs = async (req, res) => {
         const [jobs] = await db.query(
             `SELECT jp.id, jp.title, jp.location, jp.job_type, jp.work_mode, jp.status,
                     jp.openings, jp.created_at,
-                    co.id AS company_id, co.company_name,
+                    co.id AS company_id, co.company_name, co.company_tier,
+                    (SELECT i.status FROM invoices i WHERE i.job_posting_id = jp.id
+                       AND i.invoice_type = 'job_posting_fee' AND i.deleted_at IS NULL ORDER BY i.id DESC LIMIT 1) AS fee_status,
+                    (SELECT i.invoice_number FROM invoices i WHERE i.job_posting_id = jp.id
+                       AND i.invoice_type = 'job_posting_fee' AND i.deleted_at IS NULL ORDER BY i.id DESC LIMIT 1) AS fee_invoice_number,
                     (SELECT COUNT(*) FROM applications a WHERE a.job_id = jp.id AND a.deleted_at IS NULL) AS applicant_count
              FROM job_postings jp
              JOIN companies co ON co.id = jp.company_id AND co.deleted_at IS NULL
@@ -1535,9 +1568,14 @@ exports.setJobStatus = async (req, res) => {
     }
     try {
         const [[job]] = await db.query(
-            'SELECT id, company_id FROM job_postings WHERE id = ? AND deleted_at IS NULL', [req.params.id]
+            'SELECT id, company_id, status FROM job_postings WHERE id = ? AND deleted_at IS NULL', [req.params.id]
         );
         if (!job) return res.status(404).json({ message: 'Job not found.' });
+        if (job.status === 'pending_payment') {
+            return res.status(409).json({
+                message: 'This job is awaiting its ₹3,999 posting fee. Mark the fee invoice paid in Payments to publish it (or delete the job).',
+            });
+        }
         await db.query('UPDATE job_postings SET status = ? WHERE id = ?', [status, req.params.id]);
         await logAction(req.user.id, 'set_job_status', 'job_posting', req.params.id,
             { status }, ip(req));

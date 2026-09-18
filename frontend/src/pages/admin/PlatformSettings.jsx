@@ -84,17 +84,26 @@ const FEES_SETTINGS = {
         description: 'Multiplier applied to offered CTC to calculate the placement fee (e.g. 1 = 1× monthly CTC).',
         type: 'number',
     },
-    candidate_profile_access_fee: {
-        label: 'Candidate Profile Access Fee (₹)',
-        description: 'Fee charged to companies to unlock full candidate contact details.',
+    ai_subscription_amount: {
+        label: 'AI Assistant Subscription (₹ / month)',
+        description: 'Monthly price of the AI Assistant for companies and candidates. Applies to invoices raised from now on.',
         type: 'number',
     },
-    interview_scheduling_fee: {
-        label: 'Interview Scheduling Fee (₹)',
-        description: 'Fee charged to companies per interview scheduling request.',
+    ai_subscription_grace_days: {
+        label: 'AI Subscription Grace Period (days)',
+        description: 'How long a subscriber keeps access after an unpaid renewal falls due, before the subscription is suspended.',
         type: 'number',
     },
 };
+
+// Fixed pricing that lives in code rather than in platform_settings — shown so
+// admins see the whole monetisation model in one place.
+const FIXED_PRICING = [
+    { label: 'Standard company — job posting', value: '₹3,999 per job posted (per JD, not one-time)' },
+    { label: 'Standard company — placement fee', value: '1× monthly CTC per hire, unless a contracted % is set on the company' },
+    { label: 'Platinum company', value: 'No per-job fee · full pool incl. Premium candidates · 8.33% of annual CTC per hire' },
+    { label: 'Candidate Premium', value: '₹999 one-time · ₹6L+ CTC verified from payslips · boosted, Platinum-only visibility' },
+];
 
 // ── Environment / integration settings ───────────────────────────────────────
 const ENV_SECTIONS = [
@@ -158,6 +167,17 @@ const ENV_SECTIONS = [
         icon: '💬',
         fields: [
             { key: 'vaartabot_api_key', label: 'Vaartabot API Key', type: 'password', placeholder: 'vb_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx' },
+        ],
+    },
+    {
+        id: 'ollama',
+        title: 'AI Assistant (Local LLM)',
+        description: 'Ollama server behind the AI chatbot. It must be reachable from the backend server and run a tool-calling model (e.g. qwen2.5:7b). Leave blank to use the server defaults.',
+        icon: '✨',
+        fields: [
+            { key: 'ollama_base_url',   label: 'Ollama URL',      type: 'text',   placeholder: 'http://10.0.1.25:11434' },
+            { key: 'ollama_model',      label: 'Model',           type: 'text',   placeholder: 'qwen2.5:7b' },
+            { key: 'ollama_timeout_ms', label: 'Timeout (ms)',    type: 'number', placeholder: '120000' },
         ],
     },
     {
@@ -536,6 +556,17 @@ export default function PlatformSettings() {
                             </div>
                         );
                     })}
+                </div>
+                <div className="bg-gray-50 border border-gray-200 rounded-xl p-4 mt-3">
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Fixed pricing (changed in code, not here)</p>
+                    <dl className="space-y-1.5">
+                        {FIXED_PRICING.map(p => (
+                            <div key={p.label} className="flex gap-3 text-xs">
+                                <dt className="text-gray-500 w-56 shrink-0">{p.label}</dt>
+                                <dd className="text-gray-700">{p.value}</dd>
+                            </div>
+                        ))}
+                    </dl>
                 </div>
             </div>
 

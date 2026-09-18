@@ -12,11 +12,26 @@ const statusBadge = (s) => {
     );
 };
 
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+const fmtINR = (v) => v != null ? `₹${Number(v).toLocaleString('en-IN', { maximumFractionDigits: 0 })}` : null;
+
+// Premium = ₹6L+ CTC verified from payslips, then a ₹999 fee. The request
+// passes through pending → approved (awaiting the fee) → is_premium once paid.
+const premiumBadge = (c) => {
+    if (c.is_premium) return <span className="px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-700 whitespace-nowrap">⭐ Premium</span>;
+    if (c.premium_request_status === 'pending') return <span className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700 whitespace-nowrap">Verification pending</span>;
+    if (c.premium_request_status === 'approved') return <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-700 whitespace-nowrap">Approved · awaiting fee</span>;
+    return <span className="text-gray-400 text-xs">Standard</span>;
+};
+
+const AI_LABEL = { active: 'Active', grace: 'Payment overdue', suspended: 'Suspended', cancelled: 'Cancelled' };
+
 export default function CandidateManagement() {
     const [candidates, setCandidates] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
+    const [premiumOnly, setPremiumOnly] = useState(false);
     const [selected, setSelected] = useState(null);
     const [actionModal, setActionModal] = useState(null);
     const [reason, setReason] = useState('');
@@ -27,6 +42,7 @@ export default function CandidateManagement() {
         const params = {};
         if (search) params.search = search;
         if (statusFilter) params.status = statusFilter;
+        if (premiumOnly) params.premium = '1';
         adminCandidateAPI.list(params)
             .then((r) => {
                 const list = Array.isArray(r.data) ? r.data : r.data?.candidates ?? r.data?.data ?? [];
@@ -34,7 +50,7 @@ export default function CandidateManagement() {
             })
             .catch(() => { toast.error('Failed to load candidates'); setCandidates([]); })
             .finally(() => setLoading(false));
-    }, [search, statusFilter]);
+    }, [search, statusFilter, premiumOnly]);
 
     useEffect(() => {
         const t = setTimeout(load, 350);
@@ -92,6 +108,13 @@ export default function CandidateManagement() {
                     <option value="active">Active</option>
                     <option value="suspended">Suspended</option>
                 </select>
+                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input type="checkbox" checked={premiumOnly} onChange={(e) => setPremiumOnly(e.target.checked)} />
+                    ⭐ Premium only
+                </label>
+                <Link to="/hr/premium-candidate-requests" className="ml-auto text-sm text-indigo-600 hover:underline self-center">
+                    Premium verification queue →
+                </Link>
             </div>
 
             <div className="flex gap-6">
@@ -105,7 +128,7 @@ export default function CandidateManagement() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
-                                    {['Name', 'Email', 'Location', 'Applications', 'Status', ''].map((h) => (
+                                    {['Name', 'Email', 'Location', 'Applications', 'Plan', 'Status', ''].map((h) => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                                     ))}
                                 </tr>
@@ -117,6 +140,14 @@ export default function CandidateManagement() {
                                         <td className="px-4 py-3 text-gray-500">{c.email}</td>
                                         <td className="px-4 py-3 text-gray-500">{c.location || '—'}</td>
                                         <td className="px-4 py-3 text-gray-500">{c.application_count ?? 0}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex flex-col gap-1 items-start">
+                                                {premiumBadge(c)}
+                                                {(c.ai_status === 'active' || c.ai_status === 'grace') && (
+                                                    <span className="text-[10px] text-indigo-600">✨ AI Assistant</span>
+                                                )}
+                                            </div>
+                                        </td>
                                         <td className="px-4 py-3">{statusBadge(c.status)}</td>
                                         <td className="px-4 py-3 text-indigo-600 text-xs">View →</td>
                                     </tr>
@@ -140,6 +171,11 @@ export default function CandidateManagement() {
                         <dl className="space-y-2 text-sm mb-4">
                             {[
                                 ['Status', statusBadge(selected.status)],
+                                ['Plan', premiumBadge({ ...selected, premium_request_status: selected.premium_request?.status })],
+                                ['Premium since', selected.is_premium ? fmtDate(selected.premium_activated_at) : null],
+                                ['Declared CTC', selected.premium_request ? fmtINR(selected.premium_request.declared_annual_ctc) : null],
+                                ['AI Assistant', selected.ai_subscription ? (AI_LABEL[selected.ai_subscription.status] || selected.ai_subscription.status) : 'Not subscribed'],
+                                ['AI renews', ['active', 'grace'].includes(selected.ai_subscription?.status) ? fmtDate(selected.ai_subscription.current_period_end) : null],
                                 ['Location', selected.location],
                                 ['Experience', selected.experience_years != null ? `${selected.experience_years} yrs` : null],
                                 ['Applications', selected.application_count],
@@ -171,6 +207,14 @@ export default function CandidateManagement() {
                                     className="px-3 py-1.5 bg-blue-50 text-blue-700 text-xs rounded hover:bg-blue-100 border border-blue-200"
                                 >
                                     View Documents
+                                </Link>
+                            )}
+                            {selected.premium_request?.status === 'pending' && (
+                                <Link
+                                    to="/hr/premium-candidate-requests"
+                                    className="px-3 py-1.5 bg-yellow-50 text-yellow-700 text-xs rounded hover:bg-yellow-100 border border-yellow-200"
+                                >
+                                    Review Premium request
                                 </Link>
                             )}
                             {selected.status === 'active' ? (

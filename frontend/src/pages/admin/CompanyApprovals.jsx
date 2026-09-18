@@ -26,11 +26,39 @@ const statusBadge = (s, neverLoggedIn = false) => {
     );
 };
 
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
+
+// Standard = pays ₹3,999 per job; Platinum = no per-job fee, full pool, % placement fee.
+const tierBadge = (tier) => tier === 'premium' ? (
+    <span className="px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-700 whitespace-nowrap">⭐ Platinum</span>
+) : (
+    <span className="px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600">Standard</span>
+);
+
+const AI_STATUS = {
+    active:    { label: '✨ Active',          cls: 'text-green-700' },
+    grace:     { label: '✨ Payment overdue', cls: 'text-yellow-700' },
+    suspended: { label: 'Suspended',          cls: 'text-red-600' },
+    cancelled: { label: 'Cancelled',          cls: 'text-gray-500' },
+};
+const aiLabel = (status) => status
+    ? <span className={AI_STATUS[status]?.cls}>{AI_STATUS[status]?.label || status}</span>
+    : <span className="text-gray-400">Not subscribed</span>;
+
+const JOB_STATUS_CLS = {
+    pending_payment: 'bg-amber-100 text-amber-700',
+    active: 'bg-green-100 text-green-700',
+    draft: 'bg-gray-100 text-gray-600',
+    paused: 'bg-yellow-100 text-yellow-700',
+    closed: 'bg-red-100 text-red-600',
+};
+
 export default function CompanyApprovals() {
     const [tab, setTab] = useState('pending');
     const [companies, setCompanies] = useState([]);
     const [loading, setLoading] = useState(true);
     const [detail, setDetail] = useState(null);
+    const [detailJobs, setDetailJobs] = useState([]);
     const [modal, setModal] = useState(null); // { type, company }
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
@@ -70,6 +98,7 @@ export default function CompanyApprovals() {
             const payload = r.data?.data;
             const company = payload?.company || payload || r.data;
             setDetail(company);
+            setDetailJobs(payload?.jobs || []);
             setSelectedExec(company?.assigned_executive_id || '');
             setFeePercent(company?.placement_fee_percent ?? '');
             setAgreementFile(null);
@@ -182,7 +211,7 @@ export default function CompanyApprovals() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
-                                    {['Company', 'Email / Phone', 'Industry', 'Joined', 'Status', ''].map((h) => (
+                                    {['Company', 'Email / Phone', 'Industry', 'Plan', 'Joined', 'Status', ''].map((h) => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                                     ))}
                                 </tr>
@@ -196,6 +225,19 @@ export default function CompanyApprovals() {
                                             {c.contact_phone && <div className="text-xs text-indigo-600 font-medium">📞 {c.contact_phone}</div>}
                                         </td>
                                         <td className="px-4 py-3 text-gray-500">{c.industry || '—'}</td>
+                                        <td className="px-4 py-3">
+                                            {c.company_tier ? (
+                                                <div className="flex flex-col gap-1 items-start">
+                                                    {tierBadge(c.company_tier)}
+                                                    {c.company_tier !== 'premium' && c.premium_requested_at && (
+                                                        <span className="text-[10px] text-yellow-700">Platinum requested</span>
+                                                    )}
+                                                    {(c.ai_status === 'active' || c.ai_status === 'grace') && (
+                                                        <span className="text-[10px] text-indigo-600">✨ AI Assistant</span>
+                                                    )}
+                                                </div>
+                                            ) : '—'}
+                                        </td>
                                         <td className="px-4 py-3 text-gray-500">{new Date(c.created_at).toLocaleDateString()}</td>
                                         <td className="px-4 py-3">{statusBadge(c.company_status, c.never_logged_in)}</td>
                                         <td className="px-4 py-3">
@@ -233,9 +275,14 @@ export default function CompanyApprovals() {
                                 ['Location', detail.location || detail.headquarters],
                                 ['Website', detail.website],
                                 ['Status', statusBadge(detail.company_status, detail.never_logged_in)],
+                                ['Plan', detail.company_tier ? tierBadge(detail.company_tier) : null],
+                                ['Platinum since', detail.company_tier === 'premium' ? fmtDate(detail.premium_approved_at) : null],
+                                ['Platinum requested', detail.company_tier !== 'premium' ? fmtDate(detail.premium_requested_at) : null],
+                                ['AI Assistant', detail.company_tier ? aiLabel(detail.ai_status) : null],
+                                ['AI renews', ['active', 'grace'].includes(detail.ai_status) ? fmtDate(detail.ai_period_end) : null],
                                 ['Job Postings', detail.job_count],
                                 ['Applications', detail.application_count],
-                            ].map(([k, v]) => v != null && (
+                            ].map(([k, v]) => v != null && v !== '' && (
                                 <div key={k} className="flex justify-between gap-3">
                                     <dt className="text-gray-500 shrink-0">{k}</dt>
                                     <dd className="font-medium text-gray-700 text-right truncate max-w-[190px]">{v}</dd>
@@ -245,6 +292,22 @@ export default function CompanyApprovals() {
 
                         {detail.description && (
                             <p className="text-xs text-gray-500 mb-4 border-t pt-3">{detail.description}</p>
+                        )}
+
+                        {detailJobs.length > 0 && (
+                            <div className="mb-4 border-t pt-3">
+                                <p className="text-xs font-semibold text-gray-600 mb-2">Recent job postings</p>
+                                <ul className="space-y-1.5">
+                                    {detailJobs.map(j => (
+                                        <li key={j.id} className="flex items-center justify-between gap-2 text-xs">
+                                            <span className="text-gray-700 truncate">{j.title}</span>
+                                            <span className={`shrink-0 px-1.5 py-0.5 rounded font-medium ${JOB_STATUS_CLS[j.status] || 'bg-gray-100 text-gray-600'}`}>
+                                                {j.status === 'pending_payment' ? 'Awaiting payment' : j.status}
+                                            </span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
                         )}
 
                         <div className="flex flex-wrap gap-2">
@@ -307,12 +370,12 @@ export default function CompanyApprovals() {
                             </div>
                         </div>
 
-                        {/* Placement Fee Rate / Platinum */}
+                        {/* Contracted placement rate (independent of plan) */}
                         <div className="border-t mt-4 pt-4">
-                            <p className="text-xs font-semibold text-gray-600 mb-2">Placement Fee Rate (Platinum)</p>
+                            <p className="text-xs font-semibold text-gray-600 mb-2">Contracted Placement Rate</p>
                             {detail.placement_fee_percent != null ? (
                                 <p className="text-xs text-green-700 bg-green-50 px-2 py-1 rounded mb-2">
-                                    ⭐ Platinum — {parseFloat(detail.placement_fee_percent)}% contracted rate, free resume unlocks
+                                    {parseFloat(detail.placement_fee_percent)}% of annual CTC per hire (contracted)
                                 </p>
                             ) : (
                                 <p className="text-xs text-gray-400 mb-2">Using platform default rate — no contracted % set.</p>

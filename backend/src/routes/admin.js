@@ -77,6 +77,9 @@ router.get('/invoices',                        ...admin, invCtrl.adminListInvoic
 router.patch('/invoices/:id/mark-paid',        ...admin, invCtrl.adminMarkPaid);
 router.patch('/invoices/fees/:id/mark-paid',   ...admin, invCtrl.adminMarkFeePaid);
 
+// AI Assistant subscribers (company + candidate)
+router.get('/ai-subscriptions',                ...admin, require('../controllers/aiSubscriptionController').adminList);
+
 // Interview requests (admin oversight)
 const intReqCtrl = require('../controllers/interviewRequestController');
 router.get('/interview-requests',          ...admin, intReqCtrl.listExecRequests);

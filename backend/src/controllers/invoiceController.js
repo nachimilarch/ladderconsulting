@@ -1,7 +1,9 @@
 const db = require('../config/db');
 const { sendEmail } = require('../utils/email');
 const { syncPlacementFeeStatus } = require('../utils/placementFee');
+const { fulfillPaidInvoice } = require('../utils/invoiceFulfillment');
 const { generateInvoicePDF } = require('../utils/invoicePdf');
+const { logAction } = require('../utils/auditLog');
 
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
 
@@ -302,7 +304,7 @@ exports.markPaid = async (req, res) => {
     const isAdmin = req.user.role === 'admin';
     try {
         const [[inv]] = await db.query(
-            `SELECT id, company_id, application_id, invoice_type, amount, amount_paid
+            `SELECT id, company_id, candidate_id, application_id, job_posting_id, invoice_type, amount, amount_paid
              FROM invoices WHERE id = ? AND deleted_at IS NULL`, [req.params.id]
         );
         if (!inv) return res.status(404).json({ message: 'Invoice not found.' });
@@ -315,25 +317,34 @@ exports.markPaid = async (req, res) => {
         const remaining = parseFloat(inv.amount) - parseFloat(inv.amount_paid);
         if (remaining <= 0) return res.status(409).json({ message: 'Invoice is already fully paid.' });
 
+        // A candidate-paid invoice (Premium fee, candidate AI subscription) has
+        // company_id NULL — the payer is recorded on candidate_id instead.
         const conn = await db.getConnection();
         try {
             await conn.beginTransaction();
             await conn.query(
                 `INSERT INTO payment_transactions
-                    (invoice_id, company_id, amount, payment_method, status, payment_note, completed_at)
-                 VALUES (?, ?, ?, ?, 'success', ?, NOW())`,
-                [req.params.id, inv.company_id, remaining, payment_method, payment_note || null]
+                    (invoice_id, company_id, candidate_id, amount, payment_method, status, payment_note, completed_at)
+                 VALUES (?, ?, ?, ?, ?, 'success', ?, NOW())`,
+                [req.params.id, inv.company_id, inv.company_id ? null : inv.candidate_id, remaining, payment_method, payment_note || null]
             );
             await conn.query(
                 `UPDATE invoices SET amount_paid = amount, status = 'paid', paid_at = NOW() WHERE id = ?`,
                 [req.params.id]
             );
-            // Mirror onto placement_fee_invoices when this is a placement-fee invoice
-            if (inv.invoice_type === 'placement_fee') {
-                await syncPlacementFeeStatus(inv.application_id, conn);
-            }
+            // Same side effects as an online payment: placement-fee mirror, job
+            // activation, Premium status, AI subscription, …
+            await fulfillPaidInvoice(inv, 'paid', conn);
             await conn.commit();
         } catch (e) { await conn.rollback(); throw e; } finally { conn.release(); }
+
+        // An admin marking an invoice paid can publish a job / activate Premium /
+        // renew a subscription, so leave a trail (admin_logs is admin-scoped).
+        if (isAdmin) {
+            logAction(req.user.id, 'mark_invoice_paid', 'invoice', inv.id,
+                { invoice_type: inv.invoice_type, amount: remaining, payment_method },
+                req.headers['x-forwarded-for']?.split(',')[0]?.trim() || req.socket?.remoteAddress);
+        }
 
         res.json({ message: 'Invoice marked as paid.' });
     } catch (err) {
@@ -519,12 +530,17 @@ exports.companyGetInvoice = async (req, res) => {
 };
 
 // ── GET /api/admin/invoices ──────────────────────────────────────────────────
+// Payer is either a company (company_id set) or a candidate (company_id NULL,
+// candidate_id = the payer — Premium fee / candidate AI subscription). For a
+// company-paid placement-fee invoice, candidate_id is the placed candidate, so
+// `candidate_name` is only meaningful there.
 exports.adminListInvoices = async (req, res) => {
-    const { status, company_id, date_from, date_to } = req.query;
+    const { status, company_id, invoice_type, date_from, date_to } = req.query;
     const conditions = ['inv.deleted_at IS NULL'];
     const params = [];
 
     if (status) { conditions.push('inv.status = ?'); params.push(status); }
+    if (invoice_type) { conditions.push('inv.invoice_type = ?'); params.push(invoice_type); }
     if (company_id) { conditions.push('inv.company_id = ?'); params.push(company_id); }
     if (date_from) { conditions.push('DATE(inv.created_at) >= ?'); params.push(date_from); }
     if (date_to) { conditions.push('DATE(inv.created_at) <= ?'); params.push(date_to); }
@@ -533,10 +549,15 @@ exports.adminListInvoices = async (req, res) => {
         const [rows] = await db.query(
             `SELECT inv.id, inv.invoice_number, inv.invoice_type, inv.amount, inv.amount_paid,
                     inv.status, inv.due_date, inv.paid_at, inv.created_at,
-                    co.company_name, exec_u.name AS raised_by_name,
-                    cand_u.name AS candidate_name, jp.title AS job_title
+                    inv.company_id, inv.candidate_id,
+                    IF(inv.company_id IS NULL, 'candidate', 'company') AS payer_type,
+                    COALESCE(co.company_name, cand_u.name) AS payer_name,
+                    co.company_name, co.company_tier,
+                    exec_u.name AS raised_by_name,
+                    IF(inv.company_id IS NULL, NULL, cand_u.name) AS candidate_name,
+                    jp.title AS job_title
              FROM invoices inv
-             JOIN companies co ON co.id = inv.company_id
+             LEFT JOIN companies co ON co.id = inv.company_id
              LEFT JOIN candidates cand ON cand.id = inv.candidate_id
              LEFT JOIN users cand_u ON cand_u.id = cand.user_id
              LEFT JOIN job_postings jp ON jp.id = inv.job_posting_id
@@ -553,20 +574,29 @@ exports.adminListInvoices = async (req, res) => {
 };
 
 // ── GET /api/admin/invoices/summary ─────────────────────────────────────────
+// Outstanding only counts invoices still collectable — cancelled/waived
+// invoices are not money owed. `by_type` is the per-revenue-stream breakdown.
 exports.adminInvoiceSummary = async (req, res) => {
     try {
         const [[stats]] = await db.query(
             `SELECT
                SUM(amount) AS total_invoiced,
                SUM(amount_paid) AS total_collected,
-               SUM(amount - amount_paid) AS total_outstanding,
+               SUM(CASE WHEN status IN ('pending','partially_paid','overdue') THEN amount - amount_paid ELSE 0 END) AS total_outstanding,
                SUM(status = 'pending') AS pending_count,
                SUM(status = 'partially_paid') AS partial_count,
                SUM(status = 'paid') AS paid_count,
                SUM(status = 'overdue') AS overdue_count
              FROM invoices WHERE deleted_at IS NULL`
         );
-        res.json({ success: true, data: stats });
+        const [byType] = await db.query(
+            `SELECT invoice_type, COUNT(*) AS invoice_count,
+                    SUM(amount) AS invoiced, SUM(amount_paid) AS collected,
+                    SUM(status = 'paid') AS paid_count
+             FROM invoices WHERE deleted_at IS NULL
+             GROUP BY invoice_type ORDER BY collected DESC`
+        );
+        res.json({ success: true, data: { ...stats, by_type: byType } });
     } catch (err) {
         console.error('[invoice.adminSummary]', err);
         res.status(500).json({ message: 'Failed to fetch summary.' });
@@ -580,12 +610,12 @@ exports.downloadExecInvoicePDF = async (req, res) => {
         let params, query;
 
         if (isAdmin) {
-            query = `SELECT inv.*, co.company_name, co.user_id AS company_user_id,
-                            u_exec.email AS company_email,
+            query = `SELECT inv.*, COALESCE(co.company_name, cand_u.name) AS company_name, co.user_id AS company_user_id,
+                            COALESCE(u_exec.email, cand_u.email) AS company_email,
                             cand_u.name AS candidate_name, jp.title AS job_title
                      FROM invoices inv
-                     JOIN companies co ON co.id = inv.company_id
-                     JOIN users u_exec ON u_exec.id = co.user_id
+                     LEFT JOIN companies co ON co.id = inv.company_id
+                     LEFT JOIN users u_exec ON u_exec.id = co.user_id
                      LEFT JOIN candidates cand ON cand.id = inv.candidate_id
                      LEFT JOIN users cand_u ON cand_u.id = cand.user_id
                      LEFT JOIN job_postings jp ON jp.id = inv.job_posting_id

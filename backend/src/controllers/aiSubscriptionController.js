@@ -242,3 +242,69 @@ exports.cancel = async (req, res) => {
         res.status(500).json({ message: 'Failed to cancel subscription.' });
     }
 };
+
+// ── GET /api/admin/ai-subscriptions ───────────────────────────────────────────
+// Admin oversight of every subscriber (company or candidate) with the current
+// billing state. Read-only — billing moves via invoices in Admin → Payments.
+exports.adminList = async (req, res) => {
+    const { status } = req.query;
+    const where = ['s.deleted_at IS NULL'];
+    const params = [];
+    if (status) { where.push('s.status = ?'); params.push(status); }
+
+    try {
+        const [subscriptions] = await db.query(
+            `SELECT s.id, s.status, s.current_period_start, s.current_period_end, s.grace_until,
+                    s.created_at, s.cancelled_at,
+                    IF(s.company_id IS NULL, 'candidate', 'company') AS payer_type,
+                    COALESCE(co.company_name, cu.name) AS payer_name,
+                    COALESCE(cou.email, cu.email) AS payer_email,
+                    co.company_tier,
+                    (SELECT i.invoice_number FROM invoices i
+                       WHERE i.invoice_type = 'ai_subscription' AND i.deleted_at IS NULL
+                         AND i.status IN ('pending','partially_paid','overdue')
+                         AND (i.company_id = s.company_id OR i.candidate_id = s.candidate_id)
+                       ORDER BY i.created_at DESC LIMIT 1) AS open_invoice_number,
+                    (SELECT i.amount - i.amount_paid FROM invoices i
+                       WHERE i.invoice_type = 'ai_subscription' AND i.deleted_at IS NULL
+                         AND i.status IN ('pending','partially_paid','overdue')
+                         AND (i.company_id = s.company_id OR i.candidate_id = s.candidate_id)
+                       ORDER BY i.created_at DESC LIMIT 1) AS open_invoice_due_amount,
+                    (SELECT i.due_date FROM invoices i
+                       WHERE i.invoice_type = 'ai_subscription' AND i.deleted_at IS NULL
+                         AND i.status IN ('pending','partially_paid','overdue')
+                         AND (i.company_id = s.company_id OR i.candidate_id = s.candidate_id)
+                       ORDER BY i.created_at DESC LIMIT 1) AS open_invoice_due_date
+             FROM ai_subscriptions s
+             LEFT JOIN companies co ON co.id = s.company_id
+             LEFT JOIN users cou ON cou.id = co.user_id
+             LEFT JOIN candidates cd ON cd.id = s.candidate_id
+             LEFT JOIN users cu ON cu.id = cd.user_id
+             WHERE ${where.join(' AND ')}
+             ORDER BY FIELD(s.status, 'grace', 'suspended', 'active', 'cancelled'), s.current_period_end ASC`,
+            params
+        );
+
+        const [[counts]] = await db.query(
+            `SELECT COUNT(*) AS total,
+                    SUM(status = 'active') AS active, SUM(status = 'grace') AS grace,
+                    SUM(status = 'suspended') AS suspended, SUM(status = 'cancelled') AS cancelled,
+                    SUM(company_id IS NOT NULL) AS company_subscribers,
+                    SUM(candidate_id IS NOT NULL) AS candidate_subscribers
+             FROM ai_subscriptions WHERE deleted_at IS NULL`
+        );
+        const amount = parseFloat(await getSetting('ai_subscription_amount', '299'));
+        const billable = Number(counts.active || 0) + Number(counts.grace || 0);
+
+        res.json({
+            success: true,
+            data: {
+                subscriptions,
+                summary: { ...counts, monthly_amount: amount, monthly_recurring: billable * amount },
+            },
+        });
+    } catch (err) {
+        console.error('[aiSubscription.adminList]', err);
+        res.status(500).json({ success: false, message: 'Failed to fetch AI subscriptions.' });
+    }
+};

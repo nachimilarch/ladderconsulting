@@ -149,7 +149,7 @@ exports.getMyCompanies = async (req, res) => {
         if (req.user.role === 'admin') {
             [rows] = await db.query(
                 `SELECT co.id, co.company_name, co.industry, co.size, co.headquarters, co.website,
-                        co.description, co.placement_fee_percent, co.assigned_executive_id,
+                        co.description, co.placement_fee_percent, co.company_tier, co.assigned_executive_id,
                         co.executive_assigned_at,
                         u.name AS contact_name, u.email AS contact_email, u.phone AS contact_phone,
                         eu.name AS exec_name,
@@ -167,7 +167,7 @@ exports.getMyCompanies = async (req, res) => {
             // assigned_executive_id is a users.id FK — match directly against logged-in user
             [rows] = await db.query(
                 `SELECT co.id, co.company_name, co.industry, co.size, co.headquarters, co.website,
-                        co.description, co.placement_fee_percent, co.assigned_executive_id,
+                        co.description, co.placement_fee_percent, co.company_tier, co.assigned_executive_id,
                         co.executive_assigned_at,
                         u.name AS contact_name, u.email AS contact_email, u.phone AS contact_phone,
                         (SELECT COUNT(*) FROM job_postings jp WHERE jp.company_id = co.id AND jp.deleted_at IS NULL) AS job_count,
