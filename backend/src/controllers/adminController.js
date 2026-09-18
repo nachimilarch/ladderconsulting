@@ -753,7 +753,10 @@ exports.getAnalyticsSummary = async (req, res) => {
                 (SELECT COUNT(*) FROM leads WHERE deleted_at IS NULL)                                      AS total_leads,
                 (SELECT COUNT(*) FROM leads WHERE stage = 'converted' AND deleted_at IS NULL)              AS converted_leads,
                 (SELECT COUNT(*) FROM tasks WHERE status = 'completed' AND deleted_at IS NULL)             AS tasks_completed,
-                (SELECT ROUND(AVG(mr.fit_score)) FROM match_results mr)                                    AS avg_match_score`
+                (SELECT ROUND(AVG(mr.fit_score)) FROM match_results mr)                                    AS avg_match_score,
+                (SELECT COUNT(*) FROM companies WHERE company_tier = 'premium' AND deleted_at IS NULL)     AS premium_companies,
+                (SELECT COUNT(*) FROM candidates WHERE is_premium = 1 AND deleted_at IS NULL)              AS premium_candidates,
+                (SELECT COUNT(*) FROM ai_subscriptions WHERE status IN ('active','grace') AND deleted_at IS NULL) AS active_ai_subscriptions`
         );
         res.json({ success: true, data: { summary } });
     } catch (err) {

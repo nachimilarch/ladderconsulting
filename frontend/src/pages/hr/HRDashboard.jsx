@@ -2,6 +2,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { employeeAPI, reportAPI } from '../../api/hr';
+import { hrPremiumAPI } from '../../api/hrPremium';
+import { premiumCandidateReviewAPI } from '../../api/premiumCandidateReview';
 
 const REFRESH_INTERVAL = 30000; // 30 seconds
 
@@ -43,6 +45,7 @@ export default function HRDashboard() {
     const [hiring, setHiring] = useState(null);
     const [loading, setLoading] = useState(true);
     const [lastRefreshed, setLastRefreshed] = useState(null);
+    const [premiumCounts, setPremiumCounts] = useState({ company: 0, candidate: 0 });
 
     const fetchAll = useCallback(async () => {
         try {
@@ -57,18 +60,30 @@ export default function HRDashboard() {
         setLoading(false);
     }, []);
 
+    const fetchPremiumCounts = useCallback(async () => {
+        const [companyRes, candidateRes] = await Promise.allSettled([
+            hrPremiumAPI.list(),
+            premiumCandidateReviewAPI.list('pending'),
+        ]);
+        setPremiumCounts({
+            company: companyRes.status === 'fulfilled' ? (companyRes.value.data?.data || []).filter(r => !r.is_read).length : 0,
+            candidate: candidateRes.status === 'fulfilled' ? (candidateRes.value.data?.data || []).length : 0,
+        });
+    }, []);
+
     useEffect(() => {
         fetchAll();
+        fetchPremiumCounts();
         // Auto-refresh every 30 seconds
-        const timer = setInterval(fetchAll, REFRESH_INTERVAL);
+        const timer = setInterval(() => { fetchAll(); fetchPremiumCounts(); }, REFRESH_INTERVAL);
         // Refresh when tab becomes visible
-        const onVisible = () => { if (document.visibilityState === 'visible') fetchAll(); };
+        const onVisible = () => { if (document.visibilityState === 'visible') { fetchAll(); fetchPremiumCounts(); } };
         document.addEventListener('visibilitychange', onVisible);
         return () => {
             clearInterval(timer);
             document.removeEventListener('visibilitychange', onVisible);
         };
-    }, [fetchAll]);
+    }, [fetchAll, fetchPremiumCounts]);
 
     const k = hiring?.kpis;
 
@@ -78,7 +93,11 @@ export default function HRDashboard() {
         { label: 'Offer Requests',     to: '/hr/offer-requests', icon: '📋' },
         { label: 'Interviews',         to: '/hr/interviews',     icon: '🗓' },
         { label: 'Resume Sourcing',    to: '/hr/sourcing',       icon: '📄' },
+        { label: 'My Companies',       to: '/hr/companies',      icon: '🏢' },
+        { label: 'Company Premium',    to: '/hr/premium-requests', icon: '⭐', badge: premiumCounts.company },
+        { label: 'Candidate Premium',  to: '/hr/premium-candidate-requests', icon: '🌟', badge: premiumCounts.candidate },
         { label: 'Invoices',           to: '/hr/invoices',       icon: '🧾' },
+        { label: 'Outreach',           to: '/outreach',          icon: '📡' },
     ];
 
     return (
@@ -205,9 +224,14 @@ export default function HRDashboard() {
             {/* Quick navigation */}
             <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Quick Access</h3>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {quickLinks.map(({ label, to, icon }) => (
+                {quickLinks.map(({ label, to, icon, badge }) => (
                     <Link key={to} to={to}
-                        className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center gap-2 text-center">
+                        className="relative bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center gap-2 text-center">
+                        {badge > 0 && (
+                            <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                {badge}
+                            </span>
+                        )}
                         <span className="text-2xl">{icon}</span>
                         <span className="text-xs font-medium text-gray-700">{label}</span>
                     </Link>

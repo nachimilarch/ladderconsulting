@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { companyAPI } from '../../api/company';
+import { companyAPI, talentPoolAPI } from '../../api/company';
+import { aiSubscriptionAPI } from '../../api/aiSubscription';
 
 // Phone-gate: on every dashboard load, if the company has no phone, show a
 // one-field modal before anything else.  Same component as in CompanyProfile.
@@ -75,6 +76,8 @@ export default function CompanyDashboard() {
     const [data, setData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [needsPhone, setNeedsPhone] = useState(false);
+    const [tierStatus, setTierStatus] = useState(null);
+    const [aiStatus, setAiStatus] = useState(null);
 
     const fetchDashboard = () => {
         companyAPI.getDashboard()
@@ -89,6 +92,8 @@ export default function CompanyDashboard() {
         companyAPI.getProfile()
             .then(({ data }) => { if (!data.company?.contact_phone) setNeedsPhone(true); })
             .catch(() => {});
+        talentPoolAPI.activationStatus().then(({ data }) => setTierStatus(data)).catch(() => {});
+        aiSubscriptionAPI.status().then(({ data }) => setAiStatus(data)).catch(() => {});
 
         const onVisible = () => { if (document.visibilityState === 'visible') fetchDashboard(); };
         document.addEventListener('visibilitychange', onVisible);
@@ -127,20 +132,48 @@ export default function CompanyDashboard() {
             </div>
 
             {/* KPI Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                 <KPI title="Active Jobs"    value={jobs.active_jobs}             icon="💼" color="blue" />
                 <KPI title="Total Applied"  value={applications.total_applications} icon="📋" color="purple" />
                 <KPI title="Shortlisted"    value={applications.shortlisted}     icon="⭐" color="green" />
                 <KPI title="Offers Sent"    value={applications.offers_sent}     icon="📨" color="amber" />
             </div>
 
+            {/* Account status strip */}
+            <div className="flex flex-wrap gap-3 mb-8">
+                <Link to="/company/profile" className={`flex-1 min-w-[220px] rounded-2xl border px-4 py-3 text-sm hover:shadow-sm transition ${
+                    tierStatus?.company_tier === 'premium' ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'
+                }`}>
+                    {tierStatus?.company_tier === 'premium' ? (
+                        <span className="text-green-700 font-medium">⭐ Platinum — full pool, no listing fee, 8.33% per hire</span>
+                    ) : tierStatus?.activated ? (
+                        <span className="text-gray-700">Standard tier — <span className="text-indigo-600 font-medium">go Platinum →</span></span>
+                    ) : (
+                        <span className="text-gray-500">Not yet activated — <span className="text-indigo-600 font-medium">post a job to activate →</span></span>
+                    )}
+                </Link>
+                <Link to="/company/profile" className={`flex-1 min-w-[220px] rounded-2xl border px-4 py-3 text-sm hover:shadow-sm transition ${
+                    aiStatus?.subscription?.status === 'active' ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-gray-100'
+                }`}>
+                    {aiStatus?.subscription?.status === 'active' ? (
+                        <span className="text-indigo-700 font-medium">✨ AI Assistant active</span>
+                    ) : (
+                        <span className="text-gray-500">✨ AI Assistant — <span className="text-indigo-600 font-medium">subscribe for ₹{aiStatus?.amount || 299}/mo →</span></span>
+                    )}
+                </Link>
+            </div>
+
             {/* Quick actions */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {[
-                    { label: 'Post a Job',      to: '/company/jobs',       icon: '➕' },
+                    { label: 'Talent Pool',      to: '/company/talent',     icon: '👥' },
+                    { label: 'Post a Job',       to: '/company/jobs',       icon: '➕' },
                     { label: 'Review Shortlist', to: '/company/shortlist',  icon: '⭐' },
                     { label: 'Interviews',       to: '/company/interviews', icon: '🗓' },
-                    { label: 'Edit Profile',     to: '/company/profile',    icon: '🏢' },
+                    { label: 'Offers',           to: '/company/offers',     icon: '📨' },
+                    { label: 'Payments',         to: '/company/payments',   icon: '💳' },
+                    { label: 'Training',         to: '/company/training',   icon: '🎓' },
+                    { label: 'Requests',         to: '/company/requests',   icon: '📩' },
                 ].map(({ label, to, icon }) => (
                     <Link key={to} to={to}
                         className="bg-white rounded-2xl border border-gray-100 p-4 hover:border-indigo-200 hover:shadow-md transition-all flex flex-col items-center gap-2 text-center shadow-sm">

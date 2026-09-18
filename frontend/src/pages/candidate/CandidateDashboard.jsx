@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { profileAPI, jobAPI, aiAPI } from '../../api/candidate';
+import { profileAPI, jobAPI, aiAPI, candidatePremiumAPI } from '../../api/candidate';
+import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import JobDetailModal from '../../components/candidate/JobDetailModal';
 
 export default function CandidateDashboard() {
@@ -12,6 +13,8 @@ export default function CandidateDashboard() {
     const [topJobs, setTopJobs] = useState([]);
     const [rematching, setRematching] = useState(false);
     const [detailJobId, setDetailJobId] = useState(null);
+    const [premiumStatus, setPremiumStatus] = useState(null);
+    const [aiStatus, setAiStatus] = useState(null);
 
     const fetchProfile = () => {
         profileAPI.get()
@@ -31,6 +34,8 @@ export default function CandidateDashboard() {
 
     useEffect(() => {
         fetchProfile();
+        candidatePremiumAPI.status().then(({ data }) => setPremiumStatus(data)).catch(() => {});
+        aiSubscriptionAPI.status().then(({ data }) => setAiStatus(data)).catch(() => {});
 
         const onVisible = () => { if (document.visibilityState === 'visible') fetchProfile(); };
         document.addEventListener('visibilitychange', onVisible);
@@ -67,6 +72,9 @@ export default function CandidateDashboard() {
         { label: 'Complete Profile', to: '/candidate/profile', icon: '👤', desc: 'Add your details and experience', color: 'blue' },
         { label: 'Browse Jobs', to: '/candidate/jobs', icon: '💼', desc: 'Find jobs matched to your skills', color: 'green' },
         { label: 'My Applications', to: '/candidate/applications', icon: '📋', desc: 'Track your application status', color: 'purple' },
+        { label: 'Interviews', to: '/candidate/interviews', icon: '🗓', desc: 'View scheduled interviews', color: 'amber' },
+        { label: 'Documents', to: '/candidate/documents', icon: '📁', desc: 'Upload IDs, payslips, certificates', color: 'blue' },
+        { label: 'Go Premium', to: '/candidate/premium', icon: '⭐', desc: 'Get verified for boosted visibility', color: 'amber' },
     ];
 
     if (loading) {
@@ -89,14 +97,31 @@ export default function CandidateDashboard() {
                 </p>
             </div>
 
-            {/* Premium promo */}
-            <Link
-                to="/candidate/premium"
-                className="block mb-6 bg-gradient-to-r from-yellow-50 to-indigo-50 border border-yellow-100 rounded-2xl px-5 py-3 text-sm hover:shadow-sm transition"
-            >
-                <span className="font-semibold text-yellow-700">⭐ Go Premium</span>
-                <span className="text-gray-600"> — earning ₹6 LPA+? Get verified and get boosted visibility to top hiring companies.</span>
-            </Link>
+            {/* Status strip */}
+            <div className="flex flex-col sm:flex-row gap-3 mb-6">
+                <Link to="/candidate/premium" className={`flex-1 rounded-2xl border px-5 py-3 text-sm hover:shadow-sm transition ${
+                    premiumStatus?.is_premium ? 'bg-green-50 border-green-100' : 'bg-gradient-to-r from-yellow-50 to-indigo-50 border-yellow-100'
+                }`}>
+                    {premiumStatus?.is_premium ? (
+                        <span className="font-semibold text-green-700">⭐ Premium profile active — boosted to Premium companies</span>
+                    ) : premiumStatus?.request?.status === 'pending' ? (
+                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium verification pending</span> — your executive is reviewing it.</span>
+                    ) : premiumStatus?.request?.status === 'approved' ? (
+                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium approved</span> — pay ₹999 to activate →</span>
+                    ) : (
+                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Go Premium</span> — earning ₹6 LPA+? Get verified for boosted visibility.</span>
+                    )}
+                </Link>
+                <Link to="/candidate/profile" className={`flex-1 rounded-2xl border px-5 py-3 text-sm hover:shadow-sm transition ${
+                    aiStatus?.subscription?.status === 'active' ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-gray-100'
+                }`}>
+                    {aiStatus?.subscription?.status === 'active' ? (
+                        <span className="font-semibold text-indigo-700">✨ AI Assistant active</span>
+                    ) : (
+                        <span className="text-gray-500">✨ AI Assistant — <span className="text-indigo-600 font-medium">subscribe for ₹{aiStatus?.amount || 299}/mo →</span></span>
+                    )}
+                </Link>
+            </div>
 
             {/* Profile Completeness Card */}
             <div className="card-p mb-6">

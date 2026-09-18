@@ -68,6 +68,9 @@ export default function AdminDashboard() {
         { label: 'Interviews Held',   value: summary?.interviews_held,   color: 'border-teal-500',   sub: null },
         { label: 'Certificates Issued', value: summary?.certificates_issued, color: 'border-pink-500', sub: null },
         { label: 'Pending Approvals', value: summary?.pending_companies, color: 'border-red-500',    sub: 'companies awaiting review' },
+        { label: 'Platinum Companies', value: summary?.premium_companies, color: 'border-yellow-500', sub: '8.33% placement fee tier' },
+        { label: 'Premium Candidates', value: summary?.premium_candidates, color: 'border-green-500', sub: '₹6L+ verified, boosted' },
+        { label: 'AI Subscriptions',  value: summary?.active_ai_subscriptions, color: 'border-indigo-500', sub: 'active, ₹299/mo' },
     ];
 
     return (
@@ -129,6 +132,10 @@ export default function AdminDashboard() {
                             { label: 'Review Pending Companies', to: '/admin/companies', badge: summary?.pending_companies },
                             { label: 'Manage HR Staff',          to: '/admin/staff' },
                             { label: 'View Recruitment Pipeline', to: '/admin/recruitment' },
+                            { label: 'Job Postings',             to: '/admin/jobs' },
+                            { label: 'Analytics',                to: '/admin/analytics' },
+                            { label: 'Outreach',                 to: '/outreach' },
+                            { label: 'Training Manager',         to: '/admin/training' },
                             { label: 'Platform Settings',        to: '/admin/settings' },
                         ].map(({ label, to, badge }) => (
                             <button
