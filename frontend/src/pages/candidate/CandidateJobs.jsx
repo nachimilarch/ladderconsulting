@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { jobAPI, applicationAPI } from '../../api/candidate';
 import JobDetailModal from '../../components/candidate/JobDetailModal';
+import AiAssistantPromo from '../../components/AiAssistantPromo';
 
 const JOB_TYPE_MAP = {
     full_time:  { label: 'Full Time',   cls: 'badge-blue' },
@@ -83,6 +84,10 @@ export default function CandidateJobs() {
                     🎉 Congratulations on your placement through LadderStep Human Consulting! As a hired candidate,
                     you're now off the market and new applications are disabled.
                 </div>
+            )}
+
+            {!isHired && (
+                <AiAssistantPromo text="ask it to find jobs that match your profile, or apply to one for you." />
             )}
 
             {/* Search */}

@@ -4,6 +4,7 @@ import { aiSubscriptionAPI } from '../api/aiSubscription';
 import { chatbotAPI, sendChatMessage } from '../api/chatbot';
 import AiSubscriptionCard from './AiSubscriptionCard';
 import ChatbotActionCard from './ChatbotActionCard';
+import { OPEN_CHATBOT_EVENT } from './AiAssistantPromo';
 
 const PLACEHOLDER = {
     company: 'Ask me to draft a job post, or find candidates for one you’ve already posted…',
@@ -71,6 +72,16 @@ export default function ChatbotWidget() {
     useEffect(() => {
         scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
     }, [items, streamingText]);
+
+    // Lets promo callouts elsewhere on the page (AiAssistantPromo) open this
+    // widget without any prop-drilling or shared state — it's mounted once
+    // per layout, so a DOM event is simpler than threading context through.
+    useEffect(() => {
+        if (!persona) return;
+        const openFromPromo = () => setOpen(true);
+        window.addEventListener(OPEN_CHATBOT_EVENT, openFromPromo);
+        return () => window.removeEventListener(OPEN_CHATBOT_EVENT, openFromPromo);
+    }, [persona]);
 
     if (!persona) return null;
 

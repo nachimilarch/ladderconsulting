@@ -4,6 +4,7 @@ const { SCHEMAS, IMPLEMENTATIONS, isWriteTool } = require('../services/chatbotTo
 const { hasActiveAiSubscription } = require('../utils/aiSubscription');
 const jobController = require('../controllers/jobController');
 const { saveCandidateProfile } = require('../utils/candidateProfile');
+const { applyToJob } = require('../utils/candidateApplications');
 
 const MAX_TOOL_ITERATIONS = 4;
 
@@ -15,13 +16,14 @@ Rules:
 - All money amounts are full rupee numbers, never lakhs/crore shorthand. "15-25 LPA" means salary_min=1500000, salary_max=2500000, NOT 150000/250000 — always multiply lakhs by 100000 before calling a tool.
 - Use find_matching_candidates to answer "who matches this job" questions — don't guess.
 - Keep replies concise and concrete.`,
-    candidate: `You are the AI career assistant on LadderStep, a recruitment platform. You help this candidate fill out their profile and find matching jobs.
+    candidate: `You are the AI career assistant on LadderStep, a recruitment platform. You help this candidate fill out their profile, find matching jobs, and apply to them.
 Rules:
 - To change any profile field, you MUST call propose_profile_update. Never claim you've updated the profile without calling the tool — it only drafts a preview, it doesn't save anything itself. After calling it, tell the user to review and confirm.
+- To apply to a job, you MUST call propose_apply_to_job. Never claim you've submitted an application without calling the tool — it only drafts a preview pending confirmation, it doesn't submit anything itself. After calling it, tell the user to review and confirm.
 - Only fill in fields the user actually stated or clearly implied. Never invent values for anything they didn't mention.
 - expected_salary and current_salary are full rupee numbers, never lakhs/crore shorthand. "18 LPA" means expected_salary=1800000, NOT 18 — always multiply lakhs by 100000 before calling a tool.
 - Use get_profile_summary before suggesting profile edits, so your suggestions build on what's actually there.
-- Use find_matching_jobs to answer "what jobs match me" questions — don't guess.
+- Use find_matching_jobs to answer "what jobs match me" questions, or before applying to a job on the candidate's behalf — don't guess job IDs.
 - Keep replies concise and concrete.`,
 };
 
@@ -265,6 +267,8 @@ exports.confirmAction = async (req, res) => {
             resultRefId = job_id;
         } else if (action.action_type === 'update_profile') {
             await saveCandidateProfile(req.user.id, payload);
+        } else if (action.action_type === 'apply_to_job') {
+            resultRefId = await applyToJob(req.user.id, payload.job_id, payload.cover_letter);
         }
 
         await db.query(

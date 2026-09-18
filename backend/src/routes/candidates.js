@@ -12,6 +12,7 @@ const { isCandidateHired } = require('../utils/candidateStatus');
 const { upsertCandidateSkills } = require('../utils/skillTags');
 const premiumCtrl = require('../controllers/candidatePremiumController');
 const { saveCandidateProfile } = require('../utils/candidateProfile');
+const { applyToJob } = require('../utils/candidateApplications');
 
 // Ensure a candidates row exists for this user and return its id
 const getCandidateId = async (userId) => {
@@ -500,57 +501,11 @@ router.get('/applications', authenticateToken, authorizeRole('candidate'), async
 
 // ── POST /api/candidates/applications/:jobId ──────────────────────────────────
 router.post('/applications/:jobId', authenticateToken, authorizeRole('candidate'), async (req, res) => {
-    const userId = req.user.id;
-    const { jobId } = req.params;
-    const { cover_letter } = req.body;
-
     try {
-        const candidateId = await getCandidateId(userId);
-
-        // Once hired through Ladder, a candidate is off the market for new roles
-        if (await isCandidateHired(candidateId)) {
-            return res.status(403).json({
-                success: false,
-                message: 'You have already been hired through LadderStep Human Consulting and can no longer apply to new roles.',
-            });
-        }
-
-        const [[resumeRow]] = await db.query(
-            `SELECT id FROM resumes WHERE candidate_id = ? AND deleted_at IS NULL
-             ORDER BY is_primary DESC, created_at DESC LIMIT 1`,
-            [candidateId]
-        );
-        if (!resumeRow) {
-            return res.status(400).json({
-                success: false,
-                message: 'Please upload a resume before applying.',
-            });
-        }
-
-        const [[jobRow]] = await db.query(
-            "SELECT id FROM job_postings WHERE id = ? AND status = 'active' AND deleted_at IS NULL",
-            [jobId]
-        );
-        if (!jobRow) {
-            return res.status(404).json({ success: false, message: 'Job not found or no longer active.' });
-        }
-
-        const [result] = await db.query(
-            `INSERT INTO applications (candidate_id, job_id, resume_id, cover_letter) VALUES (?, ?, ?, ?)`,
-            [candidateId, jobId, resumeRow.id, cover_letter || null]
-        );
-
-        const applicationId = result.insertId;
+        const applicationId = await applyToJob(req.user.id, req.params.jobId, req.body?.cover_letter);
         res.status(201).json({ success: true, message: 'Application submitted.', data: { id: applicationId } });
-
-        setImmediate(() =>
-            matchingService.calculateMatchScore(applicationId)
-                .catch(err => console.error('[AI match]', err.message))
-        );
     } catch (err) {
-        if (err.code === 'ER_DUP_ENTRY') {
-            return res.status(409).json({ success: false, message: 'You have already applied to this job.' });
-        }
+        if (err.status) return res.status(err.status).json({ success: false, message: err.message });
         console.error('[application submit]', err);
         res.status(500).json({ success: false, message: 'Failed to submit application.' });
     }

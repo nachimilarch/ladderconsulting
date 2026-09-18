@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { talentPoolAPI, companyJobAPI } from '../../api/company';
 import toast from 'react-hot-toast';
+import AiAssistantPromo from '../../components/AiAssistantPromo';
 
 const EXP_RANGES = [
     { label: 'Any experience', min: '', max: '' },
@@ -281,6 +282,8 @@ export default function TalentPool() {
                     </a>
                 )}
             </div>
+
+            <AiAssistantPromo text="ask it to find candidates matching one of your job postings, ranked by AI match score." />
 
             {/* Filters — always shown so companies can browse masked cards */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-end">

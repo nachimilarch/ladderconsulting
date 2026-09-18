@@ -10,6 +10,7 @@
 const db = require('../config/db');
 const { scorePoolAgainstJob } = require('./matchingService');
 const jobController = require('../controllers/jobController');
+const { isCandidateHired } = require('../utils/candidateStatus');
 
 const fmtINR = (n) => (n ? `₹${parseFloat(n).toLocaleString('en-IN')}` : 'not specified');
 
@@ -181,6 +182,40 @@ async function proposeProfileUpdate({ user, conversationId }, fields) {
     return { pending_action_id: id, preview };
 }
 
+async function proposeApplyToJob({ user, conversationId }, { job_id, cover_letter }) {
+    const [[cand]] = await db.query('SELECT id FROM candidates WHERE user_id = ?', [user.id]);
+    if (!cand) return { error: 'Candidate account not found.' };
+
+    if (await isCandidateHired(cand.id)) {
+        return { error: 'You have already been hired through LadderStep Human Consulting and can no longer apply to new roles.' };
+    }
+
+    const [[resume]] = await db.query(
+        `SELECT id FROM resumes WHERE candidate_id = ? AND deleted_at IS NULL LIMIT 1`,
+        [cand.id]
+    );
+    if (!resume) return { error: 'The candidate has no resume uploaded yet — ask them to upload one before applying.' };
+
+    const [[job]] = await db.query(
+        `SELECT jp.id, jp.title, c.company_name
+         FROM job_postings jp JOIN companies c ON c.id = jp.company_id
+         WHERE jp.id = ? AND jp.status = 'active' AND jp.deleted_at IS NULL`,
+        [job_id]
+    );
+    if (!job) return { error: `Job #${job_id} not found, or no longer active.` };
+
+    const [[existing]] = await db.query(
+        `SELECT id FROM applications WHERE candidate_id = ? AND job_id = ? AND deleted_at IS NULL`,
+        [cand.id, job_id]
+    );
+    if (existing) return { error: `Already applied to "${job.title}" at ${job.company_name}.` };
+
+    const preview = `Apply to "${job.title}" at ${job.company_name}` +
+        (cover_letter ? `\nCover letter: ${cover_letter}` : '');
+    const id = await insertPendingAction(conversationId, user.id, 'apply_to_job', { job_id, cover_letter }, preview);
+    return { pending_action_id: id, preview };
+}
+
 // ── Tool registry ───────────────────────────────────────────────────────────
 
 const READ_ONLY = new Set(['find_matching_candidates', 'find_matching_jobs', 'get_profile_summary']);
@@ -193,6 +228,7 @@ const IMPLEMENTATIONS = {
     find_matching_jobs: findMatchingJobs,
     get_profile_summary: getProfileSummary,
     propose_profile_update: proposeProfileUpdate,
+    propose_apply_to_job: proposeApplyToJob,
 };
 
 const SCHEMAS = {
@@ -299,6 +335,21 @@ const SCHEMAS = {
                         portfolio_url: { type: 'string' },
                         skills: { type: 'array', items: { type: 'string' } },
                     },
+                },
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'propose_apply_to_job',
+                description: 'Propose applying the candidate to an active job posting, for the user to review and confirm. Does NOT submit the application.',
+                parameters: {
+                    type: 'object',
+                    properties: {
+                        job_id: { type: 'integer', description: 'The job posting ID to apply to.' },
+                        cover_letter: { type: 'string', description: 'Optional cover letter text.' },
+                    },
+                    required: ['job_id'],
                 },
             },
         },

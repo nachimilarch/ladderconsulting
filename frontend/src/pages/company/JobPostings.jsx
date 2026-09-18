@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { companyJobAPI, talentPoolAPI, premiumAPI } from '../../api/company';
 import toast from 'react-hot-toast';
+import AiAssistantPromo from '../../components/AiAssistantPromo';
 
 const CASHFREE_SDK_URL = 'https://sdk.cashfree.com/js/v3/cashfree.js';
 
@@ -223,6 +224,8 @@ export default function JobPostings() {
                     + Post a Job
                 </button>
             </div>
+
+            <AiAssistantPromo text="ask it to draft this job posting for you, or find matching candidates once it's live." />
 
             {companyTier !== 'premium' && <PlatinumBanner />}
 
