@@ -125,32 +125,6 @@ function CandidateCard({ cand, activated, onInterest }) {
     );
 }
 
-// ── Payment wall shown when account is not yet activated ──────────────────────
-function ActivationWall({ onPay, paying }) {
-    return (
-        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-8 text-center max-w-lg mx-auto mt-10">
-            <div className="text-5xl mb-4">🔒</div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Activate Your Hiring Account</h2>
-            <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                Pay a one-time listing fee of <strong>₹3,999</strong> to unlock full access:
-            </p>
-            <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 max-w-xs mx-auto">
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Post job descriptions and upload JDs</li>
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Search all candidates — full unmasked profiles</li>
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Shortlist and contact candidates directly</li>
-            </ul>
-            <p className="text-xs text-gray-400 mb-5">One-time fee · No recurring charges</p>
-            <button
-                onClick={onPay}
-                disabled={paying}
-                className="bg-indigo-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition text-sm"
-            >
-                {paying ? 'Processing…' : 'Pay ₹3,999 & Activate'}
-            </button>
-        </div>
-    );
-}
-
 export default function TalentPool() {
     const [candidates, setCandidates] = useState([]);
     const [total, setTotal] = useState(0);
@@ -159,7 +133,6 @@ export default function TalentPool() {
     const [activated, setActivated] = useState(false);
     const [companyTier, setCompanyTier] = useState('standard');
     const [activationChecked, setActivationChecked] = useState(false);
-    const [paying, setPaying] = useState(false);
 
     const [search, setSearch] = useState('');
     const [skill, setSkill] = useState('');
@@ -217,25 +190,6 @@ export default function TalentPool() {
             })
             .catch(() => {});
     }, []);
-
-    const handlePay = async () => {
-        setPaying(true);
-        try {
-            const { data } = await talentPoolAPI.payListingFee();
-            if (data?.payment_session_id) {
-                if (window.Cashfree) {
-                    const cf = new window.Cashfree({ mode: 'production' });
-                    cf.checkout({ paymentSessionId: data.payment_session_id });
-                } else {
-                    toast.error('Payment widget not loaded. Please refresh and try again.');
-                }
-            }
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
-        } finally {
-            setPaying(false);
-        }
-    };
 
     const handleSearchChange = (val) => {
         setSearch(val);
@@ -327,8 +281,6 @@ export default function TalentPool() {
                     </a>
                 )}
             </div>
-
-            {!activated && <ActivationWall onPay={handlePay} paying={paying} />}
 
             {/* Filters — always shown so companies can browse masked cards */}
             <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 mb-6 flex flex-wrap gap-3 items-end">

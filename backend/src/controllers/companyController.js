@@ -1004,6 +1004,7 @@ exports.payListingFee = async (req, res) => {
         res.json({
             success: true,
             payment_session_id: cfOrder.payment_session_id,
+            cashfree_env: cashfree.getEnv(),
             order_id: orderId,
             invoice_id: invoiceId,
             invoice_number: invoiceNumber,

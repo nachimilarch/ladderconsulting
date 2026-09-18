@@ -1,6 +1,46 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { companyJobAPI } from '../../api/company';
+import { companyJobAPI, talentPoolAPI } from '../../api/company';
+import toast from 'react-hot-toast';
+
+const CASHFREE_SDK_URL = 'https://sdk.cashfree.com/js/v3/cashfree.js';
+
+const loadCashfreeSDK = () => new Promise((resolve, reject) => {
+    if (window.Cashfree) return resolve();
+    const s = document.createElement('script');
+    s.src = CASHFREE_SDK_URL;
+    s.onload = resolve;
+    s.onerror = reject;
+    document.head.appendChild(s);
+});
+
+// Payment wall shown when the account is not yet activated — moved here from
+// TalentPool.jsx since posting/managing jobs (not browsing) is the actual
+// activation-gated action.
+function ActivationWall({ onPay, paying }) {
+    return (
+        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-8 text-center max-w-lg mx-auto mb-8">
+            <div className="text-5xl mb-4">🔒</div>
+            <h2 className="text-xl font-bold text-gray-900 mb-2">Activate Your Hiring Account</h2>
+            <p className="text-sm text-gray-500 mb-4 leading-relaxed">
+                Pay a one-time listing fee of <strong>₹3,999</strong> to unlock full access:
+            </p>
+            <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 max-w-xs mx-auto">
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Post job descriptions and upload JDs</li>
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Search all candidates — full unmasked profiles</li>
+                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Shortlist and contact candidates directly</li>
+            </ul>
+            <p className="text-xs text-gray-400 mb-5">One-time fee · No recurring charges</p>
+            <button
+                onClick={onPay}
+                disabled={paying}
+                className="bg-indigo-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition text-sm"
+            >
+                {paying ? 'Processing…' : 'Pay ₹3,999 & Activate'}
+            </button>
+        </div>
+    );
+}
 
 const STATUS_COLORS = {
     draft:   'bg-gray-100 text-gray-600',
@@ -24,6 +64,9 @@ export default function JobPostings() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
+    const [activated, setActivated] = useState(false);
+    const [activationChecked, setActivationChecked] = useState(false);
+    const [paying, setPaying] = useState(false);
 
     const load = () => {
         setLoading(true);
@@ -34,6 +77,30 @@ export default function JobPostings() {
     };
 
     useEffect(() => { load(); }, []);
+
+    useEffect(() => {
+        talentPoolAPI.activationStatus()
+            .then(r => setActivated(!!r.data?.activated))
+            .catch(() => {})
+            .finally(() => setActivationChecked(true));
+    }, []);
+
+    const handlePay = async () => {
+        setPaying(true);
+        try {
+            const { data } = await talentPoolAPI.payListingFee();
+            if (data?.payment_session_id) {
+                await loadCashfreeSDK();
+                const mode = data.cashfree_env === 'PROD' ? 'production' : 'sandbox';
+                const cf = new window.Cashfree({ mode });
+                cf.checkout({ paymentSessionId: data.payment_session_id });
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
+        } finally {
+            setPaying(false);
+        }
+    };
 
     const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setError(''); setShowModal(true); };
     const openEdit = (job) => {
@@ -66,7 +133,7 @@ export default function JobPostings() {
         } catch (err) {
             const code = err.response?.data?.code;
             if (code === 'ACTIVATION_REQUIRED') {
-                setError('Your account needs to be activated before posting jobs. Go to Talent Pool to pay the one-time ₹3,999 listing fee.');
+                setError('Your account needs to be activated before posting jobs — pay the one-time ₹3,999 listing fee above.');
             } else {
                 setError(err.response?.data?.message || 'Failed to save job.');
             }
@@ -105,6 +172,8 @@ export default function JobPostings() {
                     + Post a Job
                 </button>
             </div>
+
+            {activationChecked && !activated && <ActivationWall onPay={handlePay} paying={paying} />}
 
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading...</div>
