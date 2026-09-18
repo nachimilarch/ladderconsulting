@@ -37,7 +37,7 @@ exports.listActiveJobs = async (req, res) => {
     try {
         const [jobs] = await db.query(
             `SELECT jp.id, jp.title, jp.location, jp.job_type, jp.work_mode,
-                    jp.experience_min, jp.experience_max, jp.openings, jp.deadline,
+                    jp.experience_min, jp.experience_max, jp.openings,
                     jp.status, jp.created_at, co.id AS company_id, co.company_name,
                     (SELECT COUNT(*) FROM applications a
                      WHERE a.job_id = jp.id AND a.deleted_at IS NULL) AS applicant_count,
@@ -62,7 +62,7 @@ exports.getJobDetail = async (req, res) => {
         const [[job]] = await db.query(
             `SELECT jp.id, jp.title, jp.description, jp.requirements, jp.location,
                     jp.job_type, jp.work_mode, jp.salary_min, jp.salary_max,
-                    jp.experience_min, jp.experience_max, jp.openings, jp.deadline,
+                    jp.experience_min, jp.experience_max, jp.openings,
                     jp.created_at, co.id AS company_id, co.company_name,
                     co.industry, co.headquarters,
                     (SELECT COUNT(*) FROM applications a

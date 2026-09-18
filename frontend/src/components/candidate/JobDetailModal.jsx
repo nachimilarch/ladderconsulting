@@ -109,7 +109,6 @@ export default function JobDetailModal({ jobId, onClose, onApplied }) {
                                 )}
                                 {job.openings != null && <div><p className="text-xs text-gray-400">Openings</p><p className="font-medium text-gray-700">{job.openings}</p></div>}
                                 <div><p className="text-xs text-gray-400">Posted</p><p className="font-medium text-gray-700">{new Date(job.created_at).toLocaleDateString()}</p></div>
-                                {job.deadline && <div><p className="text-xs text-gray-400">Apply by</p><p className="font-medium text-orange-600">{new Date(job.deadline).toLocaleDateString()}</p></div>}
                             </div>
 
                             {/* Required / preferred skills */}

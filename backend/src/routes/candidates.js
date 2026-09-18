@@ -137,7 +137,7 @@ router.get('/jobs', authenticateToken, authorizeRole('candidate'), async (req, r
         const [jobs] = await db.query(
             `SELECT jp.id, jp.title, jp.description, jp.location, jp.job_type, jp.work_mode,
                     jp.salary_min, jp.salary_max, jp.experience_min, jp.experience_max,
-                    jp.openings, jp.deadline, jp.created_at,
+                    jp.openings, jp.created_at,
                     co.company_name,
                     CASE WHEN a.id IS NOT NULL THEN 1 ELSE 0 END AS already_applied,
                     a.status AS application_status, a.id AS application_id
@@ -178,7 +178,7 @@ router.get('/jobs/:id', authenticateToken, authorizeRole('candidate'), async (re
         const [[job]] = await db.query(
             `SELECT jp.id, jp.title, jp.description, jp.requirements, jp.location,
                     jp.job_type, jp.work_mode, jp.salary_min, jp.salary_max,
-                    jp.experience_min, jp.experience_max, jp.openings, jp.deadline,
+                    jp.experience_min, jp.experience_max, jp.openings,
                     jp.created_at,
                     co.company_name, co.industry, co.headquarters, co.website,
                     CASE WHEN a.id IS NOT NULL THEN 1 ELSE 0 END AS already_applied,

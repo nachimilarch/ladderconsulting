@@ -152,11 +152,6 @@ export default function CandidateJobs() {
                                                     </span>
                                                 )}
                                                 <span>📅 {new Date(job.created_at).toLocaleDateString()}</span>
-                                                {job.deadline && (
-                                                    <span className="text-orange-500">
-                                                        ⏰ Deadline: {new Date(job.deadline).toLocaleDateString()}
-                                                    </span>
-                                                )}
                                                 <span className="text-indigo-600 font-medium ml-auto">View full details →</span>
                                             </div>
 

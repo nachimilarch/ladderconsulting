@@ -22,7 +22,7 @@ const JOB_FIELD_LABELS = {
     location: 'Location', job_type: 'Type', work_mode: 'Mode',
     salary_min: 'Salary min', salary_max: 'Salary max',
     experience_min: 'Experience min (yrs)', experience_max: 'Experience max (yrs)',
-    openings: 'Openings', deadline: 'Deadline', status: 'Status',
+    openings: 'Openings', status: 'Status',
 };
 const describeJobFields = (fields) => Object.entries(fields)
     .filter(([, v]) => v !== undefined && v !== null && v !== '')
@@ -231,7 +231,6 @@ const SCHEMAS = {
                         experience_min: { type: 'number' },
                         experience_max: { type: 'number' },
                         openings: { type: 'integer' },
-                        deadline: { type: 'string', description: 'YYYY-MM-DD' },
                     },
                     required: ['title', 'description'],
                 },

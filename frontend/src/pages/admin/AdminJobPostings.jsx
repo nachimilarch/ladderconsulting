@@ -111,11 +111,6 @@ export default function AdminJobPostings() {
                                 <tr key={job.id} className={`hover:bg-gray-50 ${updating === job.id ? 'opacity-50' : ''}`}>
                                     <td className="px-4 py-3">
                                         <div className="font-medium text-gray-800">{job.title}</div>
-                                        {job.deadline && (
-                                            <div className="text-xs text-gray-400">
-                                                Deadline: {new Date(job.deadline).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                            </div>
-                                        )}
                                     </td>
                                     <td className="px-4 py-3 text-gray-700">{job.company_name}</td>
                                     <td className="px-4 py-3 text-gray-500 capitalize text-xs">

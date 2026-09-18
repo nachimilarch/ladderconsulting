@@ -51,7 +51,7 @@ exports.getMatchedJobsForCandidate = async (candidateId, { page = 1, limit = 10 
         `SELECT
            jp.id, jp.title, jp.description, jp.location, jp.job_type,
            jp.salary_min, jp.salary_max, jp.experience_min, jp.experience_max,
-           jp.work_mode, jp.openings, jp.deadline,
+           jp.work_mode, jp.openings,
            c.company_name, c.headquarters AS company_location,
            jp.created_at,
            COALESCE(mr.fit_score, 0)      AS match_score,
@@ -109,7 +109,7 @@ const createJobRecord = async (companyId, userId, fields, { forceStatus } = {}) 
     const {
         title, description, requirements, location, job_type, work_mode,
         salary_min, salary_max, experience_min, experience_max,
-        openings, deadline, status,
+        openings, status,
     } = fields;
 
     if (!title || !description) {
@@ -120,12 +120,12 @@ const createJobRecord = async (companyId, userId, fields, { forceStatus } = {}) 
         `INSERT INTO job_postings
          (company_id, posted_by, title, description, requirements, location,
           job_type, work_mode, salary_min, salary_max, experience_min,
-          experience_max, openings, deadline, status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          experience_max, openings, status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
         [companyId, userId, title, description, requirements || null,
          location || null, job_type || 'full_time', work_mode || 'onsite',
          salary_min || null, salary_max || null, experience_min || 0,
-         experience_max || null, openings || 1, deadline || null,
+         experience_max || null, openings || 1,
          forceStatus || status || 'draft']
     );
 
@@ -293,7 +293,7 @@ const updateJobRecord = async (companyId, jobId, fields) => {
     const {
         title, description, requirements, location, job_type, work_mode,
         salary_min, salary_max, experience_min, experience_max,
-        openings, deadline, status,
+        openings, status,
     } = fields;
 
     if (!title || !description) {
@@ -310,12 +310,12 @@ const updateJobRecord = async (companyId, jobId, fields) => {
         `UPDATE job_postings
          SET title=?, description=?, requirements=?, location=?, job_type=?,
              work_mode=?, salary_min=?, salary_max=?, experience_min=?,
-             experience_max=?, openings=?, deadline=?, status=?
+             experience_max=?, openings=?, status=?
          WHERE id=?`,
         [title, description, requirements || null, location || null,
          job_type || 'full_time', work_mode || 'onsite',
          salary_min || null, salary_max || null, experience_min || 0,
-         experience_max || null, openings || 1, deadline || null,
+         experience_max || null, openings || 1,
          status || 'draft', jobId]
     );
 

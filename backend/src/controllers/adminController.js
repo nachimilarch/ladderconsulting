@@ -1510,7 +1510,7 @@ exports.listAllJobs = async (req, res) => {
     try {
         const [jobs] = await db.query(
             `SELECT jp.id, jp.title, jp.location, jp.job_type, jp.work_mode, jp.status,
-                    jp.openings, jp.deadline, jp.created_at,
+                    jp.openings, jp.created_at,
                     co.id AS company_id, co.company_name,
                     (SELECT COUNT(*) FROM applications a WHERE a.job_id = jp.id AND a.deleted_at IS NULL) AS applicant_count
              FROM job_postings jp
