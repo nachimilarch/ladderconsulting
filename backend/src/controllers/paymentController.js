@@ -3,6 +3,7 @@ const cashfree = require('../services/cashfreeService');
 const { sendEmail } = require('../utils/email');
 const { syncPlacementFeeStatus } = require('../utils/placementFee');
 const { fulfillResumeUnlockOrder } = require('../utils/resumeUnlock');
+const jobController = require('./jobController');
 
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
 
@@ -20,7 +21,7 @@ const fmtINR = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { maximum
 const processSuccessfulPayment = async (txn, paymentId, conn) => {
     const c = conn || db;
     const [[inv]] = await c.query(
-        `SELECT id, company_id, candidate_id, application_id, amount, amount_paid, invoice_number, invoice_type
+        `SELECT id, company_id, candidate_id, application_id, job_posting_id, amount, amount_paid, invoice_number, invoice_type
          FROM invoices WHERE id = ? AND deleted_at IS NULL`,
         [txn.invoice_id]
     );
@@ -60,6 +61,20 @@ const processSuccessfulPayment = async (txn, paymentId, conn) => {
                 [inv.id, inv.company_id]
             );
         } catch (e) { console.error('[listingFeeActivate]', e.message); }
+    }
+
+    // Job-posting fee: ₹3,999 per JD for Standard-tier companies (not a
+    // one-time account activation — every new job costs this again). The
+    // same payment still activates Talent Pool access (listing_fee_paid),
+    // it just no longer buys future free job posts.
+    if (inv.invoice_type === 'job_posting_fee' && newStatus === 'paid') {
+        try {
+            await jobController.activateJobPosting(inv.job_posting_id, c);
+            await c.query(
+                `UPDATE companies SET listing_fee_paid = 1, listing_fee_invoice_id = ? WHERE id = ? AND deleted_at IS NULL`,
+                [inv.id, inv.company_id]
+            );
+        } catch (e) { console.error('[jobPostingFeeActivate]', e.message); }
     }
 
     // Premium profile fee activates the candidate's Premium status. Approval

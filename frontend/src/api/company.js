@@ -13,6 +13,7 @@ export const companyJobAPI = {
     update:     (id, data)    => api.put(`/jobs/${id}`, data),
     setStatus:  (id, status)  => api.patch(`/jobs/${id}/status`, { status }),
     remove:     (id)          => api.delete(`/jobs/${id}`),
+    pay:        (id)          => api.post(`/jobs/${id}/pay`),
 
     getApplications:     (jobId)               => api.get(`/jobs/${jobId}/applications`),
     shortlist:           (jobId, appId, data)  => api.post(`/jobs/${jobId}/applications/${appId}/shortlist`, data),
@@ -54,7 +55,6 @@ export const talentPoolAPI = {
     list:             (params)            => api.get('/companies/talent', { params }),
     expressInterest:  (candidateId, data) => api.post(`/companies/talent/${candidateId}/interest`, data),
     activationStatus: ()                  => api.get('/companies/activation-status'),
-    payListingFee:    ()                  => api.post('/companies/pay-listing-fee'),
 };
 
 export const premiumAPI = {

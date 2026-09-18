@@ -29,9 +29,9 @@ router.get('/requests',   ctrl.listRequests);
 router.get('/talent',                        ctrl.getTalentPool);
 router.post('/talent/:candidateId/interest', ctrl.expressInterest);
 
-// Listing fee — one-time ₹3,999 activation
+// Activation status — job posting is now priced per-JD (see /api/jobs),
+// this just reports whether the account has ever paid (Talent Pool access).
 router.get('/activation-status',  ctrl.getActivationStatus);
-router.post('/pay-listing-fee',   ctrl.payListingFee);
 
 // Premium tier — company-requested, executive/admin-approved, replaces the listing fee
 router.post('/premium/request',   ctrl.requestPremiumTier);

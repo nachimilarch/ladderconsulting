@@ -10,7 +10,6 @@
 const db = require('../config/db');
 const { scorePoolAgainstJob } = require('./matchingService');
 const jobController = require('../controllers/jobController');
-const { getCompanyAccess } = require('../utils/companyAccess');
 
 const fmtINR = (n) => (n ? `₹${parseFloat(n).toLocaleString('en-IN')}` : 'not specified');
 
@@ -99,18 +98,21 @@ async function findMatchingCandidates({ user }, { job_id, limit = 10 }) {
 }
 
 async function proposeJobPost({ user, conversationId }, fields) {
-    const [[company]] = await db.query('SELECT id FROM companies WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
+    const [[company]] = await db.query('SELECT id, company_tier FROM companies WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
     if (!company) return { error: 'Company account not found.' };
 
     if (!fields.title || !fields.description) {
         return { error: 'A job post needs at least a title and a description — ask the user for whichever is missing.' };
     }
-    const access = await getCompanyAccess(company.id);
-    if (!access.activated) {
-        return { error: 'This company account is not yet activated (needs the ₹3,999 listing fee or Premium tier) — job posting will fail until then. Tell the user this rather than proposing the post.' };
-    }
 
-    const preview = `New job post — "${fields.title}"\n${describeJobFields(fields)}`;
+    // Standard-tier companies pay ₹3,999 per job at confirm time (a Cashfree
+    // checkout, not something the chatbot can complete itself) — Platinum
+    // posts for free. Either way, proposing/previewing here is always allowed;
+    // this is just something the human should know before confirming.
+    const feeNote = company.company_tier === 'premium'
+        ? ''
+        : '\n\nConfirming this will redirect you to pay a ₹3,999 posting fee for this job.';
+    const preview = `New job post — "${fields.title}"\n${describeJobFields(fields)}${feeNote}`;
 
     const id = await insertPendingAction(conversationId, user.id, 'create_job', fields, preview);
     return { pending_action_id: id, preview };

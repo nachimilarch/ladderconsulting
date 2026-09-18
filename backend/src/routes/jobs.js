@@ -31,6 +31,7 @@ router.post('/',   authenticateToken, authorizeRole('company'), jobCtrl.createJo
 router.get('/:id', authenticateToken, authorizeRole('company'), jobCtrl.getJob);
 router.put('/:id', authenticateToken, authorizeRole('company'), jobCtrl.updateJob);
 router.patch('/:id/status', authenticateToken, authorizeRole('company'), jobCtrl.setJobStatus);
+router.post('/:id/pay', authenticateToken, authorizeRole('company'), jobCtrl.payForJobPosting);
 router.delete('/:id', authenticateToken, authorizeRole('company'), jobCtrl.deleteJob);
 
 // ── Company: application management per job ───────────────────────────────────

@@ -4,8 +4,6 @@ const fs = require('fs');
 const { maskName, maskCandidateForCompany, maskLocation } = require('../utils/maskPII');
 const { logAction } = require('../utils/auditLog');
 const { scorePoolAgainstJob } = require('../services/matchingService');
-const { nextInvoiceNumber } = require('../utils/placementFee');
-const cashfree = require('../services/cashfreeService');
 const { sendEmail } = require('../utils/email');
 const { getCompanyAccess } = require('../utils/companyAccess');
 
@@ -945,74 +943,8 @@ exports.requestPremiumTier = async (req, res) => {
     }
 };
 
-// ── POST /api/companies/pay-listing-fee ───────────────────────────────────────
-// Creates a ₹3,999 Cashfree order for the flat listing-fee activation.
-exports.payListingFee = async (req, res) => {
-    try {
-        const company = await getOrCreateCompany(req.user.id);
-
-        if (company.listing_fee_paid) {
-            return res.status(409).json({ message: 'Your account is already activated.' });
-        }
-
-        const [[userRow]] = await db.query('SELECT name, email, phone FROM users WHERE id = ?', [req.user.id]);
-        const amount = 3999;
-
-        const conn = await db.getConnection();
-        let invoiceId, invoiceNumber;
-        try {
-            await conn.beginTransaction();
-            invoiceNumber = await nextInvoiceNumber(conn);
-            const [invResult] = await conn.query(
-                `INSERT INTO invoices (invoice_number, company_id, raised_by, invoice_type, amount, status, description, due_date)
-                 VALUES (?, ?, ?, 'listing_fee', ?, 'pending', 'Platform Listing Fee — LadderStep Human Consulting', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
-                [invoiceNumber, company.id, req.user.id, amount]
-            );
-            invoiceId = invResult.insertId;
-            await conn.commit();
-        } catch (err) {
-            await conn.rollback();
-            throw err;
-        } finally {
-            conn.release();
-        }
-
-        const orderId = `LC-LF-${Date.now()}-${invoiceId}`;
-        const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/^http:\/\//, 'https://');
-        const returnUrl = `${frontendBase}/company/payment-callback?invoiceId=${invoiceId}&txnOrderId=${orderId}`;
-
-        await db.query(
-            `INSERT INTO payment_transactions (invoice_id, company_id, amount, payment_method, cashfree_order_id, status)
-             VALUES (?, ?, ?, 'cashfree', ?, 'initiated')`,
-            [invoiceId, company.id, amount, orderId]
-        );
-
-        const cfOrder = await cashfree.createOrder({
-            orderId,
-            amount,
-            customerName: userRow.name || company.company_name,
-            customerEmail: userRow.email,
-            customerPhone: userRow.phone || '9999999999',
-            orderNote: 'Platform Listing Fee — LadderStep Human Consulting',
-            returnUrl,
-        }).catch(async (cfErr) => {
-            await db.query(`UPDATE payment_transactions SET status = 'failed' WHERE cashfree_order_id = ?`, [orderId]);
-            console.error('[Cashfree] listing fee createOrder failed:', cfErr.response?.data || cfErr.message);
-            throw Object.assign(new Error('Payment gateway unavailable.'), { gatewayError: true });
-        });
-
-        res.json({
-            success: true,
-            payment_session_id: cfOrder.payment_session_id,
-            cashfree_env: cashfree.getEnv(),
-            order_id: orderId,
-            invoice_id: invoiceId,
-            invoice_number: invoiceNumber,
-            amount,
-        });
-    } catch (err) {
-        if (err.gatewayError) return res.status(502).json({ message: err.message });
-        console.error('[payListingFee]', err.message);
-        res.status(500).json({ message: 'Failed to initiate payment.' });
-    }
-};
+// payListingFee (standalone flat ₹3,999 account activation) retired — job
+// posting is now priced per-JD (see jobController.initiateJobPostingPayment).
+// 'listing_fee' stays in the invoices.invoice_type enum and
+// paymentController's handling for it, since historical invoices under the
+// old model still reference it.

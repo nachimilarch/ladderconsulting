@@ -5,7 +5,24 @@ const { maskCandidateForCompany } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
 const { sendEmail } = require('../utils/email');
 const { getCompanyAccess } = require('../utils/companyAccess');
+const { nextInvoiceNumber } = require('../utils/placementFee');
+const cashfree = require('../services/cashfreeService');
 const wa = require('../utils/whatsappNotify');
+
+const JOB_POSTING_FEE_AMOUNT = 3999;
+
+const triggerJobBackgroundMatching = (jobId, { title, description, requirements }) => {
+    const jdText = `${description || ''}\n\n${requirements || ''}`;
+    setImmediate(async () => {
+        try {
+            await extractAndSaveJobSkills(jobId, { title, description, requirements }, db);
+        } catch (err) {
+            console.error('[Keyword] job extraction failed:', err.message);
+        }
+        matchingService.triggerJobMatching(jobId, jdText)
+            .catch(err => console.error('[AI] Job matching failed:', err.message));
+    });
+};
 
 const safeEmail = (opts) => sendEmail(opts).catch(err => console.error('[Email]', err.message));
 
@@ -82,12 +99,13 @@ exports.listCompanyJobs = async (req, res) => {
 };
 
 // ── POST /api/jobs ────────────────────────────────────────────────────────────
-// Shared by the HTTP route below and the chatbot's confirmed create_job action
-// (chatbotTools.js) — the exact same validation, activation gate, and
-// background matching trigger either way, never reimplemented in the chatbot
-// layer. Throws an Error with .status/.code set for expected failures
-// (400 validation, 402 ACTIVATION_REQUIRED) so callers can translate it.
-const createJobRecord = async (companyId, userId, fields) => {
+// Free, immediate job creation — used for Platinum-tier companies (their
+// whole value prop is no per-job fee, 8.33% at hire instead) and internally
+// by paymentController once a Standard-tier company's job-posting fee is
+// paid (activateJobPosting below). Also reused by the chatbot's confirmed
+// create_job action for Platinum companies. Throws an Error with
+// .status/.code set for expected failures so callers can translate it.
+const createJobRecord = async (companyId, userId, fields, { forceStatus } = {}) => {
     const {
         title, description, requirements, location, job_type, work_mode,
         salary_min, salary_max, experience_min, experience_max,
@@ -96,13 +114,6 @@ const createJobRecord = async (companyId, userId, fields) => {
 
     if (!title || !description) {
         throw Object.assign(new Error('title and description are required.'), { status: 400 });
-    }
-
-    if (!(await getCompanyAccess(companyId)).activated) {
-        throw Object.assign(
-            new Error('Your account is not yet activated. Please pay the ₹3,999 listing fee (or move to the Premium tier) to post jobs and access candidates.'),
-            { status: 402, code: 'ACTIVATION_REQUIRED' }
-        );
     }
 
     const [result] = await db.query(
@@ -115,35 +126,140 @@ const createJobRecord = async (companyId, userId, fields) => {
          location || null, job_type || 'full_time', work_mode || 'onsite',
          salary_min || null, salary_max || null, experience_min || 0,
          experience_max || null, openings || 1, deadline || null,
-         status || 'draft']
+         forceStatus || status || 'draft']
     );
 
     const jobId = result.insertId;
-
-    // Background: keyword extraction first (fast, no API needed), then AI matching
-    const jdText = `${description || ''}\n\n${requirements || ''}`;
-    setImmediate(async () => {
-        try {
-            await extractAndSaveJobSkills(jobId, { title, description, requirements }, db);
-        } catch (err) {
-            console.error('[Keyword] createJob extraction failed:', err.message);
-        }
-        // AI extraction runs after; if it succeeds it replaces keyword vectors with
-        // better-quality data. If it fails, keyword vectors remain as a working fallback.
-        matchingService.triggerJobMatching(jobId, jdText)
-            .catch(err => console.error('[AI] Job matching failed:', err.message));
-    });
-
+    triggerJobBackgroundMatching(jobId, { title, description, requirements });
     return jobId;
 };
 exports.createJobRecord = createJobRecord;
 
+// Creates a ₹3,999 Cashfree order for an EXISTING job_posting row (already
+// 'pending_payment'). Split out from job creation so an abandoned/failed
+// checkout can be retried (POST /api/jobs/:id/pay) without creating a
+// duplicate job row.
+const createJobPostingFeeOrder = async (companyId, userId, jobId) => {
+    const [[userRow]] = await db.query('SELECT name, email, phone FROM users WHERE id = ?', [userId]);
+    const [[company]] = await db.query('SELECT company_name FROM companies WHERE id = ?', [companyId]);
+
+    const conn = await db.getConnection();
+    let invoiceId, invoiceNumber;
+    try {
+        await conn.beginTransaction();
+        invoiceNumber = await nextInvoiceNumber(conn);
+        const [invResult] = await conn.query(
+            `INSERT INTO invoices (invoice_number, company_id, job_posting_id, raised_by, invoice_type, amount, status, description, due_date)
+             VALUES (?, ?, ?, ?, 'job_posting_fee', ?, 'pending', 'Job Posting Fee — LadderStep Human Consulting', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+            [invoiceNumber, companyId, jobId, userId, JOB_POSTING_FEE_AMOUNT]
+        );
+        invoiceId = invResult.insertId;
+        await conn.commit();
+    } catch (err) {
+        await conn.rollback();
+        throw err;
+    } finally {
+        conn.release();
+    }
+
+    const orderId = `LC-JOB-${Date.now()}-${invoiceId}`;
+    const frontendBase = (process.env.FRONTEND_URL || 'http://localhost:5173').split(',')[0].trim().replace(/^http:\/\//, 'https://');
+    const returnUrl = `${frontendBase}/company/payment-callback?invoiceId=${invoiceId}&txnOrderId=${orderId}`;
+
+    await db.query(
+        `INSERT INTO payment_transactions (invoice_id, company_id, amount, payment_method, cashfree_order_id, status)
+         VALUES (?, ?, ?, 'cashfree', ?, 'initiated')`,
+        [invoiceId, companyId, JOB_POSTING_FEE_AMOUNT, orderId]
+    );
+
+    const cfOrder = await cashfree.createOrder({
+        orderId,
+        amount: JOB_POSTING_FEE_AMOUNT,
+        customerName: userRow.name || company.company_name,
+        customerEmail: userRow.email,
+        customerPhone: userRow.phone || '9999999999',
+        orderNote: 'Job Posting Fee — LadderStep Human Consulting',
+        returnUrl,
+    }).catch(async (cfErr) => {
+        await db.query(`UPDATE payment_transactions SET status = 'failed' WHERE cashfree_order_id = ?`, [orderId]);
+        console.error('[Cashfree] job_posting_fee createOrder failed:', cfErr.response?.data || cfErr.message);
+        throw Object.assign(new Error('Payment gateway unavailable.'), { gatewayError: true });
+    });
+
+    return {
+        payment_session_id: cfOrder.payment_session_id,
+        cashfree_env: cashfree.getEnv(),
+        order_id: orderId,
+        invoice_id: invoiceId,
+        invoice_number: invoiceNumber,
+        amount: JOB_POSTING_FEE_AMOUNT,
+        job_id: jobId,
+    };
+};
+
+// Payment-gated creation for Standard-tier companies — ₹3,999 per job posted
+// (not a one-time account activation). Inserts the job as 'pending_payment'
+// (excluded from every candidate-facing / active-job query — it isn't real
+// until paid) and returns a Cashfree order for it. The job actually goes
+// live via activateJobPosting, called from paymentController's
+// 'job_posting_fee' branch once the payment succeeds — same "payment
+// activates, not the initiating action" discipline as every other paid
+// flow in this codebase (listing fee, premium-profile fee, AI subscription).
+const initiateJobPostingPayment = async (companyId, userId, fields) => {
+    const jobId = await createJobRecord(companyId, userId, fields, { forceStatus: 'pending_payment' });
+    return createJobPostingFeeOrder(companyId, userId, jobId);
+};
+exports.initiateJobPostingPayment = initiateJobPostingPayment;
+
+// ── POST /api/jobs/:id/pay ────────────────────────────────────────────────────
+// Retries payment for a job stuck in 'pending_payment' (e.g. an abandoned
+// Cashfree checkout) without creating a duplicate job row.
+exports.payForJobPosting = async (req, res) => {
+    try {
+        const companyId = await getCompanyId(req.user.id);
+        const [[job]] = await db.query(
+            `SELECT id FROM job_postings WHERE id = ? AND company_id = ? AND status = 'pending_payment' AND deleted_at IS NULL`,
+            [req.params.id, companyId]
+        );
+        if (!job) return res.status(404).json({ message: 'No unpaid job posting found with that id.' });
+
+        const payment = await createJobPostingFeeOrder(companyId, req.user.id, job.id);
+        res.json({ success: true, ...payment });
+    } catch (err) {
+        if (err.gatewayError) return res.status(502).json({ message: err.message });
+        console.error('[payForJobPosting]', err.message);
+        res.status(500).json({ message: 'Failed to initiate payment.' });
+    }
+};
+
+// Called from paymentController when a 'job_posting_fee' invoice is paid —
+// publishes the job and, same as the old flat listing fee, unlocks Talent
+// Pool access (companies.listing_fee_paid) since that's what "activated"
+// still means for browsing; it just no longer buys future free job posts.
+exports.activateJobPosting = async (jobId, conn) => {
+    const c = conn || db;
+    const [[job]] = await c.query(
+        'SELECT title, description, requirements FROM job_postings WHERE id = ?', [jobId]
+    );
+    if (!job) return;
+    await c.query(`UPDATE job_postings SET status = 'active' WHERE id = ?`, [jobId]);
+    triggerJobBackgroundMatching(jobId, job);
+};
+
 exports.createJob = async (req, res) => {
     try {
         const companyId = await getCompanyId(req.user.id);
-        const jobId = await createJobRecord(companyId, req.user.id, req.body);
-        res.status(201).json({ message: 'Job created.', id: jobId });
+        const { isPremium } = await getCompanyAccess(companyId);
+
+        if (isPremium) {
+            const jobId = await createJobRecord(companyId, req.user.id, req.body);
+            return res.status(201).json({ message: 'Job created.', id: jobId });
+        }
+
+        const payment = await initiateJobPostingPayment(companyId, req.user.id, req.body);
+        res.status(200).json({ message: 'Complete payment to publish this job.', ...payment });
     } catch (err) {
+        if (err.gatewayError) return res.status(502).json({ message: err.message });
         if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
         console.error('createJob error:', err);
         res.status(500).json({ message: 'Failed to create job.' });

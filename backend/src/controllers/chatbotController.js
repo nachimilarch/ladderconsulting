@@ -245,10 +245,19 @@ exports.confirmAction = async (req, res) => {
 
         const payload = typeof action.payload === 'string' ? JSON.parse(action.payload) : action.payload;
         let resultRefId = null;
+        let payment = null;
 
         if (action.action_type === 'create_job') {
-            const [[company]] = await db.query('SELECT id FROM companies WHERE user_id = ? AND deleted_at IS NULL', [req.user.id]);
-            resultRefId = await jobController.createJobRecord(company.id, req.user.id, payload);
+            const [[company]] = await db.query('SELECT id, company_tier FROM companies WHERE user_id = ? AND deleted_at IS NULL', [req.user.id]);
+            if (company.company_tier === 'premium') {
+                resultRefId = await jobController.createJobRecord(company.id, req.user.id, payload);
+            } else {
+                // Standard tier: ₹3,999 per job — creates the job as
+                // 'pending_payment' and a Cashfree order; the frontend
+                // (ChatbotActionCard) redirects to checkout using `payment`.
+                payment = await jobController.initiateJobPostingPayment(company.id, req.user.id, payload);
+                resultRefId = payment.job_id;
+            }
         } else if (action.action_type === 'update_job') {
             const { job_id, ...fields } = payload;
             const [[company]] = await db.query('SELECT id FROM companies WHERE user_id = ? AND deleted_at IS NULL', [req.user.id]);
@@ -263,8 +272,14 @@ exports.confirmAction = async (req, res) => {
             [resultRefId, action.id]
         );
 
-        res.json({ success: true, message: 'Done.', result_ref_id: resultRefId });
+        res.json({
+            success: true,
+            message: payment ? 'Complete payment to publish this job.' : 'Done.',
+            result_ref_id: resultRefId,
+            ...(payment ? { payment_session_id: payment.payment_session_id, cashfree_env: payment.cashfree_env } : {}),
+        });
     } catch (err) {
+        if (err.gatewayError) return res.status(502).json({ message: err.message });
         if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
         console.error('[chatbot.confirmAction]', err.message);
         res.status(500).json({ message: 'Failed to apply the action.' });

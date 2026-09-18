@@ -14,15 +14,15 @@ const loadCashfreeSDK = () => new Promise((resolve, reject) => {
     document.head.appendChild(s);
 });
 
-// Activation wall shown when the account is not yet activated — moved here
-// from TalentPool.jsx since posting/managing jobs (not browsing) is the
-// actual activation-gated action. Fully self-contained (own status fetch,
-// own payment/request handlers) — matches components/company/PremiumTierCard.jsx's
-// pattern — so it needs no props and stays in sync even if the parent's own
-// activation-status snapshot goes stale.
-function ActivationWall() {
+// Non-blocking pricing banner for Standard-tier companies — job posting is
+// priced per-JD (₹3,999 each, charged at the point of posting via Cashfree,
+// see handleSave below), not a one-time account activation, so there's
+// nothing to "unlock" up front any more. This just surfaces the pricing and
+// the Platinum alternative. Fully self-contained (own status fetch, own
+// request handler) — matches components/company/PremiumTierCard.jsx's pattern.
+function PlatinumBanner() {
     const [premiumRequestedAt, setPremiumRequestedAt] = useState(null);
-    const [paying, setPaying] = useState(false);
+    const [expanded, setExpanded] = useState(false);
     const [note, setNote] = useState('');
     const [requesting, setRequesting] = useState(false);
     const [justRequested, setJustRequested] = useState(false);
@@ -32,23 +32,6 @@ function ActivationWall() {
             .then(r => setPremiumRequestedAt(r.data?.premium_requested_at || null))
             .catch(() => {});
     }, []);
-
-    const handlePay = async () => {
-        setPaying(true);
-        try {
-            const { data } = await talentPoolAPI.payListingFee();
-            if (data?.payment_session_id) {
-                await loadCashfreeSDK();
-                const mode = data.cashfree_env === 'PROD' ? 'production' : 'sandbox';
-                const cf = new window.Cashfree({ mode });
-                cf.checkout({ paymentSessionId: data.payment_session_id });
-            }
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
-        } finally {
-            setPaying(false);
-        }
-    };
 
     const handleRequestPremium = async () => {
         setRequesting(true);
@@ -66,68 +49,48 @@ function ActivationWall() {
     const alreadyRequested = justRequested || !!premiumRequestedAt;
 
     return (
-        <div className="mb-8">
-            <div className="text-center mb-6">
-                <div className="text-5xl mb-3">🔒</div>
-                <h2 className="text-xl font-bold text-gray-900">Activate Your Hiring Account</h2>
-                <p className="text-sm text-gray-500 mt-1">Choose how you'd like to get started.</p>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
-                {/* Standard — flat one-time fee */}
-                <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-6 flex flex-col">
-                    <p className="text-sm font-semibold text-gray-900 mb-1">Standard</p>
-                    <p className="text-2xl font-bold text-gray-900 mb-3">₹3,999 <span className="text-xs font-normal text-gray-400">one-time</span></p>
-                    <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 flex-1">
-                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Post job descriptions and upload JDs</li>
-                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Search all candidates — full unmasked profiles</li>
-                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Shortlist and contact candidates directly</li>
-                    </ul>
-                    <p className="text-xs text-gray-400 mb-4">No recurring charges. A placement fee applies per hire.</p>
-                    <button
-                        onClick={handlePay}
-                        disabled={paying}
-                        className="bg-indigo-600 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition text-sm"
-                    >
-                        {paying ? 'Processing…' : 'Pay ₹3,999 & Activate'}
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-6 text-sm">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+                <p className="text-gray-700">
+                    <strong>₹3,999</strong> per job you post. A placement fee also applies per hire.
+                </p>
+                {!alreadyRequested && (
+                    <button onClick={() => setExpanded(x => !x)} className="text-yellow-700 font-semibold hover:underline text-xs shrink-0">
+                        {expanded ? 'Hide' : '⭐ Or go Platinum — no per-job fee →'}
                     </button>
-                </div>
-
-                {/* Platinum — request/approval based, no listing fee */}
-                <div className="bg-white rounded-2xl border border-yellow-300 shadow-sm p-6 flex flex-col">
-                    <p className="text-sm font-semibold text-gray-900 mb-1">⭐ Platinum</p>
-                    <p className="text-2xl font-bold text-gray-900 mb-3">Free <span className="text-xs font-normal text-gray-400">to join</span></p>
-                    <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 flex-1">
-                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Everything in Standard, no listing fee</li>
-                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Full pool, including Premium candidates</li>
-                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> 8.33% placement fee per hire instead</li>
-                    </ul>
-                    {alreadyRequested ? (
-                        <p className="text-xs text-green-600 font-medium py-2.5">✓ Request sent — your executive will follow up.</p>
-                    ) : (
-                        <>
-                            <input
-                                value={note}
-                                onChange={e => setNote(e.target.value)}
-                                placeholder="Optional note for your executive…"
-                                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs mb-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                            />
-                            <button
-                                onClick={handleRequestPremium}
-                                disabled={requesting}
-                                className="border border-yellow-400 text-yellow-700 font-semibold px-6 py-2.5 rounded-xl hover:bg-yellow-50 disabled:opacity-60 transition text-sm"
-                            >
-                                {requesting ? '…' : 'Request Platinum Access'}
-                            </button>
-                        </>
-                    )}
-                </div>
+                )}
+                {alreadyRequested && (
+                    <span className="text-green-700 text-xs font-medium shrink-0">✓ Platinum request sent — your executive will follow up.</span>
+                )}
             </div>
+            {expanded && !alreadyRequested && (
+                <div className="mt-3 pt-3 border-t border-amber-200">
+                    <p className="text-xs text-gray-500 mb-2">
+                        Platinum: no listing/per-job fee, full pool including Premium candidates, 8.33% placement fee per hire instead. Requires executive approval.
+                    </p>
+                    <div className="flex gap-2">
+                        <input
+                            value={note}
+                            onChange={e => setNote(e.target.value)}
+                            placeholder="Optional note for your executive…"
+                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        />
+                        <button
+                            onClick={handleRequestPremium}
+                            disabled={requesting}
+                            className="border border-yellow-400 text-yellow-700 font-semibold px-4 py-1.5 rounded-lg hover:bg-yellow-100 disabled:opacity-60 transition text-xs whitespace-nowrap"
+                        >
+                            {requesting ? '…' : 'Request Platinum Access'}
+                        </button>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
 
 const STATUS_COLORS = {
+    pending_payment: 'bg-amber-100 text-amber-700',
     draft:   'bg-gray-100 text-gray-600',
     active:  'bg-green-100 text-green-700',
     paused:  'bg-yellow-100 text-yellow-700',
@@ -149,8 +112,8 @@ export default function JobPostings() {
     const [form, setForm] = useState(EMPTY_FORM);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
-    const [activated, setActivated] = useState(false);
-    const [activationChecked, setActivationChecked] = useState(false);
+    const [companyTier, setCompanyTier] = useState('standard');
+    const [payingJobId, setPayingJobId] = useState(null);
 
     const load = () => {
         setLoading(true);
@@ -164,10 +127,27 @@ export default function JobPostings() {
 
     useEffect(() => {
         talentPoolAPI.activationStatus()
-            .then(r => setActivated(!!r.data?.activated))
-            .catch(() => {})
-            .finally(() => setActivationChecked(true));
+            .then(r => setCompanyTier(r.data?.company_tier || 'standard'))
+            .catch(() => {});
     }, []);
+
+    const redirectToCheckout = async (payment) => {
+        await loadCashfreeSDK();
+        const mode = payment.cashfree_env === 'PROD' ? 'production' : 'sandbox';
+        const cf = new window.Cashfree({ mode });
+        cf.checkout({ paymentSessionId: payment.payment_session_id });
+    };
+
+    const handlePayNow = async (jobId) => {
+        setPayingJobId(jobId);
+        try {
+            const { data } = await companyJobAPI.pay(jobId);
+            if (data?.payment_session_id) await redirectToCheckout(data);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
+            setPayingJobId(null);
+        }
+    };
 
     const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setError(''); setShowModal(true); };
     const openEdit = (job) => {
@@ -191,19 +171,23 @@ export default function JobPostings() {
         setError('');
         try {
             if (editing) {
+                // Editing an already-posted job is free — no per-JD fee applies.
                 await companyJobAPI.update(editing.id, form);
+                setShowModal(false);
+                load();
             } else {
-                await companyJobAPI.create(form);
+                const { data } = await companyJobAPI.create(form);
+                setShowModal(false);
+                load();
+                if (data?.payment_session_id) {
+                    // Standard tier: job was created as 'pending_payment' — it
+                    // only goes live once this Cashfree checkout succeeds.
+                    await redirectToCheckout(data);
+                }
+                // Platinum tier: data.id present, job is already live, nothing more to do.
             }
-            setShowModal(false);
-            load();
         } catch (err) {
-            const code = err.response?.data?.code;
-            if (code === 'ACTIVATION_REQUIRED') {
-                setError('Your account needs to be activated before posting jobs — pay the one-time ₹3,999 listing fee above.');
-            } else {
-                setError(err.response?.data?.message || 'Failed to save job.');
-            }
+            setError(err.response?.data?.message || 'Failed to save job.');
         } finally {
             setSaving(false);
         }
@@ -240,7 +224,7 @@ export default function JobPostings() {
                 </button>
             </div>
 
-            {activationChecked && !activated && <ActivationWall />}
+            {companyTier !== 'premium' && <PlatinumBanner />}
 
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading...</div>
@@ -275,20 +259,34 @@ export default function JobPostings() {
                                     <td className="px-4 py-3 text-gray-600">{job.openings}</td>
                                     <td className="px-4 py-3 text-gray-600">{job.applicant_count}</td>
                                     <td className="px-4 py-3">
-                                        <select
-                                            value={job.status}
-                                            onChange={e => handleStatusChange(job.id, e.target.value)}
-                                            className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_COLORS[job.status]}`}
-                                        >
-                                            <option value="draft">Draft</option>
-                                            <option value="active">Active</option>
-                                            <option value="paused">Paused</option>
-                                            <option value="closed">Closed</option>
-                                        </select>
+                                        {job.status === 'pending_payment' ? (
+                                            <span className={`text-xs font-medium px-2 py-1 rounded-lg ${STATUS_COLORS.pending_payment}`}>
+                                                Awaiting Payment
+                                            </span>
+                                        ) : (
+                                            <select
+                                                value={job.status}
+                                                onChange={e => handleStatusChange(job.id, e.target.value)}
+                                                className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_COLORS[job.status]}`}
+                                            >
+                                                <option value="draft">Draft</option>
+                                                <option value="active">Active</option>
+                                                <option value="paused">Paused</option>
+                                                <option value="closed">Closed</option>
+                                            </select>
+                                        )}
                                     </td>
-                                    <td className="px-4 py-3 flex gap-2">
-                                        <button onClick={() => openEdit(job)}
-                                            className="text-indigo-600 hover:underline text-xs">Edit</button>
+                                    <td className="px-4 py-3 flex gap-2 items-center">
+                                        {job.status === 'pending_payment' ? (
+                                            <button onClick={() => handlePayNow(job.id)}
+                                                disabled={payingJobId === job.id}
+                                                className="text-indigo-600 hover:underline text-xs font-medium disabled:opacity-60">
+                                                {payingJobId === job.id ? 'Redirecting…' : 'Pay ₹3,999'}
+                                            </button>
+                                        ) : (
+                                            <button onClick={() => openEdit(job)}
+                                                className="text-indigo-600 hover:underline text-xs">Edit</button>
+                                        )}
                                         <button onClick={() => handleDelete(job.id)}
                                             className="text-red-500 hover:underline text-xs">Delete</button>
                                     </td>
