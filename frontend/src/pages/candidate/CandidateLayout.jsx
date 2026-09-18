@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import ChatbotWidget from '../../components/ChatbotWidget';
 
 const navItems = [
     { label: 'Dashboard',    to: '/candidate',              icon: '📊', exact: true },
@@ -120,6 +121,7 @@ export default function CandidateLayout() {
                     <Outlet />
                 </main>
             </div>
+            <ChatbotWidget />
         </div>
     );
 }

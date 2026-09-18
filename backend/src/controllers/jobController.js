@@ -25,6 +25,41 @@ const getCompanyId = async (userId) => {
     return result.insertId;
 };
 
+// Shared by GET /api/jobs/matched (routes/jobs.js) and the chatbot's
+// find_matching_jobs tool (chatbotTools.js) — identical query either way.
+exports.getMatchedJobsForCandidate = async (candidateId, { page = 1, limit = 10 } = {}) => {
+    const offset = (page - 1) * limit;
+
+    const [jobs] = await db.query(
+        `SELECT
+           jp.id, jp.title, jp.description, jp.location, jp.job_type,
+           jp.salary_min, jp.salary_max, jp.experience_min, jp.experience_max,
+           jp.work_mode, jp.openings, jp.deadline,
+           c.company_name, c.headquarters AS company_location,
+           jp.created_at,
+           COALESCE(mr.fit_score, 0)      AS match_score,
+           (mr.id IS NOT NULL)             AS match_computed,
+           mr.matched_skills, mr.missing_skills,
+           (SELECT COUNT(*) FROM applications a
+            WHERE a.job_id=jp.id AND a.candidate_id=? AND a.deleted_at IS NULL) AS already_applied
+         FROM job_postings jp
+         JOIN companies c ON c.id = jp.company_id
+         LEFT JOIN applications app_link
+           ON app_link.job_id=jp.id AND app_link.candidate_id=? AND app_link.deleted_at IS NULL
+         LEFT JOIN match_results mr ON mr.application_id = app_link.id
+         WHERE jp.status='active' AND jp.deleted_at IS NULL
+         ORDER BY match_score DESC, jp.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [candidateId, candidateId, limit, offset]
+    );
+
+    const [[{ total }]] = await db.query(
+        `SELECT COUNT(*) AS total FROM job_postings WHERE status='active' AND deleted_at IS NULL`
+    );
+
+    return { jobs, pagination: { page, limit, total } };
+};
+
 // ── GET /api/jobs ─────────────────────────────────────────────────────────────
 exports.listCompanyJobs = async (req, res) => {
     try {
@@ -47,54 +82,69 @@ exports.listCompanyJobs = async (req, res) => {
 };
 
 // ── POST /api/jobs ────────────────────────────────────────────────────────────
-exports.createJob = async (req, res) => {
+// Shared by the HTTP route below and the chatbot's confirmed create_job action
+// (chatbotTools.js) — the exact same validation, activation gate, and
+// background matching trigger either way, never reimplemented in the chatbot
+// layer. Throws an Error with .status/.code set for expected failures
+// (400 validation, 402 ACTIVATION_REQUIRED) so callers can translate it.
+const createJobRecord = async (companyId, userId, fields) => {
     const {
         title, description, requirements, location, job_type, work_mode,
         salary_min, salary_max, experience_min, experience_max,
         openings, deadline, status,
-    } = req.body;
+    } = fields;
 
     if (!title || !description) {
-        return res.status(400).json({ message: 'title and description are required.' });
+        throw Object.assign(new Error('title and description are required.'), { status: 400 });
     }
 
+    if (!(await getCompanyAccess(companyId)).activated) {
+        throw Object.assign(
+            new Error('Your account is not yet activated. Please pay the ₹3,999 listing fee (or move to the Premium tier) to post jobs and access candidates.'),
+            { status: 402, code: 'ACTIVATION_REQUIRED' }
+        );
+    }
+
+    const [result] = await db.query(
+        `INSERT INTO job_postings
+         (company_id, posted_by, title, description, requirements, location,
+          job_type, work_mode, salary_min, salary_max, experience_min,
+          experience_max, openings, deadline, status)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        [companyId, userId, title, description, requirements || null,
+         location || null, job_type || 'full_time', work_mode || 'onsite',
+         salary_min || null, salary_max || null, experience_min || 0,
+         experience_max || null, openings || 1, deadline || null,
+         status || 'draft']
+    );
+
+    const jobId = result.insertId;
+
+    // Background: keyword extraction first (fast, no API needed), then AI matching
+    const jdText = `${description || ''}\n\n${requirements || ''}`;
+    setImmediate(async () => {
+        try {
+            await extractAndSaveJobSkills(jobId, { title, description, requirements }, db);
+        } catch (err) {
+            console.error('[Keyword] createJob extraction failed:', err.message);
+        }
+        // AI extraction runs after; if it succeeds it replaces keyword vectors with
+        // better-quality data. If it fails, keyword vectors remain as a working fallback.
+        matchingService.triggerJobMatching(jobId, jdText)
+            .catch(err => console.error('[AI] Job matching failed:', err.message));
+    });
+
+    return jobId;
+};
+exports.createJobRecord = createJobRecord;
+
+exports.createJob = async (req, res) => {
     try {
         const companyId = await getCompanyId(req.user.id);
-
-        if (!(await getCompanyAccess(companyId)).activated) {
-            return res.status(402).json({ message: 'Your account is not yet activated. Please pay the ₹3,999 listing fee (or move to the Premium tier) to post jobs and access candidates.', code: 'ACTIVATION_REQUIRED' });
-        }
-
-        const [result] = await db.query(
-            `INSERT INTO job_postings
-             (company_id, posted_by, title, description, requirements, location,
-              job_type, work_mode, salary_min, salary_max, experience_min,
-              experience_max, openings, deadline, status)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-            [companyId, req.user.id, title, description, requirements || null,
-             location || null, job_type || 'full_time', work_mode || 'onsite',
-             salary_min || null, salary_max || null, experience_min || 0,
-             experience_max || null, openings || 1, deadline || null,
-             status || 'draft']
-        );
-
-        const jobId = result.insertId;
+        const jobId = await createJobRecord(companyId, req.user.id, req.body);
         res.status(201).json({ message: 'Job created.', id: jobId });
-
-        // Background: keyword extraction first (fast, no API needed), then AI matching
-        const jdText = `${description || ''}\n\n${requirements || ''}`;
-        setImmediate(async () => {
-            try {
-                await extractAndSaveJobSkills(jobId, { title, description, requirements }, db);
-            } catch (err) {
-                console.error('[Keyword] createJob extraction failed:', err.message);
-            }
-            // AI extraction runs after; if it succeeds it replaces keyword vectors with
-            // better-quality data. If it fails, keyword vectors remain as a working fallback.
-            matchingService.triggerJobMatching(jobId, jdText)
-                .catch(err => console.error('[AI] Job matching failed:', err.message));
-        });
     } catch (err) {
+        if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
         console.error('createJob error:', err);
         res.status(500).json({ message: 'Failed to create job.' });
     }
@@ -122,54 +172,58 @@ exports.getJob = async (req, res) => {
 };
 
 // ── PUT /api/jobs/:id ─────────────────────────────────────────────────────────
-exports.updateJob = async (req, res) => {
+// Shared by the HTTP route below and the chatbot's confirmed update_job action.
+const updateJobRecord = async (companyId, jobId, fields) => {
     const {
         title, description, requirements, location, job_type, work_mode,
         salary_min, salary_max, experience_min, experience_max,
         openings, deadline, status,
-    } = req.body;
+    } = fields;
 
     if (!title || !description) {
-        return res.status(400).json({ message: 'title and description are required.' });
+        throw Object.assign(new Error('title and description are required.'), { status: 400 });
     }
 
+    const [check] = await db.query(
+        'SELECT id FROM job_postings WHERE id=? AND company_id=? AND deleted_at IS NULL',
+        [jobId, companyId]
+    );
+    if (!check.length) throw Object.assign(new Error('Job not found.'), { status: 404 });
+
+    await db.query(
+        `UPDATE job_postings
+         SET title=?, description=?, requirements=?, location=?, job_type=?,
+             work_mode=?, salary_min=?, salary_max=?, experience_min=?,
+             experience_max=?, openings=?, deadline=?, status=?
+         WHERE id=?`,
+        [title, description, requirements || null, location || null,
+         job_type || 'full_time', work_mode || 'onsite',
+         salary_min || null, salary_max || null, experience_min || 0,
+         experience_max || null, openings || 1, deadline || null,
+         status || 'draft', jobId]
+    );
+
+    // Background: keyword extraction first, then AI re-matching
+    const jdText = `${description || ''}\n\n${requirements || ''}`;
+    setImmediate(async () => {
+        try {
+            await extractAndSaveJobSkills(jobId, { title, description, requirements }, db);
+        } catch (err) {
+            console.error('[Keyword] updateJob extraction failed:', err.message);
+        }
+        matchingService.triggerJobMatching(jobId, jdText)
+            .catch(err => console.error('[AI] Job re-matching failed:', err.message));
+    });
+};
+exports.updateJobRecord = updateJobRecord;
+
+exports.updateJob = async (req, res) => {
     try {
         const companyId = await getCompanyId(req.user.id);
-
-        const [check] = await db.query(
-            'SELECT id FROM job_postings WHERE id=? AND company_id=? AND deleted_at IS NULL',
-            [req.params.id, companyId]
-        );
-        if (!check.length) return res.status(404).json({ message: 'Job not found.' });
-
-        await db.query(
-            `UPDATE job_postings
-             SET title=?, description=?, requirements=?, location=?, job_type=?,
-                 work_mode=?, salary_min=?, salary_max=?, experience_min=?,
-                 experience_max=?, openings=?, deadline=?, status=?
-             WHERE id=?`,
-            [title, description, requirements || null, location || null,
-             job_type || 'full_time', work_mode || 'onsite',
-             salary_min || null, salary_max || null, experience_min || 0,
-             experience_max || null, openings || 1, deadline || null,
-             status || 'draft', req.params.id]
-        );
-
+        await updateJobRecord(companyId, parseInt(req.params.id), req.body);
         res.json({ message: 'Job updated.' });
-
-        // Background: keyword extraction first, then AI re-matching
-        const jdText = `${description || ''}\n\n${requirements || ''}`;
-        const jobIdInt = parseInt(req.params.id);
-        setImmediate(async () => {
-            try {
-                await extractAndSaveJobSkills(jobIdInt, { title, description, requirements }, db);
-            } catch (err) {
-                console.error('[Keyword] updateJob extraction failed:', err.message);
-            }
-            matchingService.triggerJobMatching(jobIdInt, jdText)
-                .catch(err => console.error('[AI] Job re-matching failed:', err.message));
-        });
     } catch (err) {
+        if (err.status) return res.status(err.status).json({ message: err.message, code: err.code });
         console.error('updateJob error:', err);
         res.status(500).json({ message: 'Failed to update job.' });
     }

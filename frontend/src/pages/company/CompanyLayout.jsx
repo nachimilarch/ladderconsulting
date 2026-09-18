@@ -5,6 +5,7 @@ import NotificationBell from '../../components/NotificationBell';
 import { companyAPI } from '../../api/company';
 import toast from 'react-hot-toast';
 import CompanyTour from '../../components/company/CompanyTour';
+import ChatbotWidget from '../../components/ChatbotWidget';
 
 const INDUSTRIES = [
     'Technology', 'Finance', 'Banking', 'Healthcare', 'Education', 'Manufacturing',
@@ -287,6 +288,7 @@ export default function CompanyLayout() {
 
             {/* Product tour */}
             <CompanyTour />
+            <ChatbotWidget />
         </div>
     );
 }
