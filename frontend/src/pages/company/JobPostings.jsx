@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { companyJobAPI, talentPoolAPI } from '../../api/company';
+import { companyJobAPI, talentPoolAPI, premiumAPI } from '../../api/company';
 import toast from 'react-hot-toast';
 
 const CASHFREE_SDK_URL = 'https://sdk.cashfree.com/js/v3/cashfree.js';
@@ -14,30 +14,115 @@ const loadCashfreeSDK = () => new Promise((resolve, reject) => {
     document.head.appendChild(s);
 });
 
-// Payment wall shown when the account is not yet activated — moved here from
-// TalentPool.jsx since posting/managing jobs (not browsing) is the actual
-// activation-gated action.
-function ActivationWall({ onPay, paying }) {
+// Activation wall shown when the account is not yet activated — moved here
+// from TalentPool.jsx since posting/managing jobs (not browsing) is the
+// actual activation-gated action. Fully self-contained (own status fetch,
+// own payment/request handlers) — matches components/company/PremiumTierCard.jsx's
+// pattern — so it needs no props and stays in sync even if the parent's own
+// activation-status snapshot goes stale.
+function ActivationWall() {
+    const [premiumRequestedAt, setPremiumRequestedAt] = useState(null);
+    const [paying, setPaying] = useState(false);
+    const [note, setNote] = useState('');
+    const [requesting, setRequesting] = useState(false);
+    const [justRequested, setJustRequested] = useState(false);
+
+    useEffect(() => {
+        talentPoolAPI.activationStatus()
+            .then(r => setPremiumRequestedAt(r.data?.premium_requested_at || null))
+            .catch(() => {});
+    }, []);
+
+    const handlePay = async () => {
+        setPaying(true);
+        try {
+            const { data } = await talentPoolAPI.payListingFee();
+            if (data?.payment_session_id) {
+                await loadCashfreeSDK();
+                const mode = data.cashfree_env === 'PROD' ? 'production' : 'sandbox';
+                const cf = new window.Cashfree({ mode });
+                cf.checkout({ paymentSessionId: data.payment_session_id });
+            }
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
+        } finally {
+            setPaying(false);
+        }
+    };
+
+    const handleRequestPremium = async () => {
+        setRequesting(true);
+        try {
+            const { data } = await premiumAPI.request(note.trim() || undefined);
+            toast.success(data?.message || 'Request sent.');
+            setJustRequested(true);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to send request.');
+        } finally {
+            setRequesting(false);
+        }
+    };
+
+    const alreadyRequested = justRequested || !!premiumRequestedAt;
+
     return (
-        <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-8 text-center max-w-lg mx-auto mb-8">
-            <div className="text-5xl mb-4">🔒</div>
-            <h2 className="text-xl font-bold text-gray-900 mb-2">Activate Your Hiring Account</h2>
-            <p className="text-sm text-gray-500 mb-4 leading-relaxed">
-                Pay a one-time listing fee of <strong>₹3,999</strong> to unlock full access:
-            </p>
-            <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 max-w-xs mx-auto">
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Post job descriptions and upload JDs</li>
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Search all candidates — full unmasked profiles</li>
-                <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Shortlist and contact candidates directly</li>
-            </ul>
-            <p className="text-xs text-gray-400 mb-5">One-time fee · No recurring charges</p>
-            <button
-                onClick={onPay}
-                disabled={paying}
-                className="bg-indigo-600 text-white font-semibold px-8 py-3 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition text-sm"
-            >
-                {paying ? 'Processing…' : 'Pay ₹3,999 & Activate'}
-            </button>
+        <div className="mb-8">
+            <div className="text-center mb-6">
+                <div className="text-5xl mb-3">🔒</div>
+                <h2 className="text-xl font-bold text-gray-900">Activate Your Hiring Account</h2>
+                <p className="text-sm text-gray-500 mt-1">Choose how you'd like to get started.</p>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                {/* Standard — flat one-time fee */}
+                <div className="bg-white rounded-2xl border border-amber-200 shadow-sm p-6 flex flex-col">
+                    <p className="text-sm font-semibold text-gray-900 mb-1">Standard</p>
+                    <p className="text-2xl font-bold text-gray-900 mb-3">₹3,999 <span className="text-xs font-normal text-gray-400">one-time</span></p>
+                    <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 flex-1">
+                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Post job descriptions and upload JDs</li>
+                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Search all candidates — full unmasked profiles</li>
+                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Shortlist and contact candidates directly</li>
+                    </ul>
+                    <p className="text-xs text-gray-400 mb-4">No recurring charges. A placement fee applies per hire.</p>
+                    <button
+                        onClick={handlePay}
+                        disabled={paying}
+                        className="bg-indigo-600 text-white font-semibold px-6 py-2.5 rounded-xl hover:bg-indigo-700 disabled:opacity-60 transition text-sm"
+                    >
+                        {paying ? 'Processing…' : 'Pay ₹3,999 & Activate'}
+                    </button>
+                </div>
+
+                {/* Platinum — request/approval based, no listing fee */}
+                <div className="bg-white rounded-2xl border border-yellow-300 shadow-sm p-6 flex flex-col">
+                    <p className="text-sm font-semibold text-gray-900 mb-1">⭐ Platinum</p>
+                    <p className="text-2xl font-bold text-gray-900 mb-3">Free <span className="text-xs font-normal text-gray-400">to join</span></p>
+                    <ul className="text-sm text-gray-600 mb-6 text-left space-y-2 flex-1">
+                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Everything in Standard, no listing fee</li>
+                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> Full pool, including Premium candidates</li>
+                        <li className="flex items-start gap-2"><span className="text-green-600 font-bold mt-0.5">✓</span> 8.33% placement fee per hire instead</li>
+                    </ul>
+                    {alreadyRequested ? (
+                        <p className="text-xs text-green-600 font-medium py-2.5">✓ Request sent — your executive will follow up.</p>
+                    ) : (
+                        <>
+                            <input
+                                value={note}
+                                onChange={e => setNote(e.target.value)}
+                                placeholder="Optional note for your executive…"
+                                className="w-full border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs mb-2 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            />
+                            <button
+                                onClick={handleRequestPremium}
+                                disabled={requesting}
+                                className="border border-yellow-400 text-yellow-700 font-semibold px-6 py-2.5 rounded-xl hover:bg-yellow-50 disabled:opacity-60 transition text-sm"
+                            >
+                                {requesting ? '…' : 'Request Platinum Access'}
+                            </button>
+                        </>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }
@@ -66,7 +151,6 @@ export default function JobPostings() {
     const [error, setError] = useState('');
     const [activated, setActivated] = useState(false);
     const [activationChecked, setActivationChecked] = useState(false);
-    const [paying, setPaying] = useState(false);
 
     const load = () => {
         setLoading(true);
@@ -84,23 +168,6 @@ export default function JobPostings() {
             .catch(() => {})
             .finally(() => setActivationChecked(true));
     }, []);
-
-    const handlePay = async () => {
-        setPaying(true);
-        try {
-            const { data } = await talentPoolAPI.payListingFee();
-            if (data?.payment_session_id) {
-                await loadCashfreeSDK();
-                const mode = data.cashfree_env === 'PROD' ? 'production' : 'sandbox';
-                const cf = new window.Cashfree({ mode });
-                cf.checkout({ paymentSessionId: data.payment_session_id });
-            }
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to initiate payment.');
-        } finally {
-            setPaying(false);
-        }
-    };
 
     const openCreate = () => { setEditing(null); setForm(EMPTY_FORM); setError(''); setShowModal(true); };
     const openEdit = (job) => {
@@ -173,7 +240,7 @@ export default function JobPostings() {
                 </button>
             </div>
 
-            {activationChecked && !activated && <ActivationWall onPay={handlePay} paying={paying} />}
+            {activationChecked && !activated && <ActivationWall />}
 
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading...</div>
