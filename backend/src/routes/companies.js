@@ -33,4 +33,7 @@ router.post('/talent/:candidateId/interest', ctrl.expressInterest);
 router.get('/activation-status',  ctrl.getActivationStatus);
 router.post('/pay-listing-fee',   ctrl.payListingFee);
 
+// Premium tier — company-requested, executive/admin-approved, replaces the listing fee
+router.post('/premium/request',   ctrl.requestPremiumTier);
+
 module.exports = router;

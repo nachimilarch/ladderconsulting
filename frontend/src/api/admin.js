@@ -15,7 +15,6 @@ export const adminCompanyAPI = {
         headers: { 'Content-Type': 'multipart/form-data' },
     }),
     downloadAgreement: (id) => api.get(`/admin/companies/${id}/agreement`, { responseType: 'blob' }),
-    activatePackage: (id, tier) => api.post(`/admin/companies/${id}/activate-package`, { tier }),
 };
 
 export const adminRequestAPI = {

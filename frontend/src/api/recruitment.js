@@ -34,9 +34,4 @@ export const recruitmentAPI = {
     listTalentInterests: () => api.get('/recruitment/talent-interests'),
     actOnTalentInterest: (notifId, jobId) =>
         api.post(`/recruitment/talent-interests/${notifId}/assign`, { job_id: jobId || undefined }),
-
-    // Platinum profile-unlock approval queue (exec/admin)
-    listProfileUnlockRequests: () => api.get('/recruitment/profile-unlock-requests'),
-    approveProfileUnlock: (requestId) => api.put(`/recruitment/profile-unlock-requests/${requestId}/approve`),
-    rejectProfileUnlock: (requestId, reason) => api.put(`/recruitment/profile-unlock-requests/${requestId}/reject`, { reason }),
 };

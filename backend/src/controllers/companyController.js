@@ -7,6 +7,7 @@ const { scorePoolAgainstJob } = require('../services/matchingService');
 const { nextInvoiceNumber } = require('../utils/placementFee');
 const cashfree = require('../services/cashfreeService');
 const { sendEmail } = require('../utils/email');
+const { getCompanyAccess } = require('../utils/companyAccess');
 
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
@@ -22,9 +23,11 @@ const notify = async (userId, type, title, body, metadata = null) => {
 };
 
 // ── Helper: get or create companies row for this user ──────────────────────
+const COMPANY_FIELDS = 'id, company_name, industry, size, website, headquarters, description, is_approved, placement_fee_percent, listing_fee_paid, company_tier, assigned_executive_id';
+
 const getOrCreateCompany = async (userId) => {
     const [rows] = await db.query(
-        'SELECT id, company_name, industry, size, website, headquarters, description, is_approved, placement_fee_percent, listing_fee_paid FROM companies WHERE user_id = ? AND deleted_at IS NULL',
+        `SELECT ${COMPANY_FIELDS} FROM companies WHERE user_id = ? AND deleted_at IS NULL`,
         [userId]
     );
     if (rows.length) return rows[0];
@@ -35,7 +38,7 @@ const getOrCreateCompany = async (userId) => {
         'INSERT INTO companies (user_id, company_name, is_approved) VALUES (?, ?, 1)',
         [userId, user.name]
     );
-    const [[newRow]] = await db.query('SELECT id, company_name, industry, size, website, headquarters, description, is_approved, placement_fee_percent, listing_fee_paid FROM companies WHERE id = ?', [result.insertId]);
+    const [[newRow]] = await db.query(`SELECT ${COMPANY_FIELDS} FROM companies WHERE id = ?`, [result.insertId]);
     return newRow;
 };
 
@@ -270,7 +273,7 @@ exports.listInterviews = async (req, res) => {
             [company.id]
         );
 
-        const activated = !!company.listing_fee_paid;
+        const activated = !!company.listing_fee_paid || company.company_tier === 'premium';
 
         const masked = interviews.map(i => ({
             ...i,
@@ -654,7 +657,7 @@ exports.listRequests = async (req, res) => {
 exports.getTalentPool = async (req, res) => {
     try {
         const company = await getOrCreateCompany(req.user.id);
-        const activated = !!company.listing_fee_paid;
+        const { activated, isPremium } = await getCompanyAccess(company.id);
 
         const { search = '', experience_min, experience_max, skill, page = 1, jobId } = req.query;
         const limit = 24;
@@ -701,9 +704,14 @@ exports.getTalentPool = async (req, res) => {
             params.push(`%${skill.trim()}%`);
         }
 
+        // Premium candidates are completely invisible to Standard-tier companies —
+        // this is the whole value prop of moving to Premium, not just a de-prioritization.
+        const premiumClause = isPremium ? '' : 'AND COALESCE(c.is_premium, 0) = 0';
+
         const [rows] = await db.query(
             `SELECT
                 c.id AS candidate_id,
+                c.is_premium,
                 u.name AS candidate_name,
                 cp.headline,
                 cp.summary,
@@ -731,10 +739,11 @@ exports.getTalentPool = async (req, res) => {
                    JOIN offers o ON o.application_id = a3.id AND o.deleted_at IS NULL
                    WHERE a3.candidate_id = c.id AND o.status IN ('sent', 'accepted')
                )
+               ${premiumClause}
                ${searchClause}
                ${expClause}
                ${skillClause}
-             ORDER BY cp.total_experience DESC, c.id DESC
+             ORDER BY c.is_premium DESC, cp.total_experience DESC, c.id DESC
              LIMIT ? OFFSET ?`,
             [...params, limit, offset]
         );
@@ -757,6 +766,7 @@ exports.getTalentPool = async (req, res) => {
                    JOIN offers o ON o.application_id = a3.id AND o.deleted_at IS NULL
                    WHERE a3.candidate_id = c.id AND o.status IN ('sent', 'accepted')
                )
+               ${premiumClause}
                ${searchClause}
                ${expClause}
                ${skillClause}`,
@@ -792,6 +802,7 @@ exports.getTalentPool = async (req, res) => {
             page: parseInt(page),
             limit,
             activated,
+            company_tier: company.company_tier,
             match_job_id: matchJobId,
         });
     } catch (err) {
@@ -869,10 +880,68 @@ exports.expressInterest = async (req, res) => {
 exports.getActivationStatus = async (req, res) => {
     try {
         const company = await getOrCreateCompany(req.user.id);
-        res.json({ success: true, activated: !!company.listing_fee_paid });
+        const { activated, isPremium } = await getCompanyAccess(company.id);
+        res.json({
+            success: true,
+            activated,
+            company_tier: company.company_tier,
+            is_premium_tier: isPremium,
+            premium_requested_at: company.premium_requested_at ?? null,
+        });
     } catch (err) {
         console.error('[getActivationStatus]', err.message);
         res.status(500).json({ message: 'Failed to check activation status.' });
+    }
+};
+
+// ── POST /api/companies/premium/request ──────────────────────────────────────
+// Company self-service request to move to the Premium tier (8.33%-of-CTC-per-hire
+// membership, replacing the flat listing fee). Free to request — an executive/admin
+// approval is what actually flips the tier (see companyPremiumController).
+exports.requestPremiumTier = async (req, res) => {
+    try {
+        const company = await getOrCreateCompany(req.user.id);
+
+        if (company.company_tier === 'premium') {
+            return res.status(409).json({ message: 'Your account is already on the Premium tier.' });
+        }
+
+        const [[pending]] = await db.query(
+            `SELECT id FROM notifications
+             WHERE type = 'company_premium_request' AND is_read = 0 AND deleted_at IS NULL
+               AND JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.company_id')) = ?
+             LIMIT 1`,
+            [String(company.id)]
+        );
+        if (pending) {
+            return res.status(409).json({ message: 'A Premium tier request is already pending review.' });
+        }
+
+        await db.query(`UPDATE companies SET premium_requested_at = NOW() WHERE id = ?`, [company.id]);
+
+        let recipientUserId = company.assigned_executive_id;
+        if (!recipientUserId) {
+            const [[admin]] = await db.query(
+                `SELECT u.id FROM users u JOIN roles r ON r.id = u.role_id
+                 WHERE r.name = 'admin' AND u.status = 'active' AND u.deleted_at IS NULL LIMIT 1`
+            );
+            recipientUserId = admin?.id || null;
+        }
+
+        await notify(
+            recipientUserId,
+            'company_premium_request',
+            `Premium Tier Request — ${company.company_name}`,
+            `${company.company_name} has requested to move to the Premium tier (8.33% placement fee per hire, access to Premium candidates).${req.body?.note ? ` Note: ${req.body.note}` : ''}`,
+            { company_id: company.id }
+        );
+
+        logAction(req.user.id, 'request_premium_tier', 'company', company.id, {}, ip(req));
+
+        res.json({ success: true, message: 'Premium tier request submitted. Your executive will review it shortly.' });
+    } catch (err) {
+        console.error('[requestPremiumTier]', err.message);
+        res.status(500).json({ message: 'Failed to submit request.' });
     }
 };
 

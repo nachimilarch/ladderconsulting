@@ -50,10 +50,4 @@ router.get('/resumes/:resumeId/download', ...exec, ctrl.downloadResume);
 // DELETE a sourced candidate profile (soft-delete user + candidate + resumes, removes resume files)
 router.delete('/candidates/:candidateId', ...exec, ctrl.deleteCandidate);
 
-// Platinum profile-unlock requests — exec/admin queue + approve/reject
-const unlockCtrl = require('../controllers/resumeUnlockController');
-router.get('/profile-unlock-requests',                        ...exec, unlockCtrl.listProfileUnlockRequests);
-router.put('/profile-unlock-requests/:requestId/approve',     ...exec, unlockCtrl.approveProfileUnlock);
-router.put('/profile-unlock-requests/:requestId/reject',      ...exec, unlockCtrl.rejectProfileUnlock);
-
 module.exports = router;

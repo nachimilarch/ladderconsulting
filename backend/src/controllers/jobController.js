@@ -4,11 +4,7 @@ const { extractAndSaveJobSkills } = require('../services/jobSkillExtractor');
 const { maskCandidateForCompany } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
 const { sendEmail } = require('../utils/email');
-
-const isListingFeePaid = async (companyId) => {
-    const [[row]] = await db.query('SELECT listing_fee_paid FROM companies WHERE id = ? AND deleted_at IS NULL', [companyId]);
-    return !!row?.listing_fee_paid;
-};
+const { getCompanyAccess } = require('../utils/companyAccess');
 const wa = require('../utils/whatsappNotify');
 
 const safeEmail = (opts) => sendEmail(opts).catch(err => console.error('[Email]', err.message));
@@ -65,8 +61,8 @@ exports.createJob = async (req, res) => {
     try {
         const companyId = await getCompanyId(req.user.id);
 
-        if (!await isListingFeePaid(companyId)) {
-            return res.status(402).json({ message: 'Your account is not yet activated. Please pay the ₹3,999 listing fee to post jobs and access candidates.', code: 'ACTIVATION_REQUIRED' });
+        if (!(await getCompanyAccess(companyId)).activated) {
+            return res.status(402).json({ message: 'Your account is not yet activated. Please pay the ₹3,999 listing fee (or move to the Premium tier) to post jobs and access candidates.', code: 'ACTIVATION_REQUIRED' });
         }
 
         const [result] = await db.query(
@@ -239,7 +235,7 @@ exports.getJobApplications = async (req, res) => {
         );
         if (!check.length) return res.status(404).json({ message: 'Job not found.' });
 
-        const activated = await isListingFeePaid(companyId);
+        const { activated } = await getCompanyAccess(companyId);
 
         const filters = ['a.job_id=?', 'a.deleted_at IS NULL'];
         const params = [req.params.jobId];
@@ -331,8 +327,8 @@ exports.shortlistApplication = async (req, res) => {
         );
         if (!check.length) return res.status(404).json({ message: 'Application not found.' });
 
-        if (!await isListingFeePaid(companyId)) {
-            return res.status(402).json({ message: 'Please activate your account (₹3,999 listing fee) to shortlist candidates.', code: 'ACTIVATION_REQUIRED' });
+        if (!(await getCompanyAccess(companyId)).activated) {
+            return res.status(402).json({ message: 'Please activate your account (₹3,999 listing fee, or the Premium tier) to shortlist candidates.', code: 'ACTIVATION_REQUIRED' });
         }
 
         // A candidate hired through Ladder is off the market — block shortlisting
@@ -431,8 +427,8 @@ exports.updateApplicationStatus = async (req, res) => {
 
         // 'rejected' and 'under_review' are allowed without activation (housekeeping moves only)
         const GATED = ['shortlisted', 'interview_scheduled', 'interviewed', 'offer_sent'];
-        if (GATED.includes(status) && !await isListingFeePaid(companyId)) {
-            return res.status(402).json({ message: 'Please activate your account (₹3,999 listing fee) to advance candidates.', code: 'ACTIVATION_REQUIRED' });
+        if (GATED.includes(status) && !(await getCompanyAccess(companyId)).activated) {
+            return res.status(402).json({ message: 'Please activate your account (₹3,999 listing fee, or the Premium tier) to advance candidates.', code: 'ACTIVATION_REQUIRED' });
         }
 
         // Once hired through Ladder, a candidate cannot be advanced by another company.

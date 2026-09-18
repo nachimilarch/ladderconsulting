@@ -39,7 +39,14 @@ function CandidateCard({ cand, activated, onInterest }) {
                             {(cand.candidate_name || 'C')[0].toUpperCase()}
                         </div>
                         <div>
-                            <p className="text-sm font-semibold text-gray-900 truncate">{cand.candidate_name}</p>
+                            <div className="flex items-center gap-1.5">
+                                <p className="text-sm font-semibold text-gray-900 truncate">{cand.candidate_name}</p>
+                                {cand.is_premium ? (
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-700 shrink-0">
+                                        ⭐ Premium
+                                    </span>
+                                ) : null}
+                            </div>
                             {cand.current_location && (
                                 <p className="text-[11px] text-gray-400">{cand.current_location}</p>
                             )}
@@ -150,6 +157,7 @@ export default function TalentPool() {
     const [page, setPage] = useState(1);
     const [loading, setLoading] = useState(true);
     const [activated, setActivated] = useState(false);
+    const [companyTier, setCompanyTier] = useState('standard');
     const [activationChecked, setActivationChecked] = useState(false);
     const [paying, setPaying] = useState(false);
 
@@ -168,7 +176,10 @@ export default function TalentPool() {
 
     useEffect(() => {
         talentPoolAPI.activationStatus()
-            .then(r => setActivated(!!r.data?.activated))
+            .then(r => {
+                setActivated(!!r.data?.activated);
+                if (r.data?.company_tier) setCompanyTier(r.data.company_tier);
+            })
             .catch(() => {})
             .finally(() => setActivationChecked(true));
     }, []);
@@ -188,6 +199,7 @@ export default function TalentPool() {
             setCandidates(data?.data || []);
             setTotal(data?.total || 0);
             if (data?.activated !== undefined) setActivated(!!data.activated);
+            if (data?.company_tier) setCompanyTier(data.company_tier);
         } catch {
             toast.error('Failed to load talent pool.');
         } finally {
@@ -296,10 +308,23 @@ export default function TalentPool() {
                         ? ' Full profiles and contact details are visible.'
                         : ' Activate your account to view full profiles.'}
                 </p>
-                {activated && (
+                {activated && companyTier === 'premium' && (
+                    <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
+                        ⭐ Premium — full pool including Premium candidates
+                    </span>
+                )}
+                {activated && companyTier !== 'premium' && (
                     <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
                         ✓ Account Activated
                     </span>
+                )}
+                {companyTier !== 'premium' && (
+                    <a
+                        href="/company/profile"
+                        className="inline-block mt-2 ml-2 text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-100 px-2.5 py-1 rounded-full hover:bg-yellow-100 transition"
+                    >
+                        ⭐ Upgrade to Premium — see Premium candidates too
+                    </a>
                 )}
             </div>
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { companyAPI } from '../../api/company';
-import PackagePicker from '../../components/company/PackagePicker';
+import PremiumTierCard from '../../components/company/PremiumTierCard';
+import AiSubscriptionCard from '../../components/AiSubscriptionCard';
 
 const SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
 
@@ -208,8 +209,9 @@ export default function CompanyProfile() {
                 </button>
             </form>
 
-            <div className="mt-6">
-                <PackagePicker />
+            <div className="mt-6 flex flex-col gap-6">
+                <PremiumTierCard />
+                <AiSubscriptionCard />
             </div>
         </div>
     );

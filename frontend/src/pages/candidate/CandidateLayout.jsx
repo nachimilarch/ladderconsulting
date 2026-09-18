@@ -9,6 +9,7 @@ const navItems = [
     { label: 'Applications', to: '/candidate/applications', icon: '📋' },
     { label: 'Interviews',   to: '/candidate/interviews',   icon: '🗓' },
     { label: 'Documents',    to: '/candidate/documents',    icon: '📁' },
+    { label: 'Premium',      to: '/candidate/premium',      icon: '⭐' },
     { label: 'How to Use',   to: '/candidate/help',         icon: '❓' },
 ];
 

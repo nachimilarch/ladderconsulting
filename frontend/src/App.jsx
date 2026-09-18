@@ -43,6 +43,8 @@ import CandidateJobs from './pages/candidate/CandidateJobs';
 import CandidateApplications from './pages/candidate/CandidateApplications';
 import CandidateInterviews from './pages/candidate/CandidateInterviews';
 import CandidateDocuments from './pages/candidate/CandidateDocuments';
+import CandidatePremium from './pages/candidate/CandidatePremium';
+import CandidatePaymentCallback from './pages/candidate/PaymentCallback';
 import CandidateHelp from './pages/candidate/CandidateHelp';
 
 // Company training
@@ -51,14 +53,14 @@ import CompanyTraining from './pages/company/CompanyTraining';
 // HR offer request pages
 import OfferRequests from './pages/hr/OfferRequests';
 import OfferRequestDetail from './pages/hr/OfferRequestDetail';
-import ProfileUnlockRequests from './pages/hr/ProfileUnlockRequests';
+import PremiumRequests from './pages/hr/PremiumRequests';
+import PremiumCandidateRequests from './pages/hr/PremiumCandidateRequests';
 
 // HR interview request pages
 import InterviewRequestDetail from './pages/hr/InterviewRequestDetail';
 import Interviews from './pages/hr/Interviews';
 import HRInvoices from './pages/hr/HRInvoices';
 import ResumeSourcing from './pages/hr/ResumeSourcing';
-import PackageRequests from './pages/hr/PackageRequests';
 import CandidateDocumentsView from './pages/hr/CandidateDocumentsView';
 import AssignedCompanies from './pages/hr/AssignedCompanies';
 
@@ -175,13 +177,13 @@ export default function App() {
           <Route path="interview-requests" element={<Navigate to="/hr/interviews" replace />} />
           <Route path="interview-requests/:id" element={<InterviewRequestDetail />} />
           <Route path="scheduled-interviews" element={<Navigate to="/hr/interviews" replace />} />
-          <Route path="package-requests" element={<PackageRequests />} />
+          <Route path="premium-requests" element={<PremiumRequests />} />
+          <Route path="premium-candidate-requests" element={<PremiumCandidateRequests />} />
           <Route path="invoices" element={<HRInvoices />} />
           <Route path="invoices/:id" element={<HRInvoices />} />
           <Route path="sourcing" element={<ResumeSourcing />} />
           <Route path="companies" element={<AssignedCompanies />} />
           <Route path="candidates/:candidateId/documents" element={<CandidateDocumentsView />} />
-          <Route path="profile-unlock-requests" element={<ProfileUnlockRequests />} />
         </Route>
 
         {/* ── Candidate Module ───────────────────────── */}
@@ -196,6 +198,8 @@ export default function App() {
           <Route path="applications" element={<CandidateApplications />} />
           <Route path="interviews" element={<CandidateInterviews />} />
           <Route path="documents" element={<CandidateDocuments />} />
+          <Route path="premium" element={<CandidatePremium />} />
+          <Route path="payment-callback" element={<CandidatePaymentCallback />} />
           <Route path="help" element={<CandidateHelp />} />
         </Route>
 
@@ -217,6 +221,10 @@ export default function App() {
           <Route path="payments" element={<CompanyPayments />} />
           <Route path="payments/:invoiceId" element={<CompanyPayments />} />
           <Route path="payments/:invoiceId/callback" element={<PaymentCallback />} />
+          {/* payListingFee's Cashfree returnUrl points here (invoiceId as a query param,
+              not a path param) — this route was previously missing, so a listing-fee
+              payment landed on the catch-all -> /login instead of a confirmation screen. */}
+          <Route path="payment-callback" element={<PaymentCallback />} />
           <Route path="talent/unlock-callback" element={<ResumeUnlockCallback />} />
           <Route path="help" element={<CompanyHelp />} />
         </Route>

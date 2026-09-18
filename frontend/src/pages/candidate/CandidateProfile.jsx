@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { profileAPI, resumeAPI } from '../../api/candidate';
+import AiSubscriptionCard from '../../components/AiSubscriptionCard';
 import toast from 'react-hot-toast';
 
 const EMPTY_FORM = {
@@ -319,6 +320,10 @@ export default function CandidateProfile() {
                     {saving ? 'Saving…' : 'Save Profile'}
                 </button>
             </form>
+
+            <div className="mt-6">
+                <AiSubscriptionCard />
+            </div>
         </div>
     );
 }

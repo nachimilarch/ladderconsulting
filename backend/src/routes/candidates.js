@@ -10,6 +10,7 @@ const matchingService = require('../services/matchingService');
 const { maskResumeText } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
 const { upsertCandidateSkills } = require('../utils/skillTags');
+const premiumCtrl = require('../controllers/candidatePremiumController');
 
 // Ensure a candidates row exists for this user and return its id
 const getCandidateId = async (userId) => {
@@ -763,6 +764,13 @@ router.get('/documents/:id/download', authenticateToken, authorizeRole('candidat
         res.status(500).json({ success: false, message: 'Failed to serve document.' });
     }
 });
+
+// ── Premium candidate tier — CTC declaration + payslip-backed verification ────
+// Payslips themselves are uploaded via the existing /documents endpoints above
+// with doc_type='payslip' — no separate upload path needed.
+router.get('/premium/status',  authenticateToken, authorizeRole('candidate'), premiumCtrl.getPremiumStatus);
+router.post('/premium/request', authenticateToken, authorizeRole('candidate'), premiumCtrl.submitPremiumRequest);
+router.post('/premium/pay',    authenticateToken, authorizeRole('candidate'), premiumCtrl.payPremiumFee);
 
 // ── GET /api/candidates/:candidateId/documents  (hr_staff, admin) ─────────────
 router.get('/:candidateId/documents', authenticateToken, authorizeRole('hr_staff', 'admin'), async (req, res) => {

@@ -2,6 +2,7 @@ require('dotenv').config();
 const express = require('express');
 const { startMailPoller } = require('./services/mailPoller');
 const { startWAPoller }   = require('./services/waPoller');
+const { startSubscriptionBiller } = require('./services/subscriptionBiller');
 
 // Load DB-stored env overrides into process.env so UI-configured values are
 // picked up at startup without needing to edit .env files.
@@ -125,8 +126,10 @@ app.use('/api/interview-requests', require('./routes/interviewRequests'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/payments', require('./routes/payments'));
+app.use('/api/ai-subscription', require('./routes/aiSubscription'));
 app.use('/api/recruitment', require('./routes/recruitment'));
-app.use('/api/hr/package-requests', require('./routes/hrPackages'));
+app.use('/api/hr/premium-requests', require('./routes/hrPremiumRequests'));
+app.use('/api/hr/premium-candidate-requests', require('./routes/premiumCandidateRequests'));
 app.use('/api/hr/companies',        require('./routes/hrCompanies'));
 app.use('/api/admin', require('./routes/admin'));
 
@@ -169,5 +172,6 @@ loadEnvOverrides().then(() => {
     console.log(`Server running on port ${PORT}`);
     startMailPoller();
     startWAPoller();
+    startSubscriptionBiller();
   });
 });

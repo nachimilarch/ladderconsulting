@@ -56,3 +56,7 @@ export const talentPoolAPI = {
     activationStatus: ()                  => api.get('/companies/activation-status'),
     payListingFee:    ()                  => api.post('/companies/pay-listing-fee'),
 };
+
+export const premiumAPI = {
+    request: (note) => api.post('/companies/premium/request', { note }),
+};

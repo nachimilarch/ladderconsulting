@@ -51,3 +51,9 @@ export const hrDocumentAPI = {
     list:        (candidateId)         => api.get(`/candidates/${candidateId}/documents`),
     downloadUrl: (candidateId, docId)  => `${api.defaults.baseURL}/candidates/${candidateId}/documents/${docId}/download`,
 };
+
+export const candidatePremiumAPI = {
+    status:  ()                 => api.get('/candidates/premium/status'),
+    request: (declaredAnnualCtc) => api.post('/candidates/premium/request', { declared_annual_ctc: declaredAnnualCtc }),
+    pay:     ()                 => api.post('/candidates/premium/pay'),
+};

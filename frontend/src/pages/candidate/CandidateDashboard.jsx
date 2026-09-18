@@ -89,6 +89,15 @@ export default function CandidateDashboard() {
                 </p>
             </div>
 
+            {/* Premium promo */}
+            <Link
+                to="/candidate/premium"
+                className="block mb-6 bg-gradient-to-r from-yellow-50 to-indigo-50 border border-yellow-100 rounded-2xl px-5 py-3 text-sm hover:shadow-sm transition"
+            >
+                <span className="font-semibold text-yellow-700">⭐ Go Premium</span>
+                <span className="text-gray-600"> — earning ₹6 LPA+? Get verified and get boosted visibility to top hiring companies.</span>
+            </Link>
+
             {/* Profile Completeness Card */}
             <div className="card-p mb-6">
                 <div className="flex items-center justify-between mb-3">

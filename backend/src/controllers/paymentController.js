@@ -20,7 +20,7 @@ const fmtINR = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { maximum
 const processSuccessfulPayment = async (txn, paymentId, conn) => {
     const c = conn || db;
     const [[inv]] = await c.query(
-        `SELECT id, company_id, application_id, amount, amount_paid, invoice_number, invoice_type
+        `SELECT id, company_id, candidate_id, application_id, amount, amount_paid, invoice_number, invoice_type
          FROM invoices WHERE id = ? AND deleted_at IS NULL`,
         [txn.invoice_id]
     );
@@ -62,22 +62,73 @@ const processSuccessfulPayment = async (txn, paymentId, conn) => {
         } catch (e) { console.error('[listingFeeActivate]', e.message); }
     }
 
-    // Get executive user_id for notification
-    const [[compInfo]] = await c.query(
-        `SELECT c.assigned_executive_id, co_u.id AS company_user_id, u_exec.id AS exec_id
-         FROM companies c
-         JOIN users co_u ON co_u.id = c.user_id
-         LEFT JOIN users u_exec ON u_exec.id = c.assigned_executive_id
-         WHERE c.id = ? AND c.deleted_at IS NULL`, [inv.company_id]
-    );
+    // Premium profile fee activates the candidate's Premium status. Approval
+    // (candidate_premium_requests.status='approved') alone does NOT activate it —
+    // paying this fee is the deliberate final step.
+    if (inv.invoice_type === 'premium_profile_fee' && newStatus === 'paid') {
+        try {
+            await c.query(
+                `UPDATE candidates SET is_premium = 1, premium_activated_at = NOW(), premium_invoice_id = ? WHERE id = ? AND deleted_at IS NULL`,
+                [inv.id, inv.candidate_id]
+            );
+        } catch (e) { console.error('[premiumProfileActivate]', e.message); }
+    }
+
+    // AI subscription: create the ai_subscriptions row on first payment, or
+    // extend the existing one's period on a renewal payment — same row either
+    // way, found by payer. Extends from whichever is later (old period end or
+    // today) so a very-late payment doesn't stack backdated free time.
+    if (inv.invoice_type === 'ai_subscription' && newStatus === 'paid') {
+        try {
+            const column = inv.candidate_id ? 'candidate_id' : 'company_id';
+            const payerId = inv.candidate_id || inv.company_id;
+            const [[existingSub]] = await c.query(
+                `SELECT id FROM ai_subscriptions WHERE ${column} = ? AND deleted_at IS NULL LIMIT 1`,
+                [payerId]
+            );
+            if (existingSub) {
+                await c.query(
+                    `UPDATE ai_subscriptions
+                     SET status = 'active', grace_until = NULL, last_invoice_id = ?,
+                         current_period_start = GREATEST(current_period_end, CURDATE()),
+                         current_period_end = DATE_ADD(GREATEST(current_period_end, CURDATE()), INTERVAL 1 MONTH)
+                     WHERE id = ?`,
+                    [inv.id, existingSub.id]
+                );
+            } else {
+                await c.query(
+                    `INSERT INTO ai_subscriptions (${column}, status, current_period_start, current_period_end, last_invoice_id)
+                     VALUES (?, 'active', CURDATE(), DATE_ADD(CURDATE(), INTERVAL 1 MONTH), ?)`,
+                    [payerId, inv.id]
+                );
+            }
+        } catch (e) { console.error('[aiSubscriptionActivate]', e.message); }
+    }
 
     const [[admin]] = await c.query(
         `SELECT u.id FROM users u JOIN roles ro ON ro.id = u.role_id
          WHERE ro.name = 'admin' AND u.status = 'active' AND u.deleted_at IS NULL LIMIT 1`
     );
-
     const notifMsg = `Payment of ${fmtINR(txn.amount)} received for Invoice ${inv.invoice_number}. Invoice is now ${newStatus.replace('_', ' ')}.`;
-    if (compInfo?.exec_id) notify(compInfo.exec_id, 'payment_received', `Payment Received — ${inv.invoice_number}`, notifMsg, { invoice_id: inv.id });
+
+    if (inv.company_id) {
+        // Get executive user_id for notification
+        const [[compInfo]] = await c.query(
+            `SELECT c.assigned_executive_id, co_u.id AS company_user_id, u_exec.id AS exec_id
+             FROM companies c
+             JOIN users co_u ON co_u.id = c.user_id
+             LEFT JOIN users u_exec ON u_exec.id = c.assigned_executive_id
+             WHERE c.id = ? AND c.deleted_at IS NULL`, [inv.company_id]
+        );
+        if (compInfo?.exec_id) notify(compInfo.exec_id, 'payment_received', `Payment Received — ${inv.invoice_number}`, notifMsg, { invoice_id: inv.id });
+    } else if (inv.candidate_id) {
+        const [[candInfo]] = await c.query(
+            `SELECT u.id AS user_id FROM candidates cd JOIN users u ON u.id = cd.user_id WHERE cd.id = ? AND cd.deleted_at IS NULL`,
+            [inv.candidate_id]
+        );
+        if (candInfo?.user_id) notify(candInfo.user_id, 'payment_received', `Payment Received — ${inv.invoice_number}`, notifMsg, { invoice_id: inv.id });
+    }
+
     if (admin?.id) notify(admin.id, 'payment_received', `Payment Received — ${inv.invoice_number}`, notifMsg, { invoice_id: inv.id });
 };
 
@@ -165,7 +216,7 @@ exports.verifyPayment = async (req, res) => {
 
     try {
         const [[txn]] = await db.query(
-            `SELECT pt.id, pt.invoice_id, pt.company_id, pt.amount, pt.status, pt.cashfree_payment_id
+            `SELECT pt.id, pt.invoice_id, pt.company_id, pt.candidate_id, pt.amount, pt.status, pt.cashfree_payment_id
              FROM payment_transactions pt
              WHERE pt.cashfree_order_id = ? LIMIT 1`,
             [cashfreeOrderId]
@@ -231,7 +282,7 @@ exports.cashfreeWebhook = async (req, res) => {
         if (!orderId) return res.status(200).json({ received: true });
 
         const [[txn]] = await db.query(
-            `SELECT id, invoice_id, company_id, amount, status, cashfree_payment_id
+            `SELECT id, invoice_id, company_id, candidate_id, amount, status, cashfree_payment_id
              FROM payment_transactions WHERE cashfree_order_id = ? LIMIT 1`,
             [orderId]
         );
@@ -248,12 +299,21 @@ exports.cashfreeWebhook = async (req, res) => {
                 await db.query(
                     `UPDATE payment_transactions SET status = 'failed' WHERE id = ?`, [txn.id]
                 );
-                // Notify company of failure
-                const [[comp]] = await db.query(
-                    `SELECT u.id AS user_id FROM companies c JOIN users u ON u.id = c.user_id WHERE c.id = ?`, [txn.company_id]
-                );
-                if (comp) {
-                    notify(comp.user_id, 'payment_failed', 'Payment Failed', 'Your payment attempt failed. Please try again from the Payments section.', { invoice_id: txn.invoice_id });
+                // Notify the payer of failure — company or candidate
+                if (txn.company_id) {
+                    const [[comp]] = await db.query(
+                        `SELECT u.id AS user_id FROM companies c JOIN users u ON u.id = c.user_id WHERE c.id = ?`, [txn.company_id]
+                    );
+                    if (comp) {
+                        notify(comp.user_id, 'payment_failed', 'Payment Failed', 'Your payment attempt failed. Please try again from the Payments section.', { invoice_id: txn.invoice_id });
+                    }
+                } else if (txn.candidate_id) {
+                    const [[cand]] = await db.query(
+                        `SELECT u.id AS user_id FROM candidates c JOIN users u ON u.id = c.user_id WHERE c.id = ?`, [txn.candidate_id]
+                    );
+                    if (cand) {
+                        notify(cand.user_id, 'payment_failed', 'Payment Failed', 'Your payment attempt failed. Please try again.', { invoice_id: txn.invoice_id });
+                    }
                 }
             }
         }
