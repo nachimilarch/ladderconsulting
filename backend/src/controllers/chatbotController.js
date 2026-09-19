@@ -127,10 +127,19 @@ exports.sendMessage = async (req, res) => {
     }
 
     res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
+    // no-transform stops the compression() middleware from buffering the stream
+    // (browsers send Accept-Encoding: gzip); X-Accel-Buffering does the same for nginx.
+    res.setHeader('Cache-Control', 'no-cache, no-transform');
+    res.setHeader('X-Accel-Buffering', 'no');
     res.setHeader('Connection', 'keep-alive');
     res.flushHeaders?.();
     const send = (event) => res.write(`data: ${JSON.stringify(event)}\n\n`);
+
+    // CPU inference can be silent for 30–90s (cold model load), longer than nginx's
+    // 60s read timeout. A comment line keeps the connection alive; the client only
+    // parses `data:` lines so it ignores these.
+    const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 10000);
+    res.on('close', () => clearInterval(heartbeat));
 
     try {
         await db.query(
@@ -230,6 +239,8 @@ exports.sendMessage = async (req, res) => {
         console.error('[chatbot.sendMessage]', err.message);
         send({ type: 'error', message: 'The assistant is unavailable right now. Please try again.' });
         res.end();
+    } finally {
+        clearInterval(heartbeat);
     }
 };
 
