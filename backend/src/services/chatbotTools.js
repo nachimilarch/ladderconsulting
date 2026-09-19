@@ -35,6 +35,10 @@ const describeJobFields = (fields) => Object.entries(fields)
     })
     .join('\n');
 
+// The chat UI renders match results as cards on its own, so tell the model not to
+// repeat the list — a short human comment and a next step reads far better.
+const CARD_NOTE = "The app already shows these results to the user as cards. Do NOT list them again; add one or two friendly sentences about the best fit and ask what they'd like to do next.";
+
 const insertPendingAction = async (conversationId, userId, actionType, payload, previewText) => {
     const [result] = await db.query(
         `INSERT INTO chatbot_pending_actions (conversation_id, user_id, action_type, payload, preview_text, status)
@@ -46,7 +50,7 @@ const insertPendingAction = async (conversationId, userId, actionType, payload, 
 
 // ── Company persona tools ──────────────────────────────────────────────────
 
-async function findMatchingCandidates({ user }, { job_id, limit = 10 }) {
+async function findMatchingCandidates({ user }, { job_id, limit = 5 }) {
     const [[company]] = await db.query('SELECT id, company_tier FROM companies WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
     if (!company) return { error: 'Company account not found.' };
 
@@ -94,7 +98,9 @@ async function findMatchingCandidates({ user }, { job_id, limit = 10 }) {
             experience_years: byId[r.candidateId]?.total_experience,
             is_premium: !!byId[r.candidateId]?.is_premium,
             match_score: r.score,
+            matched_skills: (r.matched_skills || []).slice(0, 4),
         })),
+        note: CARD_NOTE,
     };
 }
 
@@ -138,21 +144,61 @@ async function proposeJobUpdate({ user, conversationId }, { job_id, ...fields })
     return { pending_action_id: id, preview };
 }
 
+async function getJobDetails({ user }, { job_id }) {
+    const [[company]] = await db.query('SELECT id FROM companies WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
+    if (!company) return { error: 'Company account not found.' };
+    const [[job]] = await db.query(
+        `SELECT id AS job_id, title, description, requirements, location, job_type, work_mode,
+                salary_min, salary_max, experience_min, experience_max, openings, status
+         FROM job_postings WHERE id = ? AND company_id = ? AND deleted_at IS NULL`,
+        [job_id, company.id]
+    );
+    if (!job) return { error: `Job #${job_id} not found, or does not belong to your company.` };
+    return { job };
+}
+
 // ── Candidate persona tools ────────────────────────────────────────────────
 
-async function findMatchingJobs({ user }, { limit = 10 } = {}) {
+async function findMatchingJobs({ user }, { limit = 5 } = {}) {
     const [[cand]] = await db.query('SELECT id FROM candidates WHERE user_id = ?', [user.id]);
     if (!cand) return { error: 'Candidate account not found.' };
-    const result = await jobController.getMatchedJobsForCandidate(cand.id, { page: 1, limit });
-    return {
-        jobs: result.jobs.map(j => ({
+
+    // Scores are only stored per application, so a job the candidate hasn't applied
+    // to comes back as 0 — score those on the fly with the same skill-vector engine
+    // the Talent Pool uses, then rank.
+    const { jobs: active } = await jobController.getMatchedJobsForCandidate(cand.id, { page: 1, limit: 30 });
+    const scored = await Promise.all(active.map(async (j) => {
+        let score = j.match_computed ? Number(j.match_score) : null;
+        let matched = [];
+        if (score === null) {
+            const r = (await scorePoolAgainstJob(j.id, [cand.id])).get(cand.id);
+            if (r) { score = r.score; matched = r.matched_skills || []; }
+        } else if (j.matched_skills) {
+            try { matched = typeof j.matched_skills === 'string' ? JSON.parse(j.matched_skills) : j.matched_skills; } catch { /* leave [] */ }
+        }
+        return {
             job_id: j.id,
             title: j.title,
             company: j.company_name,
             location: j.location,
-            match_score: j.match_score,
+            job_type: j.job_type,
+            work_mode: j.work_mode,
+            salary_min: j.salary_min,
+            salary_max: j.salary_max,
+            match_score: score === null ? null : Math.round(score),
+            matched_skills: (matched || []).slice(0, 4),
             already_applied: !!j.already_applied,
-        })),
+        };
+    }));
+
+    const ranked = scored
+        .sort((a, b) => (b.match_score ?? -1) - (a.match_score ?? -1))
+        .slice(0, limit);
+    const anyScored = ranked.some(j => j.match_score !== null);
+
+    return {
+        jobs: ranked,
+        note: CARD_NOTE + (anyScored ? '' : " None could be scored, which usually means the profile has no skills yet: suggest they add skills or upload a resume."),
     };
 }
 
@@ -212,17 +258,22 @@ async function proposeApplyToJob({ user, conversationId }, { job_id, cover_lette
 
     const preview = `Apply to "${job.title}" at ${job.company_name}` +
         (cover_letter ? `\nCover letter: ${cover_letter}` : '');
-    const id = await insertPendingAction(conversationId, user.id, 'apply_to_job', { job_id, cover_letter }, preview);
+    const id = await insertPendingAction(
+        conversationId, user.id, 'apply_to_job',
+        { job_id, cover_letter, job_title: job.title, company_name: job.company_name },
+        preview
+    );
     return { pending_action_id: id, preview };
 }
 
 // ── Tool registry ───────────────────────────────────────────────────────────
 
-const READ_ONLY = new Set(['find_matching_candidates', 'find_matching_jobs', 'get_profile_summary']);
+const READ_ONLY = new Set(['find_matching_candidates', 'find_matching_jobs', 'get_profile_summary', 'get_job_details']);
 const isWriteTool = (name) => !READ_ONLY.has(name);
 
 const IMPLEMENTATIONS = {
     find_matching_candidates: findMatchingCandidates,
+    get_job_details: getJobDetails,
     propose_job_post: proposeJobPost,
     propose_job_update: proposeJobUpdate,
     find_matching_jobs: findMatchingJobs,
@@ -244,6 +295,18 @@ const SCHEMAS = {
                         job_id: { type: 'integer', description: 'The job posting ID to match candidates against.' },
                         limit: { type: 'integer', description: 'Max candidates to return (default 10).' },
                     },
+                    required: ['job_id'],
+                },
+            },
+        },
+        {
+            type: 'function',
+            function: {
+                name: 'get_job_details',
+                description: "Read the full current text of one of the company's job postings (needed before improving or editing it).",
+                parameters: {
+                    type: 'object',
+                    properties: { job_id: { type: 'integer', description: 'The job posting ID.' } },
                     required: ['job_id'],
                 },
             },
@@ -306,14 +369,6 @@ const SCHEMAS = {
                     type: 'object',
                     properties: { limit: { type: 'integer', description: 'Max jobs to return (default 10).' } },
                 },
-            },
-        },
-        {
-            type: 'function',
-            function: {
-                name: 'get_profile_summary',
-                description: "Read the candidate's current profile fields and skills.",
-                parameters: { type: 'object', properties: {} },
             },
         },
         {
