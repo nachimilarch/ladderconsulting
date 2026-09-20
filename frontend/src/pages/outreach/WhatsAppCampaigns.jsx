@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { waCampaignAPI, vaartabotAPI } from '../../api/outreach';
+import { fmtIst } from '../../utils/schedule';
 
 const STATUS_COLORS = {
     draft:'bg-gray-100 text-gray-600', sending:'bg-blue-100 text-blue-700',
     sent:'bg-green-100 text-green-700', paused:'bg-yellow-100 text-yellow-700',
-    failed:'bg-red-100 text-red-700',
+    failed:'bg-red-100 text-red-700', scheduled:'bg-purple-100 text-purple-700',
 };
 
 export default function WhatsAppCampaigns() {
@@ -88,13 +89,14 @@ export default function WhatsAppCampaigns() {
                                     <div className="flex items-center gap-2">
                                         <p className="text-sm font-semibold text-gray-800">{c.campaign_name}</p>
                                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[c.status]}`}>{c.status}</span>
+                                        {c.status === 'scheduled' && c.scheduled_at && <span className="text-xs text-purple-600">🗓 {fmtIst(c.scheduled_at)}</span>}
                                     </div>
                                     <p className="text-xs text-gray-400 mt-0.5">Template: {c.template_name} · List: {c.list_name}</p>
                                     <p className="text-xs text-gray-400 mt-0.5">{c.sent_count}/{c.total_recipients} sent · {c.reply_count} replies</p>
                                 </div>
                                 <div className="flex items-center gap-3 ml-4 shrink-0">
                                     <Link to={`/outreach/whatsapp/${c.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
-                                    {c.status === 'draft' && (
+                                    {['draft', 'scheduled'].includes(c.status) && (
                                         <button onClick={() => handleSend(c.id)} className="text-xs text-green-600 hover:underline">Send</button>
                                     )}
                                 </div>

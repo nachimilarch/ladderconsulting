@@ -88,6 +88,7 @@ router.get('/whatsapp-campaigns',              whatsappCtrl.listWACampaigns);
 router.get('/whatsapp-campaigns/:id',          whatsappCtrl.getWACampaign);
 router.get('/whatsapp-campaigns/:id/failed',   campaignCtrl.getWAFailedLogs);
 router.post('/whatsapp-campaigns/:id/send',    whatsappCtrl.sendWACampaign);
+router.patch('/whatsapp-campaigns/:id/schedule', whatsappCtrl.updateWASchedule);
 
 // ── Email Auto-Replies ───────────────────────────────────────────────────────
 router.get('/email/auto-replies',              emailAutoReplyCtrl.listFlows);
@@ -103,5 +104,8 @@ router.put('/calls/:id',                       callCtrl.updateCall);
 // ── Analytics ────────────────────────────────────────────────────────────────
 router.get('/analytics/campaigns',             analyticsCtrl.campaignStats);
 router.get('/analytics/conversions',           analyticsCtrl.conversionStats);
+
+// ── AI assistance (contacts, copy, replies, planning, writing tasks) ─────────
+router.use('/ai', require('./outreachAi'));
 
 module.exports = router;

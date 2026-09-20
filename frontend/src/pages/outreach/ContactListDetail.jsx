@@ -98,7 +98,10 @@ export default function ContactListDetail() {
             <div className="flex items-center gap-3 mb-6">
                 <Link to="/outreach/lists" className="text-sm text-gray-400 hover:text-gray-600">← Lists</Link>
                 <span className="text-gray-300">/</span>
-                <h2 className="text-xl font-bold text-gray-800">{list?.list_name || '…'}</h2>
+                <h2 className="text-xl font-bold text-gray-800 flex-1">{list?.list_name || '…'}</h2>
+                {list?.import_status === 'done' && (
+                    <Link to={`/outreach/ai?tab=contacts&list=${id}`} className="text-sm font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-3.5 py-1.5 hover:bg-brand-100 transition">✨ Analyze with AI</Link>
+                )}
             </div>
 
             {list && (

@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { waCampaignAPI, waTemplateAPI, contactListAPI } from '../../api/outreach';
+import { toIso } from '../../utils/schedule';
 
 const CONTACT_FIELDS = ['first_name','full_name','company_name','designation','city','phone'];
 
@@ -10,7 +11,7 @@ export default function WhatsAppCampaignNew() {
     const [lists, setLists]         = useState([]);
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
-    const [form, setForm]           = useState({ campaign_name:'', list_id:'', whatsapp_template_id:'' });
+    const [form, setForm]           = useState({ campaign_name:'', list_id:'', whatsapp_template_id:'', scheduled_at:'' });
     const [varMapping, setVarMapping] = useState({});
     const [saving, setSaving]       = useState(false);
 
@@ -38,7 +39,7 @@ export default function WhatsAppCampaignNew() {
         }
         setSaving(true);
         try {
-            const r = await waCampaignAPI.create({ ...form, variable_mapping: varMapping });
+            const r = await waCampaignAPI.create({ ...form, scheduled_at: toIso(form.scheduled_at), variable_mapping: varMapping });
             toast.success('Campaign created!');
             navigate(`/outreach/whatsapp/${r.data.id}`);
         } catch (err) {
@@ -112,6 +113,13 @@ export default function WhatsAppCampaignNew() {
                         </div>
                     </div>
                 )}
+
+                <div>
+                    <label className="text-xs font-medium text-gray-600 block mb-1">Schedule (optional)</label>
+                    <input type="datetime-local" value={form.scheduled_at} onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))}
+                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                    <p className="text-[11px] text-gray-400 mt-1">{form.scheduled_at ? 'Sends by itself at this time. You can cancel it before then.' : 'Leave empty to save as a draft and send when you choose.'} <Link to="/outreach/ai?tab=planner&channel=whatsapp" className="text-brand-600 hover:underline">Plan the sends with AI</Link></p>
+                </div>
 
                 <div className="flex gap-3 pt-2">
                     <button type="submit" disabled={saving}

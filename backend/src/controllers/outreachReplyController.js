@@ -20,7 +20,7 @@ const notify = async (userId, type, title, body, metadata = null) => {
 
 // ── GET /outreach/replies ─────────────────────────────────────────────────────
 exports.listReplies = async (req, res) => {
-    const { status, channel, page = 1, limit = 20 } = req.query;
+    const { status, channel, campaign_id, page = 1, limit = 20 } = req.query;
     const offset  = (parseInt(page) - 1) * parseInt(limit);
     const filters = ['r.deleted_at IS NULL'];
     const params  = [];
@@ -31,6 +31,7 @@ exports.listReplies = async (req, res) => {
     }
     if (status)  { filters.push('r.reply_status = ?');  params.push(status); }
     if (channel) { filters.push('r.channel = ?');       params.push(channel); }
+    if (Number.isInteger(parseInt(campaign_id, 10))) { filters.push('r.campaign_id = ?'); params.push(parseInt(campaign_id, 10)); }
 
     const where = filters.join(' AND ');
     try {

@@ -43,6 +43,7 @@ export const waCampaignAPI = {
     getOne:     (id)     => api.get(`/outreach/whatsapp-campaigns/${id}`),
     failedLogs: (id)     => api.get(`/outreach/whatsapp-campaigns/${id}/failed`),
     send:       (id)     => api.post(`/outreach/whatsapp-campaigns/${id}/send`),
+    schedule:   (id, scheduled_at) => api.patch(`/outreach/whatsapp-campaigns/${id}/schedule`, { scheduled_at }),
 };
 
 export const vaartabotAPI = {

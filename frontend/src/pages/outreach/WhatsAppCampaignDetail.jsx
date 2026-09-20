@@ -2,11 +2,12 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { waCampaignAPI } from '../../api/outreach';
+import { fmtIst } from '../../utils/schedule';
 
 const STATUS_COLORS = {
     draft:'bg-gray-100 text-gray-600', sending:'bg-blue-100 text-blue-700',
     sent:'bg-green-100 text-green-700', paused:'bg-yellow-100 text-yellow-700',
-    failed:'bg-red-100 text-red-700',
+    failed:'bg-red-100 text-red-700', scheduled:'bg-purple-100 text-purple-700',
 };
 
 export default function WhatsAppCampaignDetail() {
@@ -34,6 +35,16 @@ export default function WhatsAppCampaignDetail() {
         return () => clearTimeout(t);
     }, [campaign]);
 
+    const handleUnschedule = async () => {
+        if (!confirm('Cancel the schedule? The campaign goes back to a draft and will not send by itself.')) return;
+        try {
+            await waCampaignAPI.schedule(id, '');
+            toast.success('Schedule cancelled'); fetch();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not cancel the schedule');
+        }
+    };
+
     const handleSend = async () => {
         if (!confirm('Send this WhatsApp campaign?')) return;
         try {
@@ -56,7 +67,14 @@ export default function WhatsAppCampaignDetail() {
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[campaign.status]}`}>{campaign.status}</span>
             </div>
 
-            {campaign.status === 'draft' && (
+            {campaign.status === 'scheduled' && campaign.scheduled_at && (
+                <div className="mb-4 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-sm text-purple-800">🗓 Scheduled: sends by itself on <b>{fmtIst(campaign.scheduled_at)}</b></p>
+                    <button onClick={handleUnschedule} className="text-xs font-semibold text-purple-700 underline">Cancel schedule</button>
+                </div>
+            )}
+
+            {['draft', 'scheduled'].includes(campaign.status) && (
                 <button onClick={handleSend} className="mb-4 bg-green-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-green-700 transition">
                     Send Now
                 </button>

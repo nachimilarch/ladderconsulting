@@ -125,29 +125,38 @@ exports.deleteTemplate = async (req, res) => {
 
 // ── WhatsApp Campaigns ────────────────────────────────────────────────────────
 
-exports.createWACampaign = async (req, res) => {
-    const { campaign_name, list_id, whatsapp_template_id, variable_mapping } = req.body;
-    if (!campaign_name || !list_id || !whatsapp_template_id) {
-        return res.status(422).json({ success: false, message: 'campaign_name, list_id, whatsapp_template_id required.' });
-    }
-    try {
-        const [[list]] = await db.query(
-            'SELECT id, uploaded_by FROM outreach_contact_lists WHERE id = ? AND deleted_at IS NULL', [list_id]
-        );
-        if (!list) return res.status(404).json({ success: false, message: 'Contact list not found.' });
-        if (req.user.role === 'hr_staff' && list.uploaded_by !== req.user.id) {
-            return res.status(403).json({ success: false, message: 'You do not own this contact list.' });
-        }
+// Creates a WhatsApp campaign for `user`; returns { id } or throws { status, message }.
+async function createWACampaignRecord(user, body) {
+    const { campaign_name, list_id, whatsapp_template_id, variable_mapping, scheduled_at } = body;
+    const fail = (status, message) => Object.assign(new Error(message), { status, userFacing: true });
+    if (!campaign_name || !list_id || !whatsapp_template_id) throw fail(422, 'campaign_name, list_id, whatsapp_template_id required.');
+    const { parseWhen, isFuture } = require('./outreachCampaignController');
+    const parsed = parseWhen(scheduled_at);
+    if (parsed.error) throw fail(422, parsed.error);
 
-        const [result] = await db.query(
-            `INSERT INTO outreach_campaigns
-               (created_by, campaign_name, campaign_type, list_id, whatsapp_template_id, variable_mapping, status)
-             VALUES (?, ?, 'whatsapp', ?, ?, ?, 'draft')`,
-            [req.user.id, campaign_name, list_id, whatsapp_template_id,
-             variable_mapping ? JSON.stringify(variable_mapping) : null]
-        );
-        res.status(201).json({ success: true, message: 'WhatsApp campaign created.', id: result.insertId });
+    const [[list]] = await db.query(
+        'SELECT id, uploaded_by FROM outreach_contact_lists WHERE id = ? AND deleted_at IS NULL', [list_id]
+    );
+    if (!list) throw fail(404, 'Contact list not found.');
+    if (user.role === 'hr_staff' && list.uploaded_by !== user.id) throw fail(403, 'You do not own this contact list.');
+
+    const [result] = await db.query(
+        `INSERT INTO outreach_campaigns
+           (created_by, campaign_name, campaign_type, list_id, whatsapp_template_id, variable_mapping, status, scheduled_at)
+         VALUES (?, ?, 'whatsapp', ?, ?, ?, ?, ?)`,
+        [user.id, campaign_name, list_id, whatsapp_template_id,
+         variable_mapping ? JSON.stringify(variable_mapping) : null, isFuture(parsed.when) ? 'scheduled' : 'draft', parsed.when]
+    );
+    return { id: result.insertId };
+}
+exports.createWACampaignRecord = createWACampaignRecord;
+
+exports.createWACampaign = async (req, res) => {
+    try {
+        const { id } = await createWACampaignRecord(req.user, req.body);
+        res.status(201).json({ success: true, message: 'WhatsApp campaign created.', id });
     } catch (err) {
+        if (err.userFacing) return res.status(err.status).json({ success: false, message: err.message });
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
@@ -212,30 +221,58 @@ exports.sendWACampaign = async (req, res) => {
             return res.status(422).json({ success: false, message: `Cannot send campaign with status '${campaign.status}'.` });
         }
 
-        const [[template]] = await db.query(
-            'SELECT * FROM whatsapp_templates WHERE id = ? AND deleted_at IS NULL', [campaign.whatsapp_template_id]
-        );
-        if (!template) return res.status(422).json({ success: false, message: 'WhatsApp template not found.' });
+        const started = await beginWASend(campaign);
+        if (started.error) return res.status(422).json({ success: false, message: started.error });
+        res.json({ success: true, message: `WhatsApp send started for ${started.total} contacts.`, total_recipients: started.total });
+    } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
 
-        const [contacts] = await db.query(
-            `SELECT c.* FROM outreach_contacts c
-             LEFT JOIN outreach_campaign_logs cl ON cl.campaign_id = ? AND cl.contact_id = c.id
-             WHERE c.list_id = ? AND c.deleted_at IS NULL AND c.is_unsubscribed = 0
-               AND (c.phone IS NOT NULL OR c.whatsapp_number IS NOT NULL)
-               AND cl.id IS NULL`,
-            [campaignId, campaign.list_id]
-        );
+// Marks the campaign as sending and sends in the background. Used by the Send button and by
+// the scheduler. Returns { total } or { error }.
+async function beginWASend(campaign) {
+    const [[template]] = await db.query(
+        'SELECT * FROM whatsapp_templates WHERE id = ? AND deleted_at IS NULL', [campaign.whatsapp_template_id]
+    );
+    if (!template) return { error: 'WhatsApp template not found.' };
 
-        await db.query(
-            "UPDATE outreach_campaigns SET status = 'sending', total_recipients = ?, sent_at = NOW() WHERE id = ?",
-            [contacts.length, campaignId]
-        );
+    const [contacts] = await db.query(
+        `SELECT c.* FROM outreach_contacts c
+         LEFT JOIN outreach_campaign_logs cl ON cl.campaign_id = ? AND cl.contact_id = c.id
+         WHERE c.list_id = ? AND c.deleted_at IS NULL AND c.is_unsubscribed = 0
+           AND (c.phone IS NOT NULL OR c.whatsapp_number IS NOT NULL)
+           AND cl.id IS NULL`,
+        [campaign.id, campaign.list_id]
+    );
 
-        res.json({ success: true, message: `WhatsApp send started for ${contacts.length} contacts.`, total_recipients: contacts.length });
+    await db.query(
+        "UPDATE outreach_campaigns SET status = 'sending', total_recipients = ?, sent_at = NOW() WHERE id = ?",
+        [contacts.length, campaign.id]
+    );
 
-        setImmediate(() => sendWABatch(campaign, template, contacts).catch(e =>
-            console.error('[whatsapp.sendBatch]', e.message)
-        ));
+    setImmediate(() => sendWABatch(campaign, template, contacts).catch(e =>
+        console.error('[whatsapp.sendBatch]', e.message)
+    ));
+    return { total: contacts.length };
+}
+exports.beginWASend = beginWASend;
+
+// ── PATCH /outreach/whatsapp-campaigns/:id/schedule  { scheduled_at } ─────────
+// A future time hands the campaign to the scheduler; an empty value cancels the schedule.
+exports.updateWASchedule = async (req, res) => {
+    try {
+        const { parseWhen, isFuture } = require('./outreachCampaignController');
+        const [[campaign]] = await db.query(
+            "SELECT id, created_by, status FROM outreach_campaigns WHERE id = ? AND deleted_at IS NULL AND campaign_type = 'whatsapp'", [req.params.id]);
+        if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found.' });
+        if (req.user.role === 'hr_staff' && campaign.created_by !== req.user.id) return res.status(403).json({ success: false, message: 'Access denied.' });
+        if (!['draft', 'scheduled'].includes(campaign.status)) return res.status(422).json({ success: false, message: 'Only draft or scheduled campaigns can be rescheduled.' });
+        const parsed = parseWhen(req.body?.scheduled_at);
+        if (parsed.error) return res.status(422).json({ success: false, message: parsed.error });
+        await db.query('UPDATE outreach_campaigns SET scheduled_at = ?, status = ? WHERE id = ?',
+            [parsed.when, isFuture(parsed.when) ? 'scheduled' : 'draft', campaign.id]);
+        res.json({ success: true, message: isFuture(parsed.when) ? 'Campaign scheduled.' : 'Schedule cancelled.' });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Server error.' });
     }

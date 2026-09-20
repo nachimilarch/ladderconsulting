@@ -30,6 +30,16 @@ const PLATFORM_SETTINGS = {
         description: 'Polls the outreach inbox every N minutes to capture campaign replies.',
         type: 'toggle',
     },
+    outreach_ai_enabled: {
+        label: 'Outreach AI Writing Help',
+        description: 'Lets outreach staff use the AI Studio writing tools (campaign emails, subject lines, follow-ups, WhatsApp templates, reply drafts, call scripts, insights). Contact analysis, copy checks and the planner always work. Turn off if the AI server is overloaded.',
+        type: 'toggle',
+    },
+    campaign_scheduler_enabled: {
+        label: 'Send Scheduled Campaigns Automatically',
+        description: 'When on, campaigns scheduled for a future time send by themselves at that time. Turn off to hold every scheduled campaign (nothing is lost; turn it back on and due campaigns send).',
+        type: 'toggle',
+    },
     llm_resume_enrichment: {
         label: 'AI Resume Second Look',
         description: 'After a candidate uploads a resume, the AI model suggests extra profile details (headline, summary, skills, education) for the candidate to accept. Turn off if the AI server is overloaded.',

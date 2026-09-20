@@ -5,6 +5,7 @@ import NotificationBell from '../NotificationBell';
 
 const navItems = [
     { label: 'Dashboard',       to: '/outreach',                    exact: true, icon: '📊' },
+    { label: 'AI Studio',       to: '/outreach/ai',                 icon: '✨' },
     { label: 'Contact Lists',   to: '/outreach/lists',              icon: '📋' },
     { label: 'Email Campaigns', to: '/outreach/email',              icon: '✉️' },
     { label: 'Email Templates', to: '/outreach/email/templates',    icon: '📄' },

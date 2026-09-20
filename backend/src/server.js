@@ -3,6 +3,7 @@ const express = require('express');
 const { startMailPoller } = require('./services/mailPoller');
 const { startWAPoller }   = require('./services/waPoller');
 const { startSubscriptionBiller } = require('./services/subscriptionBiller');
+const { startCampaignScheduler } = require('./services/campaignScheduler');
 
 // Load DB-stored env overrides into process.env so UI-configured values are
 // picked up at startup without needing to edit .env files.
@@ -176,5 +177,6 @@ loadEnvOverrides().then(() => {
     startMailPoller();
     startWAPoller();
     startSubscriptionBiller();
+    startCampaignScheduler();
   });
 });

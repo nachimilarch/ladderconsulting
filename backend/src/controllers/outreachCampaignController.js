@@ -21,45 +21,64 @@ const notify = async (userId, type, title, body, metadata = null) => {
 // Global map to track which campaigns are currently pausing (prevents new batch sends)
 const pausedCampaigns = new Set();
 
+// A schedule arrives as an ISO instant from the browser (or a Date). Stored as UTC.
+// Returns { when: Date|null } or { error } for junk.
+const parseWhen = (v) => {
+    if (v === undefined || v === null || v === '') return { when: null };
+    const d = v instanceof Date ? v : new Date(v);
+    return Number.isNaN(d.getTime()) ? { error: 'scheduled_at is not a valid date and time.' } : { when: d };
+};
+const isFuture = (d) => !!d && d.getTime() > Date.now() + 60 * 1000;
+
+// Creates an email campaign for `user` and returns { id } or throws { status, message }.
+// A campaign with a future schedule starts as 'scheduled' (the scheduler sends it), else 'draft'.
+async function createEmailCampaignRecord(user, body) {
+    const { campaign_name, list_id, subject, message_body, from_name, scheduled_at } = body;
+    const fail = (status, message) => Object.assign(new Error(message), { status, userFacing: true });
+    if (!campaign_name || !list_id || !subject || !message_body) throw fail(422, 'campaign_name, list_id, subject, message_body required.');
+    const parsed = parseWhen(scheduled_at);
+    if (parsed.error) throw fail(422, parsed.error);
+
+    // Verify list exists and is accessible
+    const [[list]] = await db.query(
+        'SELECT id, uploaded_by FROM outreach_contact_lists WHERE id = ? AND deleted_at IS NULL', [list_id]
+    );
+    if (!list) throw fail(404, 'Contact list not found.');
+    if (user.role === 'hr_staff' && list.uploaded_by !== user.id) throw fail(403, 'You do not own this contact list.');
+
+    // Resolve executive's from_email
+    const [[emp]] = await db.query(
+        'SELECT outreach_email, outreach_email_name FROM employees WHERE user_id = ? AND deleted_at IS NULL',
+        [user.id]
+    );
+    const fromEmail = emp?.outreach_email || getDefaultFrom();
+    const resolvedFromName = from_name || emp?.outreach_email_name || process.env.GODADDY_DEFAULT_FROM_NAME || 'LadderStep Human Consulting';
+
+    const [result] = await db.query(
+        `INSERT INTO outreach_campaigns
+           (created_by, campaign_name, campaign_type, list_id, subject, message_body,
+            from_email, from_name, status, scheduled_at)
+         VALUES (?, ?, 'email', ?, ?, ?, ?, ?, ?, ?)`,
+        [user.id, campaign_name, list_id, subject, message_body,
+         fromEmail, resolvedFromName, isFuture(parsed.when) ? 'scheduled' : 'draft', parsed.when]
+    );
+    return { id: result.insertId };
+}
+
 // ── POST /outreach/email-campaigns ───────────────────────────────────────────
 exports.createEmailCampaign = async (req, res) => {
-    const { campaign_name, list_id, subject, message_body, from_name, scheduled_at } = req.body;
-    if (!campaign_name || !list_id || !subject || !message_body) {
-        return res.status(422).json({ success: false, message: 'campaign_name, list_id, subject, message_body required.' });
-    }
-
     try {
-        // Verify list exists and is accessible
-        const [[list]] = await db.query(
-            'SELECT id, uploaded_by FROM outreach_contact_lists WHERE id = ? AND deleted_at IS NULL', [list_id]
-        );
-        if (!list) return res.status(404).json({ success: false, message: 'Contact list not found.' });
-        if (req.user.role === 'hr_staff' && list.uploaded_by !== req.user.id) {
-            return res.status(403).json({ success: false, message: 'You do not own this contact list.' });
-        }
-
-        // Resolve executive's from_email
-        const [[emp]] = await db.query(
-            'SELECT outreach_email, outreach_email_name FROM employees WHERE user_id = ? AND deleted_at IS NULL',
-            [req.user.id]
-        );
-        const fromEmail = emp?.outreach_email || getDefaultFrom();
-        const resolvedFromName = from_name || emp?.outreach_email_name || process.env.GODADDY_DEFAULT_FROM_NAME || 'LadderStep Human Consulting';
-
-        const [result] = await db.query(
-            `INSERT INTO outreach_campaigns
-               (created_by, campaign_name, campaign_type, list_id, subject, message_body,
-                from_email, from_name, status, scheduled_at)
-             VALUES (?, ?, 'email', ?, ?, ?, ?, ?, 'draft', ?)`,
-            [req.user.id, campaign_name, list_id, subject, message_body,
-             fromEmail, resolvedFromName, scheduled_at || null]
-        );
-        res.status(201).json({ success: true, message: 'Campaign created.', id: result.insertId });
+        const { id } = await createEmailCampaignRecord(req.user, req.body);
+        res.status(201).json({ success: true, message: 'Campaign created.', id });
     } catch (err) {
+        if (err.userFacing) return res.status(err.status).json({ success: false, message: err.message });
         console.error('[outreachCampaign.create]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
+exports.createEmailCampaignRecord = createEmailCampaignRecord;
+exports.parseWhen = parseWhen;
+exports.isFuture = isFuture;
 
 // ── GET /outreach/email-campaigns ────────────────────────────────────────────
 exports.listEmailCampaigns = async (req, res) => {
@@ -140,7 +159,13 @@ exports.updateEmailCampaign = async (req, res) => {
         if (subject       !== undefined) { fields.push('subject = ?');       vals.push(subject); }
         if (message_body  !== undefined) { fields.push('message_body = ?');  vals.push(message_body); }
         if (from_name     !== undefined) { fields.push('from_name = ?');     vals.push(from_name); }
-        if (scheduled_at  !== undefined) { fields.push('scheduled_at = ?');  vals.push(scheduled_at || null); }
+        if (scheduled_at  !== undefined) {
+            const parsed = parseWhen(scheduled_at);
+            if (parsed.error) return res.status(422).json({ success: false, message: parsed.error });
+            fields.push('scheduled_at = ?'); vals.push(parsed.when);
+            // A future time hands the campaign to the scheduler; clearing it makes it a draft again.
+            fields.push('status = ?'); vals.push(isFuture(parsed.when) ? 'scheduled' : 'draft');
+        }
         if (!fields.length) return res.status(422).json({ success: false, message: 'Nothing to update.' });
 
         vals.push(req.params.id);
@@ -169,42 +194,49 @@ exports.sendEmailCampaign = async (req, res) => {
             return res.status(422).json({ success: false, message: `Cannot send a campaign with status '${campaign.status}'.` });
         }
 
-        // Mark as sending immediately
-        await db.query(
-            "UPDATE outreach_campaigns SET status = 'sending', sent_at = NOW() WHERE id = ?",
-            [campaignId]
-        );
-        pausedCampaigns.delete(campaignId);
-
-        // Fetch contacts that haven't been sent to yet
-        const [contacts] = await db.query(
-            `SELECT c.* FROM outreach_contacts c
-             LEFT JOIN outreach_campaign_logs cl ON cl.campaign_id = ? AND cl.contact_id = c.id
-             WHERE c.list_id = ? AND c.deleted_at IS NULL AND c.is_unsubscribed = 0
-               AND c.email IS NOT NULL AND cl.id IS NULL`,
-            [campaignId, campaign.list_id]
-        );
-
-        await db.query(
-            'UPDATE outreach_campaigns SET total_recipients = ? WHERE id = ?',
-            [contacts.length, campaignId]
-        );
-
+        const { total } = await beginEmailSend(campaign, req.user.id);
         res.json({
             success: true,
-            message: `Sending started for ${contacts.length} recipients.`,
-            total_recipients: contacts.length,
+            message: `Sending started for ${total} recipients.`,
+            total_recipients: total,
         });
-
-        // Run send in background
-        setImmediate(() => sendEmailBatch(campaign, contacts, req.user.id).catch(e =>
-            console.error('[outreachCampaign.sendBatch]', e.message)
-        ));
     } catch (err) {
         console.error('[outreachCampaign.send]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
+
+// Marks the campaign as sending, works out who is left to email and sends in the background.
+// Used by the Send button and by the scheduler. Returns { total }.
+async function beginEmailSend(campaign, senderUserId) {
+    const campaignId = campaign.id;
+    await db.query(
+        "UPDATE outreach_campaigns SET status = 'sending', sent_at = NOW() WHERE id = ?",
+        [campaignId]
+    );
+    pausedCampaigns.delete(campaignId);
+
+    // Fetch contacts that haven't been sent to yet
+    const [contacts] = await db.query(
+        `SELECT c.* FROM outreach_contacts c
+         LEFT JOIN outreach_campaign_logs cl ON cl.campaign_id = ? AND cl.contact_id = c.id
+         WHERE c.list_id = ? AND c.deleted_at IS NULL AND c.is_unsubscribed = 0
+           AND c.email IS NOT NULL AND cl.id IS NULL`,
+        [campaignId, campaign.list_id]
+    );
+
+    await db.query(
+        'UPDATE outreach_campaigns SET total_recipients = ? WHERE id = ?',
+        [contacts.length, campaignId]
+    );
+
+    // Run send in background
+    setImmediate(() => sendEmailBatch(campaign, contacts, senderUserId).catch(e =>
+        console.error('[outreachCampaign.sendBatch]', e.message)
+    ));
+    return { total: contacts.length };
+}
+exports.beginEmailSend = beginEmailSend;
 
 // ── Background email send ─────────────────────────────────────────────────────
 async function sendEmailBatch(campaign, contacts, senderUserId) {

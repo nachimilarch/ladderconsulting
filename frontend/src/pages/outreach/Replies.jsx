@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { replyAPI } from '../../api/outreach';
+import { outreachAiAPI } from '../../api/outreachAi';
+import { IntentBadge } from '../../components/outreach/ai/RepliesTab';
 
 const STATUS_COLORS = {
     unread: 'bg-yellow-100 text-yellow-700',
@@ -18,12 +20,18 @@ export default function Replies() {
     const [page, setPage]         = useState(1);
     const [status, setStatus]     = useState('');
     const [channel, setChannel]   = useState('');
+    const [triage, setTriage]     = useState({});
     const LIMIT = 20;
 
     const fetch = (p = 1) => {
         setLoading(true);
         replyAPI.getAll({ page: p, limit: LIMIT, status: status || undefined, channel: channel || undefined })
-            .then(r => { setReplies(r.data.data || []); setTotal(r.data.total || 0); })
+            .then(r => {
+                const rows = r.data.data || [];
+                setReplies(rows); setTotal(r.data.total || 0);
+                const emailIds = rows.filter(x => x.channel === 'email').map(x => x.id);
+                if (emailIds.length) outreachAiAPI.triage(emailIds).then(t => setTriage(t.data.data || {})).catch(() => {});
+            })
             .catch(() => toast.error('Failed to load replies'))
             .finally(() => setLoading(false));
     };
@@ -42,6 +50,7 @@ export default function Replies() {
                     </h2>
                     <p className="text-sm text-gray-500 mt-0.5">Email and WhatsApp replies from your campaigns</p>
                 </div>
+                <Link to="/outreach/ai?tab=replies" className="text-sm font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-3.5 py-1.5 hover:bg-brand-100 transition">✨ Sort by what matters</Link>
             </div>
 
             <div className="flex gap-3 mb-4 flex-wrap">
@@ -83,6 +92,7 @@ export default function Replies() {
                                                     {r.from_name || r.from_email || r.from_phone || 'Unknown'}
                                                 </p>
                                                 <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded capitalize">{r.channel}</span>
+                                                <IntentBadge triage={triage[r.id]} />
                                             </div>
                                             <p className="text-xs text-gray-500 mt-0.5 truncate">{r.subject || r.body_text?.slice(0, 80) || '(no subject)'}</p>
                                             {r.campaign_name && <p className="text-xs text-gray-400 mt-0.5">Campaign: {r.campaign_name}</p>}

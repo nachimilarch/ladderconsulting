@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { emailCampaignAPI } from '../../api/outreach';
+import { fmtIst } from '../../utils/schedule';
 
 const STATUS_COLORS = {
     draft:     'bg-gray-100 text-gray-600',
@@ -88,6 +89,9 @@ export default function EmailCampaigns() {
                                         <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[c.status]}`}>{c.status}</span>
                                         {c.status === 'sending' && (
                                             <span className="text-xs text-blue-500 animate-pulse">● Sending…</span>
+                                        )}
+                                        {c.status === 'scheduled' && c.scheduled_at && (
+                                            <span className="text-xs text-purple-600">🗓 {fmtIst(c.scheduled_at)}</span>
                                         )}
                                     </div>
                                     <p className="text-xs text-gray-400 mt-0.5 truncate">{c.subject}</p>

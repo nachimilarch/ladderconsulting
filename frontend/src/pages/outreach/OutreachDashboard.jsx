@@ -64,6 +64,11 @@ export default function OutreachDashboard() {
                 )}
             </div>
 
+            <Link to="/outreach/ai" className="block mb-6 rounded-2xl border border-brand-200 bg-gradient-to-r from-brand-50 to-white px-5 py-4 hover:shadow-sm transition">
+                <p className="text-sm font-semibold text-gray-900">✨ AI Studio</p>
+                <p className="text-xs text-gray-600 mt-0.5">Write campaign emails and WhatsApp templates, check and rank your contact lists, plan the best days and times to send, and get replies sorted with drafted answers.</p>
+            </Link>
+
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-gray-400">Loading…</div>
             ) : (

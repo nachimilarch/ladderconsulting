@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { replyAPI } from '../../api/outreach';
+import { outreachAiAPI } from '../../api/outreachAi';
+import { IntentBadge, ReplyDraft } from '../../components/outreach/ai/RepliesTab';
+import { htmlToPlain } from '../../components/outreach/ai/ui';
 import { employeeAPI } from '../../api/hr';
 import { useAuth } from '../../context/AuthContext';
 
@@ -14,6 +17,7 @@ export default function ReplyDetail() {
     const [reply, setReply]         = useState(null);
     const [loading, setLoading]     = useState(true);
     const [replyText, setReplyText] = useState('');
+    const [triage, setTriage]       = useState(null);
     const [sending, setSending]     = useState(false);
     const [converting, setConverting] = useState(false);
 
@@ -25,7 +29,12 @@ export default function ReplyDetail() {
 
     useEffect(() => {
         replyAPI.getOne(id)
-            .then(r => setReply(r.data.data))
+            .then(r => {
+                setReply(r.data.data);
+                if (r.data.data?.channel === 'email') {
+                    outreachAiAPI.triage([Number(id)]).then(t => setTriage(t.data.data?.[id] || null)).catch(() => {});
+                }
+            })
             .catch(() => toast.error('Failed to load reply'))
             .finally(() => setLoading(false));
     }, [id]);
@@ -141,6 +150,20 @@ export default function ReplyDetail() {
                             className="border border-blue-200 text-blue-600 text-sm px-4 py-2 rounded-xl hover:bg-blue-50 transition">
                             View Lead →
                         </Link>
+                    )}
+                </div>
+            )}
+
+            {/* AI triage and draft */}
+            {reply.channel === 'email' && !['ignored'].includes(reply.reply_status) && triage && (
+                <div className="bg-white rounded-2xl border border-brand-100 p-5 shadow-sm mb-4">
+                    <div className="flex items-center gap-2 flex-wrap mb-1">
+                        <h3 className="font-semibold text-gray-800 text-sm">✨ AI read of this reply</h3>
+                        <IntentBadge triage={triage} />
+                    </div>
+                    <p className="text-sm text-gray-600 mb-3">{triage.suggested_action}</p>
+                    {!['auto_generated', 'out_of_office', 'unsubscribe'].includes(triage.intent) && (
+                        <ReplyDraft replyId={reply.id} onUse={(d) => { setReplyText(htmlToPlain(d.body_html)); toast.success('Draft added to the reply box. Read it, then send.'); }} />
                     )}
                 </div>
             )}

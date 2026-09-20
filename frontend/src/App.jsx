@@ -78,6 +78,7 @@ import NotificationsPage from './pages/NotificationsPage';
 // Outreach module
 import OutreachLayout from './components/outreach/OutreachLayout';
 import OutreachDashboard from './pages/outreach/OutreachDashboard';
+import OutreachAiStudio from './pages/outreach/OutreachAiStudio';
 import ContactLists from './pages/outreach/ContactLists';
 import ContactListDetail from './pages/outreach/ContactListDetail';
 import EmailCampaigns from './pages/outreach/EmailCampaigns';
@@ -256,6 +257,7 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<OutreachDashboard />} />
+          <Route path="ai" element={<OutreachAiStudio />} />
           <Route path="lists" element={<ContactLists />} />
           <Route path="lists/:id" element={<ContactListDetail />} />
           <Route path="email" element={<EmailCampaigns />} />

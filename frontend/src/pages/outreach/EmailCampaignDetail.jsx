@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { emailCampaignAPI, replyAPI } from '../../api/outreach';
+import { fmtIst } from '../../utils/schedule';
 
 const STATUS_COLORS = {
     draft:'bg-gray-100 text-gray-600', sending:'bg-blue-100 text-blue-700',
@@ -159,6 +160,17 @@ export default function EmailCampaignDetail() {
         }
     };
 
+    const handleUnschedule = async () => {
+        if (!confirm('Cancel the schedule? The campaign goes back to a draft and will not send by itself.')) return;
+        try {
+            await emailCampaignAPI.update(id, { scheduled_at: '' });
+            toast.success('Schedule cancelled');
+            fetch();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not cancel the schedule');
+        }
+    };
+
     const handlePause = async () => {
         try {
             await emailCampaignAPI.pause(id);
@@ -183,6 +195,13 @@ export default function EmailCampaignDetail() {
                 <h2 className="text-xl font-bold text-gray-800 flex-1 truncate">{campaign.campaign_name}</h2>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[campaign.status]}`}>{campaign.status}</span>
             </div>
+
+            {campaign.status === 'scheduled' && campaign.scheduled_at && (
+                <div className="mb-4 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
+                    <p className="text-sm text-purple-800">🗓 Scheduled: sends by itself on <b>{fmtIst(campaign.scheduled_at)}</b></p>
+                    <button onClick={handleUnschedule} className="text-xs font-semibold text-purple-700 underline">Cancel schedule</button>
+                </div>
+            )}
 
             <div className="flex gap-2 mb-4 flex-wrap">
                 {['draft','scheduled'].includes(campaign.status) && (

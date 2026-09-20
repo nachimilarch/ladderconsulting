@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Chart, registerables } from 'chart.js';
 import toast from 'react-hot-toast';
 import { analyticsAPI } from '../../api/outreach';
@@ -71,9 +72,12 @@ export default function OutreachAnalytics() {
 
     return (
         <div className="max-w-5xl mx-auto">
-            <div className="mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Outreach Analytics</h2>
-                <p className="text-sm text-gray-500 mt-0.5">Campaign performance and lead conversion stats</p>
+            <div className="mb-6 flex items-start justify-between gap-3">
+                <div>
+                    <h2 className="text-xl font-bold text-gray-800">Outreach Analytics</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">Campaign performance and lead conversion stats</p>
+                </div>
+                <Link to="/outreach/ai?tab=insights" className="shrink-0 text-sm font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-3.5 py-1.5 hover:bg-brand-100 transition">✨ Explain my results</Link>
             </div>
 
             {/* Summary */}

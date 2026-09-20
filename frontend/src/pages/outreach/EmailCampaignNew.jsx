@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { emailCampaignAPI, emailTemplateAPI, contactListAPI } from '../../api/outreach';
+import { outreachAiAPI } from '../../api/outreachAi';
+import { toLocalInput, toIso } from '../../utils/schedule';
+import EmailDraftPanel from '../../components/outreach/ai/EmailDraftPanel';
+import { CopyReport } from '../../components/outreach/ai/common';
 
 const MERGE_TAGS = ['{{first_name}}','{{full_name}}','{{company_name}}','{{designation}}','{{city}}','{{executive_name}}'];
 
@@ -14,6 +18,8 @@ export default function EmailCampaignNew() {
     const [templates, setTemplates]   = useState([]);
     const [appliedTpl, setAppliedTpl] = useState(null);
     const [saving, setSaving]         = useState(false);
+    const [showAi, setShowAi]         = useState(false);
+    const [report, setReport]         = useState(null);
     const [form, setForm]             = useState({
         campaign_name: '',
         list_id:       '',
@@ -35,7 +41,7 @@ export default function EmailCampaignNew() {
                         subject:       c.subject || '',
                         message_body:  c.message_body || '',
                         from_name:     c.from_name || '',
-                        scheduled_at:  c.scheduled_at ? c.scheduled_at.slice(0,16) : '',
+                        scheduled_at:  toLocalInput(c.scheduled_at),
                     });
                 })
                 .catch(() => toast.error('Failed to load campaign'));
@@ -47,6 +53,16 @@ export default function EmailCampaignNew() {
     }, [editId]);
 
     const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
+
+    // Instant copy check while typing: spam words, missing opt-out, broken merge tags.
+    useEffect(() => {
+        if (!form.subject && !form.message_body) return undefined;
+        const t = setTimeout(() => {
+            outreachAiAPI.checkCopy({ channel: 'email', subject: form.subject, body: form.message_body })
+                .then(({ data }) => setReport(data.data)).catch(() => {});
+        }, 700);
+        return () => clearTimeout(t);
+    }, [form.subject, form.message_body]);
 
     const insertTag = (tag) => {
         const el = document.getElementById('msg-body');
@@ -77,13 +93,14 @@ export default function EmailCampaignNew() {
             return toast.error('Fill in all required fields');
         }
         setSaving(true);
+        const payload = { ...form, scheduled_at: toIso(form.scheduled_at) };
         try {
             if (editId) {
-                await emailCampaignAPI.update(editId, form);
+                await emailCampaignAPI.update(editId, payload);
                 toast.success('Campaign updated');
                 navigate(`/outreach/email/${editId}`);
             } else {
-                const r = await emailCampaignAPI.create(form);
+                const r = await emailCampaignAPI.create(payload);
                 toast.success('Campaign created!');
                 navigate(`/outreach/email/${r.data.id}`);
             }
@@ -163,6 +180,7 @@ export default function EmailCampaignNew() {
                         <label className="text-xs font-medium text-gray-600 block mb-1">Schedule (optional)</label>
                         <input type="datetime-local" value={form.scheduled_at} onChange={set('scheduled_at')}
                             className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+                        <p className="text-[11px] text-gray-400 mt-1">{form.scheduled_at ? 'Sends by itself at this time. You can change or cancel it before then.' : 'Leave empty to save as a draft and send when you choose.'} Need help picking a time? <Link to="/outreach/ai?tab=planner" className="text-brand-600 hover:underline">Plan the sends with AI</Link></p>
                     </div>
                 </div>
 
@@ -190,6 +208,22 @@ export default function EmailCampaignNew() {
                         placeholder="Write your email body here. You can use merge tags like {{first_name}} to personalise." />
                     <p className="text-xs text-gray-400 mt-1">HTML is supported. Use merge tags to personalise per contact.</p>
                 </div>
+
+                <CopyReport report={report} />
+
+                {!editId && (
+                    <div>
+                        <button type="button" onClick={() => setShowAi(v => !v)}
+                            className="text-sm font-semibold text-brand-700 bg-brand-50 border border-brand-200 rounded-xl px-4 py-2 hover:bg-brand-100 transition">
+                            ✨ {showAi ? 'Hide the AI writer' : 'Write this email with AI'}
+                        </button>
+                        {showAi && (
+                            <div className="mt-3 rounded-2xl border border-gray-100 bg-white p-4">
+                                <EmailDraftPanel onUse={({ subject, body }) => { setForm(f => ({ ...f, subject, message_body: body })); setShowAi(false); toast.success('Added to your campaign. Review it, then save.'); }} />
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 <div className="flex gap-3 pt-2">
                     <button type="submit" disabled={saving}
