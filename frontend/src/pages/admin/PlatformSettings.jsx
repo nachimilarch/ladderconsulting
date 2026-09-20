@@ -30,6 +30,16 @@ const PLATFORM_SETTINGS = {
         description: 'Polls the outreach inbox every N minutes to capture campaign replies.',
         type: 'toggle',
     },
+    llm_resume_enrichment: {
+        label: 'AI Resume Second Look',
+        description: 'After a candidate uploads a resume, the AI model suggests extra profile details (headline, summary, skills, education) for the candidate to accept. Turn off if the AI server is overloaded.',
+        type: 'toggle',
+    },
+    llm_match_insight: {
+        label: 'AI "Why This Fit" Notes',
+        description: 'Lets companies ask the AI model to explain a top candidate\'s match in a few sentences. The match % itself always comes from the fixed formula. Turn off if the AI server is overloaded.',
+        type: 'toggle',
+    },
     mail_poller_interval_mins: {
         label: 'Mail Poller Interval (mins)',
         description: 'How often the reply inbox is polled. Default: 2.',

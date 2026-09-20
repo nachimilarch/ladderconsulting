@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { companyJobAPI, candidateResumeAPI } from '../../api/company';
 import { matchTextCls } from '../../utils/matchScore';
+import MatchInsight from '../../components/company/MatchInsight';
 
 function CandidateProfileDrawer({ app, onClose }) {
     const skills = (() => {
@@ -252,7 +253,7 @@ export default function ShortlistView() {
                 </div>
             ) : (
                 <div className="flex flex-col gap-4">
-                    {filtered.map(app => {
+                    {filtered.map((app, idx) => {
                         const statusCls = STATUS_COLORS[app.status] || 'bg-gray-100 text-gray-500';
                         const isShortlisted = app.status === 'shortlisted' || app.shortlist_status === 'shortlisted';
                         const isLoading = actionLoading === app.id;
@@ -287,7 +288,7 @@ export default function ShortlistView() {
                                             </span>
                                             {app.match_score > 0 && (
                                                 <span className={`text-xs font-bold ${matchTextCls(app.match_score)}`}>
-                                                    {app.match_score}% match
+                                                    {Math.round(Number(app.match_score))}% match
                                                 </span>
                                             )}
                                             {app.source === 'executive' && (
@@ -353,6 +354,11 @@ export default function ShortlistView() {
                                                     </div>
                                                 )}
                                             </>
+                                        )}
+
+                                        {/* The AI explains the score, for the top few only (the % itself is a fixed formula) */}
+                                        {idx < 3 && selectedJob && Number(app.match_score) > 0 && (
+                                            <MatchInsight jobId={selectedJob} candidateId={app.candidate_id} />
                                         )}
                                     </div>
 

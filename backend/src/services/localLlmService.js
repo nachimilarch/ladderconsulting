@@ -19,17 +19,20 @@ const getTimeout = () => parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 120000;
 // Non-streaming call — used for internal tool-loop iterations (e.g. after a
 // read-only tool result comes back, ask the model to continue) where there's
 // no user-facing stream to write to.
-async function chatCompletion({ messages, tools, json = false }) {
+// maxTokens / timeoutMs / temperature let background jobs (resume enrichment, match
+// notes) cap how long they hold the model; the chatbot leaves them unset.
+async function chatCompletion({ messages, tools, json = false, temperature, maxTokens, timeoutMs }) {
     const res = await axios.post(
         `${getBaseUrl()}/v1/chat/completions`,
         {
             model: getModel(),
             messages,
             // JSON mode is far more reliable than tool-calling for small models.
-            ...(json ? { response_format: { type: 'json_object' }, temperature: 0.4 } : {}),
+            ...(json ? { response_format: { type: 'json_object' }, temperature: temperature ?? 0.4 } : {}),
             ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
+            ...(maxTokens ? { max_tokens: maxTokens } : {}),
         },
-        { timeout: getTimeout() }
+        { timeout: timeoutMs || getTimeout() }
     );
     return res.data.choices[0].message; // { role, content, tool_calls? }
 }

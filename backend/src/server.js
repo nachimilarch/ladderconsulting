@@ -129,6 +129,7 @@ app.use('/api/invoices', require('./routes/invoices'));
 app.use('/api/payments', require('./routes/payments'));
 app.use('/api/ai-subscription', require('./routes/aiSubscription'));
 app.use('/api/chatbot', require('./routes/chatbot'));
+app.use('/api/match-insights', require('./routes/matchInsights'));
 app.use('/api/recruitment', require('./routes/recruitment'));
 app.use('/api/hr/premium-requests', require('./routes/hrPremiumRequests'));
 app.use('/api/hr/premium-candidate-requests', require('./routes/premiumCandidateRequests'));

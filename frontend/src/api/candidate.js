@@ -17,6 +17,8 @@ export const resumeAPI = {
         api.get('/candidates/resume/download', { responseType: 'blob' }),
     parse: () => api.post('/candidates/resume/parse'),
     extractProfile: () => api.post('/candidates/resume/extract-profile'),
+    aiEnrichment: () => api.get('/candidates/resume/ai-enrichment'),
+    runAiEnrichment: () => api.post('/candidates/resume/ai-enrichment'),
 };
 
 export const jobAPI = {

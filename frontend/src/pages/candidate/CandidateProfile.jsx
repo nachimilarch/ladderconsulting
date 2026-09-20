@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { profileAPI, resumeAPI } from '../../api/candidate';
 import AiSubscriptionCard from '../../components/AiSubscriptionCard';
 import AiAssistantPromo from '../../components/AiAssistantPromo';
+import AiEnrichmentCard from '../../components/candidate/AiEnrichmentCard';
 import toast from 'react-hot-toast';
 
 const EMPTY_FORM = {
@@ -231,6 +232,16 @@ export default function CandidateProfile() {
                     </div>
                 )}
             </div>
+
+            {/* ── AI second look at the resume (suggestions only) ───────────── */}
+            {resume && (
+                <AiEnrichmentCard
+                    key={resume.created_at || resume.uploaded_at || 'resume'}
+                    form={form} setForm={setForm}
+                    education={education} setEducation={setEducation}
+                    skills={skills} setSkills={setSkills}
+                />
+            )}
 
             {/* ── Profile form ─────────────────────────────────────────────── */}
             <form onSubmit={handleSave} className="space-y-6">

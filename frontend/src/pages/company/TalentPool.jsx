@@ -3,6 +3,7 @@ import { talentPoolAPI, companyJobAPI } from '../../api/company';
 import toast from 'react-hot-toast';
 import AiAssistantPromo from '../../components/AiAssistantPromo';
 import { matchBoxCls } from '../../utils/matchScore';
+import MatchInsight from '../../components/company/MatchInsight';
 
 const EXP_RANGES = [
     { label: 'Any experience', min: '', max: '' },
@@ -25,7 +26,7 @@ function SkillChip({ label }) {
 }
 
 
-function CandidateCard({ cand, activated, onInterest }) {
+function CandidateCard({ cand, activated, onInterest, insightJobId }) {
     const skills = Array.isArray(cand.skills) ? cand.skills.filter(Boolean) : [];
     const shown = skills.slice(0, 5);
     const extra = skills.length - shown.length;
@@ -86,6 +87,8 @@ function CandidateCard({ cand, activated, onInterest }) {
                     )}
                 </div>
             )}
+
+            {insightJobId && <MatchInsight jobId={insightJobId} candidateId={cand.candidate_id} />}
 
             <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-50 gap-2">
                 <div className="flex gap-3 text-[11px] text-gray-400">
@@ -356,12 +359,13 @@ export default function TalentPool() {
                 <>
                     <div className="text-xs text-gray-400 mb-3">{total} candidate{total !== 1 ? 's' : ''} available</div>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
-                        {candidates.map(c => (
+                        {candidates.map((c, idx) => (
                             <CandidateCard
                                 key={c.candidate_id}
                                 cand={c}
                                 activated={activated}
                                 onInterest={openModal}
+                                insightJobId={matchJob && page === 1 && idx < 3 && c.match_score > 0 ? matchJob : null}
                             />
                         ))}
                     </div>

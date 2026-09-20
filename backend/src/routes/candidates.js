@@ -6,6 +6,7 @@ const db = require('../config/db');
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { uploadResume, uploadDocument } = require('../middleware/upload');
 const { parseResumeText, parseFullProfile } = require('../utils/aiParser');
+const resumeEnrichment = require('../services/resumeEnrichment');
 const matchingService = require('../services/matchingService');
 const { maskResumeText } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
@@ -284,6 +285,8 @@ router.post('/resume', authenticateToken, authorizeRole('candidate'), (req, res,
                     // Use original unmasked text for matching accuracy; this also
                     // extracts + batch-upserts the candidate's skill vectors.
                     await matchingService.triggerCandidateMatching(candidateId, parsedText);
+                    // Then let the local model suggest what the rules missed (queued, never blocks).
+                    await resumeEnrichment.schedule(resumeId, maskedText);
                 }
             } catch (err) {
                 console.error('[resume background]', err.message);
@@ -337,6 +340,65 @@ router.post('/resume/extract-profile', authenticateToken, authorizeRole('candida
     } catch (err) {
         console.error('[resume.extract-profile]', err.message);
         res.status(500).json({ message: 'Failed to extract profile from resume.' });
+    }
+});
+
+// ── GET /api/candidates/resume/ai-enrichment ─────────────────────────────────
+// What the local model suggested for the latest resume. The offline extraction above
+// always comes first; these are extra suggestions the candidate can accept or ignore.
+router.get('/resume/ai-enrichment', authenticateToken, authorizeRole('candidate'), async (req, res) => {
+    try {
+        const candidateId = await getCandidateId(req.user.id);
+        const [[row]] = await db.query(
+            `SELECT id, llm_status, llm_extract, llm_at, parse_status FROM resumes
+             WHERE candidate_id = ? AND deleted_at IS NULL
+             ORDER BY is_primary DESC, created_at DESC LIMIT 1`,
+            [candidateId]
+        );
+        const enabled = await resumeEnrichment.isEnabled();
+        const status = resumeEnrichment.currentStatus(row);
+        const extract = row?.llm_extract
+            ? (typeof row.llm_extract === 'string' ? JSON.parse(row.llm_extract) : row.llm_extract)
+            : null;
+        res.json({
+            success: true,
+            data: {
+                enabled,
+                has_resume: !!row,
+                can_run: !!row && row.parse_status === 'done' && enabled && status !== 'pending',
+                status,
+                extract: status === 'done' ? extract : null,
+            },
+        });
+    } catch (err) {
+        console.error('[resume.ai-enrichment]', err.message);
+        res.status(500).json({ success: false, message: 'Could not load AI suggestions.' });
+    }
+});
+
+// ── POST /api/candidates/resume/ai-enrichment ────────────────────────────────
+// (Re)run it for the latest resume: older resumes uploaded before the feature, or a retry.
+router.post('/resume/ai-enrichment', authenticateToken, authorizeRole('candidate'), async (req, res) => {
+    try {
+        const candidateId = await getCandidateId(req.user.id);
+        const [[row]] = await db.query(
+            `SELECT id, llm_status, llm_at, parsed_text, parse_status FROM resumes
+             WHERE candidate_id = ? AND deleted_at IS NULL
+             ORDER BY is_primary DESC, created_at DESC LIMIT 1`,
+            [candidateId]
+        );
+        if (!row) return res.status(404).json({ success: false, message: 'Upload a resume first.' });
+        if (row.parse_status !== 'done' || !row.parsed_text) {
+            return res.status(409).json({ success: false, message: 'Your resume is still being read. Try again in a moment.' });
+        }
+        if (resumeEnrichment.currentStatus(row) === 'pending') {
+            return res.json({ success: true, data: { status: 'pending' } });
+        }
+        const status = await resumeEnrichment.schedule(row.id, row.parsed_text);
+        res.json({ success: true, data: { status } });
+    } catch (err) {
+        console.error('[resume.ai-enrichment run]', err.message);
+        res.status(500).json({ success: false, message: 'Could not start the AI check.' });
     }
 });
 
