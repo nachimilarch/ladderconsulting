@@ -7,6 +7,8 @@
 const db = require('../config/db');
 const { getTransporter, getDefaultFrom } = require('../utils/outreachEmail');
 
+const AUTO_REPLY_COOLDOWN_HOURS = 24;
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function matchesKeywords(text, keywords, matchType) {
@@ -39,12 +41,30 @@ async function hasEmailedBefore(fromEmail) {
  * @param {object} reply  — the just-inserted outreach_email_replies row fields:
  *   { id, from_email, from_name, subject, body_text, campaign_id, message_id }
  */
-const SKIP_ADDR = /^(microsoftexchange|postmaster|mailer-daemon|noreply|no-reply|bounce|delivery|auto-?reply|donotreply|do-not-reply|daemon)[@+]/i;
+const SKIP_ADDR = /^(microsoftexchange[0-9a-f]*|postmaster|mailer-daemon|noreply|no-reply|bounce|delivery|auto-?reply|donotreply|do-not-reply|daemon)[@+]/i;
 
 async function fireEmailAutoReply(reply) {
     try {
         // Never auto-reply to system/bounce addresses
         if (!reply.from_email || SKIP_ADDR.test(reply.from_email)) return;
+        if (reply.suppress) return; // bulk/list mail, or the sender asked not to be auto-answered
+
+        // Never answer our own mailbox or anyone on our own domain: an auto-reply that lands
+        // back in this inbox would be answered again, and again, every poll (a mail loop).
+        const ownUser = String(getDefaultFrom() || '').toLowerCase();
+        const ownDomain = ownUser.includes('@') ? ownUser.split('@')[1] : '';
+        const sender = reply.from_email.toLowerCase();
+        if (sender === ownUser || (ownDomain && sender.endsWith(`@${ownDomain}`))) return;
+
+        // Last line of defence against any loop we have not thought of: at most one
+        // auto-reply per sender per day.
+        const [[recent]] = await db.query(
+            `SELECT id FROM outreach_email_replies
+             WHERE from_email = ? AND auto_reply_sent = 1 AND id <> ?
+               AND created_at > DATE_SUB(NOW(), INTERVAL ${AUTO_REPLY_COOLDOWN_HOURS} HOUR) LIMIT 1`,
+            [reply.from_email, reply.id]
+        );
+        if (recent) return;
 
         // Skip if we already sent an auto-reply for this inbound message
         const [[alreadySent]] = await db.query(
@@ -95,6 +115,12 @@ async function fireEmailAutoReply(reply) {
             html:      matchedFlow.response_body.replace(/\n/g, '<br>'),
             inReplyTo: reply.message_id || undefined,
             references: reply.message_id ? [reply.message_id] : undefined,
+            // Tell other mail systems (and our own poller) this is automatic: do not answer it.
+            headers: {
+                'Auto-Submitted': 'auto-replied',
+                'X-Auto-Response-Suppress': 'All',
+                Precedence: 'auto_reply',
+            },
         });
 
         await db.query(

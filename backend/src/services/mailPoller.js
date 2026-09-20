@@ -14,7 +14,7 @@
 const axios = require('axios');
 const db    = require('../config/db');
 const { getGraphToken }        = require('../utils/graphMail');
-const { parseReplyToTag }      = require('../utils/outreachEmail');
+const { parseReplyToTag, getDefaultFrom } = require('../utils/outreachEmail');
 const { createLeadFromContact } = require('./leadConverter');
 const { fireEmailAutoReply }    = require('./emailAutoReply');
 
@@ -46,7 +46,15 @@ const getAdminUserId = async () => {
 };
 
 // Addresses and subject patterns that indicate system/bounce/auto-generated mail
-const SYSTEM_ADDR = /^(microsoftexchange|postmaster|mailer-daemon|noreply|no-reply|bounce|delivery|auto-?reply|donotreply|do-not-reply|daemon|mdaemon|mail-daemon)[@+]/i;
+// Exchange bounce senders look like MicrosoftExchange329e71ec...@domain, so allow hex after the name.
+const SYSTEM_ADDR = /^(microsoftexchange[0-9a-f]*|postmaster|mailer-daemon|noreply|no-reply|bounce|delivery|auto-?reply|donotreply|do-not-reply|daemon|mdaemon|mail-daemon)[@+]/i;
+
+// Our own sending mailbox(es). Mail FROM one of these is our own auto-reply or a self-send,
+// never a reply from a prospect; treating it as one is what let the auto-reply loop feed itself.
+const ownAddresses = () => new Set(
+    [getDefaultFrom(), process.env.GODADDY_IMAP_USER, process.env.SMTP_USER, process.env.GODADDY_SMTP_USER]
+        .filter(Boolean).map((a) => String(a).trim().toLowerCase())
+);
 const SYSTEM_SUBJ = ['delivery status notification', 'undeliverable', 'mail delivery failed', 'automatic reply', 'auto-reply', 'auto reply', 'out of office', 'out of the office', 'non-delivery'];
 
 // ── Process one parsed email ──────────────────────────────────────────────────
@@ -63,7 +71,15 @@ const processMail = async (parsed) => {
 
     // Skip system/bounce/auto-generated emails to prevent reply loops
     if (SYSTEM_ADDR.test(fromAddr)) return;
+    if (ownAddresses().has(fromAddr.toLowerCase())) return;
     if (SYSTEM_SUBJ.some(s => subject.toLowerCase().includes(s))) return;
+    // RFC 3834: anything marked Auto-Submitted (auto-replies, out-of-office, bounces) is not a person replying.
+    const autoSubmitted = String(parsed.headers?.['auto-submitted'] || '').trim().toLowerCase();
+    if (autoSubmitted && autoSubmitted !== 'no') return;
+    // Bulk / list mail is kept (it may be relevant) but never gets an auto-reply.
+    const precedence = String(parsed.headers?.precedence || '').trim().toLowerCase();
+    const suppressAutoReply = ['bulk', 'junk', 'list', 'auto_reply'].includes(precedence)
+        || !!parsed.headers?.['x-auto-response-suppress'] || !!parsed.headers?.['list-unsubscribe'];
     // Skip Microsoft Exchange NDR/delivery notification addresses in To/CC
     const isExchangeSystem = [
         ...(parsed.to?.value  || []),
@@ -214,6 +230,7 @@ const processMail = async (parsed) => {
     fireEmailAutoReply({
         id: replyId, from_email: fromAddr, from_name: fromName,
         subject, body_text: bodyText, campaign_id: campaignId, message_id: messageId,
+        suppress: suppressAutoReply,
     }).catch(e => console.error('[mailPoller:autoReply]', e.message));
 };
 
@@ -250,6 +267,7 @@ const graphToMailParsed = (msg) => {
         },
         to:  { value: (msg.toRecipients  || []).map(r => ({ address: r.emailAddress.address })) },
         cc:  { value: (msg.ccRecipients  || []).map(r => ({ address: r.emailAddress.address })) },
+        headers:   Object.fromEntries(headers.map((h) => [String(h.name).toLowerCase(), String(h.value || '')])),
         subject:   msg.subject || '',
         text:      bodyText,
         html:      bodyHtml || bodyText,
