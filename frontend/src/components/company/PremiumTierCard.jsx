@@ -43,7 +43,7 @@ export default function PremiumTierCard() {
             <p className="text-xs text-gray-500 mb-4">
                 {isPremium
                     ? 'You post jobs with no per-job fee. Every hire carries an 8.33% placement fee.'
-                    : 'You’re on the Standard tier — post jobs and hire from the free candidate pool for a flat ₹3,999.'}
+                    : 'You’re on the Standard tier: each job you post costs ₹3,999 to go live, plus a placement fee (one month’s CTC) per hire.'}
             </p>
 
             {loading ? (
@@ -56,16 +56,15 @@ export default function PremiumTierCard() {
                 <>
                     <div className={`rounded-xl px-4 py-3 text-sm font-medium mb-4 ${status?.activated ? 'bg-indigo-50 border border-indigo-100 text-indigo-700' : 'bg-gray-50 border border-gray-100 text-gray-500'}`}>
                         {status?.activated
-                            ? '✓ Listing fee paid — you can post jobs and browse the free candidate pool.'
-                            : 'Pay the ₹3,999 listing fee to post jobs and browse the free candidate pool.'}
+                            ? '✓ You have a live job posting — you can shortlist candidates and see full profiles.'
+                            : 'Post your first job (₹3,999) to shortlist candidates and see full profiles.'}
                     </div>
 
                     <div className="border border-gray-200 rounded-xl px-4 py-3">
-                        <p className="text-sm font-semibold text-gray-900 mb-1">Premium Tier</p>
-                        <p className="text-xs text-gray-400 mb-2">
-                            Replaces the per-job fee: you pay nothing to post jobs, but every hire is charged an
-                            8.33% placement fee at hire time.
-                            Reviewed and approved by your account executive.
+                        <p className="text-sm font-semibold text-gray-900 mb-1">⭐ Platinum</p>
+                        <p className="text-xs text-gray-500 mb-2">
+                            No per-job fee: post as many jobs as you need. Every hire carries an 8.33% placement fee
+                            (one month’s CTC). Approved by your account executive.
                         </p>
                         {requested || status?.premium_requested_at ? (
                             <p className="text-xs text-green-600 font-medium">✓ Request sent — your executive will follow up.</p>

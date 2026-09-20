@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { recruitmentAPI } from '../../api/recruitment';
 import toast from 'react-hot-toast';
+import { matchTextCls, matchBoxCls } from '../../utils/matchScore';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const fmtExp  = (min, max) => { const lo = min != null ? parseFloat(min) : null; const hi = max != null ? parseFloat(max) : null; if (lo != null && hi != null) return `${lo}–${hi} yrs`; if (lo != null) return `${lo}+ yrs`; if (hi != null) return `up to ${hi} yrs`; return ''; };
@@ -9,8 +10,6 @@ const ITEM_ST = { pending:'badge-gray', parsing:'badge-blue', done:'badge-green'
 const ACCEPTED = ['.pdf','.doc','.docx'];
 const MAX_FILES = 20;
 const MAX_MB    = 5 * 1024 * 1024;
-const SCORE_COLOR = (s) => s >= 70 ? 'text-green-600' : s >= 40 ? 'text-yellow-600' : 'text-red-500';
-const SCORE_BG    = (s) => s >= 70 ? 'bg-green-50 border-green-200 text-green-700' : s >= 40 ? 'bg-yellow-50 border-yellow-200 text-yellow-700' : 'bg-red-50 border-red-200 text-red-600';
 
 const parseBatchNote = (status, msg) => {
     if (!msg) return { tag: null, text: null };
@@ -101,7 +100,7 @@ function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
 
                         {/* Fit score (when job context provided) */}
                         {jobId && data.fit_score != null && (
-                            <div className={`rounded-xl border px-4 py-3 ${SCORE_BG(data.fit_score)}`}>
+                            <div className={`rounded-xl border px-4 py-3 ${matchBoxCls(data.fit_score)}`}>
                                 <div className="flex items-center justify-between mb-2">
                                     <span className="text-xs font-semibold uppercase tracking-wide">Fit Score</span>
                                     <span className="text-lg font-bold">{data.fit_score}%</span>
@@ -300,7 +299,7 @@ function PoolCard({ candidate, jobSelected, onAssign, assigning, onViewProfile, 
                         {!candidate.latest_resume_id && <span className="badge-yellow text-[10px]">No resume</span>}
                         {candidate.fit_score != null && (
                             <span
-                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${SCORE_BG(candidate.fit_score)}`}
+                                className={`text-[10px] font-bold px-1.5 py-0.5 rounded border ${matchBoxCls(candidate.fit_score)}`}
                                 title={candidate.already_applied ? 'Match score for this JD' : 'Estimated match if assigned to this JD'}
                             >
                                 {candidate.fit_score}% fit
@@ -884,7 +883,7 @@ export default function ResumeSourcing() {
                                                                 <td><span className={ITEM_ST[item.status]||'badge-gray'}>{item.status}</span></td>
                                                                 <td>
                                                                     {item.fit_score != null
-                                                                        ? <span className={`font-semibold ${SCORE_COLOR(item.fit_score)}`}>{item.fit_score}%</span>
+                                                                        ? <span className={`font-semibold ${matchTextCls(item.fit_score)}`}>{item.fit_score}%</span>
                                                                         : '—'}
                                                                 </td>
                                                                 <td><BatchResultCell status={item.status} errorMessage={item.error_message} /></td>

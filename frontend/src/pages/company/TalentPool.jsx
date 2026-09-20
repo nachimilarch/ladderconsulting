@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { talentPoolAPI, companyJobAPI } from '../../api/company';
 import toast from 'react-hot-toast';
 import AiAssistantPromo from '../../components/AiAssistantPromo';
+import { matchBoxCls } from '../../utils/matchScore';
 
 const EXP_RANGES = [
     { label: 'Any experience', min: '', max: '' },
@@ -23,7 +24,6 @@ function SkillChip({ label }) {
     );
 }
 
-const SCORE_COLOR_CLS = (s) => s >= 70 ? 'text-green-700 bg-green-50 border-green-200' : s >= 40 ? 'text-yellow-700 bg-yellow-50 border-yellow-200' : 'text-red-600 bg-red-50 border-red-200';
 
 function CandidateCard({ cand, activated, onInterest }) {
     const skills = Array.isArray(cand.skills) ? cand.skills.filter(Boolean) : [];
@@ -58,7 +58,7 @@ function CandidateCard({ cand, activated, onInterest }) {
                 </div>
                 <div className="shrink-0 flex flex-col items-end gap-1">
                     {cand.match_score != null && cand.match_score > 0 && (
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${SCORE_COLOR_CLS(cand.match_score)}`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${matchBoxCls(cand.match_score)}`}>
                             {cand.match_score}% match
                         </span>
                     )}
@@ -263,7 +263,7 @@ export default function TalentPool() {
                     Browse {total > 0 ? `${total} available` : 'available'} candidates sourced by LadderStep Human Consulting.
                     {activated
                         ? ' Full profiles and contact details are visible.'
-                        : ' Activate your account to view full profiles.'}
+                        : ' Post a job to see full profiles.'}
                 </p>
                 {activated && companyTier === 'premium' && (
                     <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
@@ -272,7 +272,7 @@ export default function TalentPool() {
                 )}
                 {activated && companyTier !== 'premium' && (
                     <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
-                        ✓ Account Activated
+                        ✓ Full profiles unlocked
                     </span>
                 )}
                 <p className="text-xs text-gray-400 mt-2">

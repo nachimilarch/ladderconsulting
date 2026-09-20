@@ -21,6 +21,8 @@ const INV_STATUS = {
 const fmtType = (t) => ({
     candidate_profile_access: 'Candidate Profile Access',
     interview_scheduling: 'Interview Scheduling',
+    interview_schedule: 'Interview Scheduling',
+    profile_unlock: 'Profile Access',
     offer_letter_release: 'Offer Letter Release',
 }[t] || t);
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) : '—';

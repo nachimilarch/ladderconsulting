@@ -154,7 +154,7 @@ export default function PlatformAnalytics() {
     const periodDesc  = PERIODS.find(pp => pp.key === period)?.desc  ?? '';
 
     return (
-        <div className="p-6 lg:p-8 space-y-10 max-w-[1600px]">
+        <div className="p-4 sm:p-6 lg:p-8 space-y-10 max-w-[1600px]">
 
             {/* ── Page header ──────────────────────────────────────────────── */}
             <div className="flex items-end justify-between flex-wrap gap-4">
@@ -242,7 +242,7 @@ export default function PlatformAnalytics() {
                         Columns are colour-coded by function: <span className="text-indigo-600 font-medium">purple = outreach</span>, <span className="text-amber-600 font-medium">amber = leads</span>, <span className="text-green-600 font-medium">green = hiring</span>.
                     </p>
 
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
                         {!mis.executives?.length ? (
                             <p className="text-sm text-gray-400 p-6">No executive data available.</p>
                         ) : (

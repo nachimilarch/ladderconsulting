@@ -12,17 +12,17 @@ const STEPS = [
     {
         target: '[data-tour="talent-pool"]',
         title: '👥 Talent Pool',
-        body: 'Browse our pre-screened candidate database. Purchase an unlock package to reveal contact details, download resumes, and pull the best fits into your hiring pipeline.',
+        body: 'Browse our pre-screened candidates, ranked by how well they fit one of your jobs. Premium candidates (⭐) are listed first. Express interest and your executive takes it from there.',
     },
     {
         target: '[data-tour="job-postings"]',
         title: '💼 Job Postings',
-        body: 'Post your open roles here. LadderStep executives will actively source and assign matching candidates to each job description you create.',
+        body: 'Post your open roles here. Each job is ₹3,999 to go live (Platinum companies pay no per-job fee), and our executives source matching candidates for it.',
     },
     {
         target: '[data-tour="shortlist"]',
         title: '⭐ Applications & Shortlist',
-        body: 'All candidates assigned to your jobs appear here — including those sourced by our team. Unlock a profile first, then shortlist and track them through your pipeline.',
+        body: 'Everyone who applied or was sourced for your jobs appears here, best fit first with Premium ⭐ candidates on top. Shortlist and move them through your pipeline.',
     },
     {
         target: '[data-tour="interviews"]',
@@ -36,8 +36,8 @@ const STEPS = [
     },
     {
         target: '[data-tour="payments"]',
-        title: '💳 Packages & Payments',
-        body: 'Start with the 5-Resume Pack (₹3,999) to unlock 5 candidate profiles. Once active, top up with a Single (₹999) or another pack anytime. Or enquire about Platinum for unlimited access with a placement fee only at hire.',
+        title: '💳 Payments',
+        body: 'Job posting fees, placement fees and your AI assistant subscription (₹299/month) all live here. Pay securely online and download every invoice.',
     },
     {
         target: '[data-tour="help"]',
@@ -46,23 +46,26 @@ const STEPS = [
     },
 ];
 
-export default function CompanyTour() {
+export default function CompanyTour({ hold = false }) {
     const [step, setStep] = useState(0);
     const [visible, setVisible] = useState(false);
     const [rect, setRect] = useState(null);
     const [fadeIn, setFadeIn] = useState(false);
 
     useEffect(() => {
-        if (!localStorage.getItem(TOUR_KEY)) {
+        if (hold) return;
+        let seen = true; // storage blocked → skip the tour rather than nag on every load
+        try { seen = !!localStorage.getItem(TOUR_KEY); } catch { /* keep the default */ }
+        if (!seen) {
             // Small delay so the layout fully renders before we measure elements
             const t = setTimeout(() => setVisible(true), 600);
             return () => clearTimeout(t);
         }
-    }, []);
+    }, [hold]);
 
     useEffect(() => {
         const handler = () => {
-            localStorage.removeItem(TOUR_KEY);
+            try { localStorage.removeItem(TOUR_KEY); } catch { /* ignore */ }
             setStep(0);
             setVisible(true);
         };
@@ -94,7 +97,7 @@ export default function CompanyTour() {
     }, [step, visible]);
 
     const finish = useCallback(() => {
-        localStorage.setItem(TOUR_KEY, '1');
+        try { localStorage.setItem(TOUR_KEY, '1'); } catch { /* ignore */ }
         setVisible(false);
     }, []);
 

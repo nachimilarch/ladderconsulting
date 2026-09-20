@@ -69,7 +69,7 @@ export default function Employees() {
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading...</div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                <div className="bg-white rounded-xl shadow-sm overflow-x-auto border border-gray-100">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                             <tr>

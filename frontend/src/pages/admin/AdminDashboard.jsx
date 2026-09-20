@@ -6,13 +6,40 @@ import { offerRequestAPI } from '../../api/interview';
 import { adminCompanyAPI } from '../../api/admin';
 import toast from 'react-hot-toast';
 
-const Kpi = ({ label, value, sub, color }) => (
-    <div className={`bg-white rounded-lg p-5 border-l-4 ${color} shadow-sm`}>
-        <p className="text-xs text-gray-500 uppercase tracking-wide">{label}</p>
-        <p className="text-3xl font-bold text-gray-800 mt-1">{value ?? '—'}</p>
-        {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+// Numbers about the platform: neutral cards, no colour. Colour is reserved for
+// things that need somebody to act (see Attention below).
+const Kpi = ({ icon, label, value, sub }) => (
+    <div className="card-p flex items-start gap-3">
+        <span className="w-10 h-10 rounded-xl bg-brand-50 flex items-center justify-center text-lg shrink-0">{icon}</span>
+        <div className="min-w-0">
+            <p className="text-xs font-medium text-gray-500">{label}</p>
+            <p className="text-2xl font-bold text-gray-900 leading-tight">{value ?? '—'}</p>
+            {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+        </div>
     </div>
 );
+
+// Amber only when there is something waiting; otherwise a quiet "all clear".
+const Attention = ({ label, hint, value, onClick }) => {
+    const n = value == null ? null : Number(value || 0);
+    const hot = n > 0;
+    return (
+        <button
+            onClick={onClick}
+            className={`rounded-2xl border p-4 text-left transition ${
+                hot
+                    ? 'bg-warning-50 border-warning-200 hover:border-warning-400'
+                    : 'bg-white border-gray-100 hover:border-gray-200'
+            }`}
+        >
+            <p className={`text-xs font-medium ${hot ? 'text-warning-800' : 'text-gray-500'}`}>{label}</p>
+            <p className={`text-3xl font-bold mt-1 leading-none ${hot ? 'text-warning-800' : 'text-gray-900'}`}>{n ?? '—'}</p>
+            <p className={`text-xs mt-1.5 ${hot ? 'text-warning-700' : 'text-success-600'}`}>
+                {n == null ? 'Loading…' : hot ? hint : '✓ All clear'}
+            </p>
+        </button>
+    );
+};
 
 export default function AdminDashboard() {
     const [summary, setSummary] = useState(null);
@@ -60,105 +87,68 @@ export default function AdminDashboard() {
     }
 
     const kpis = [
-        { label: 'Total Companies',   value: summary?.total_companies,   color: 'border-blue-500',   sub: `${summary?.pending_companies ?? 0} pending approval` },
-        { label: 'Total Candidates',  value: summary?.total_candidates,  color: 'border-green-500',  sub: `${summary?.active_candidates ?? 0} active` },
-        { label: 'HR Staff',          value: summary?.total_hr_staff,    color: 'border-purple-500', sub: null },
-        { label: 'Active Jobs',       value: summary?.active_jobs,       color: 'border-yellow-500', sub: null },
-        { label: 'Applications',      value: summary?.total_applications, color: 'border-orange-500', sub: `${summary?.placements_this_month ?? 0} placed this month` },
-        { label: 'Interviews Held',   value: summary?.interviews_held,   color: 'border-teal-500',   sub: null },
-        { label: 'Certificates Issued', value: summary?.certificates_issued, color: 'border-pink-500', sub: null },
-        { label: 'Pending Approvals', value: summary?.pending_companies, color: 'border-red-500',    sub: 'companies awaiting review' },
-        { label: 'Platinum Companies', value: summary?.premium_companies, color: 'border-yellow-500', sub: '8.33% placement fee tier' },
-        { label: 'Premium Candidates', value: summary?.premium_candidates, color: 'border-green-500', sub: '₹6L+ verified, listed first' },
-        { label: 'AI Subscriptions',  value: summary?.active_ai_subscriptions, color: 'border-indigo-500', sub: 'active, ₹299/mo' },
+        { icon: '🏢', label: 'Companies',           value: summary?.total_companies,    sub: `${summary?.pending_companies ?? 0} pending approval` },
+        { icon: '👤', label: 'Candidates',          value: summary?.total_candidates,   sub: `${summary?.active_candidates ?? 0} active` },
+        { icon: '💼', label: 'Active Jobs',         value: summary?.active_jobs },
+        { icon: '📨', label: 'Applications',        value: summary?.total_applications, sub: `${summary?.placements_this_month ?? 0} placed this month` },
+        { icon: '🗓', label: 'Interviews Held',     value: summary?.interviews_held },
+        { icon: '👥', label: 'HR Staff',            value: summary?.total_hr_staff },
+        { icon: '⭐', label: 'Platinum Companies',  value: summary?.premium_companies,  sub: '8.33% placement fee tier' },
+        { icon: '🌟', label: 'Premium Candidates',  value: summary?.premium_candidates, sub: '₹6L+ verified, listed first' },
+        { icon: '🤖', label: 'AI Subscriptions',    value: summary?.active_ai_subscriptions, sub: 'active, ₹299/mo' },
+        { icon: '🎓', label: 'Certificates Issued', value: summary?.certificates_issued },
     ];
 
+    const outstandingInvoices = invoiceSummary
+        ? parseInt(invoiceSummary.pending_count || 0) + parseInt(invoiceSummary.partial_count || 0)
+        : null;
+    const outstandingAmount = invoiceSummary?.total_outstanding
+        ? `₹${parseFloat(invoiceSummary.total_outstanding).toLocaleString('en-IN', { maximumFractionDigits: 0 })} to collect`
+        : 'awaiting payment';
+
+    // Built mostly from the summary, so the first four still show if the
+    // pending-actions calls fail.
+    const attention = [
+        { label: 'Companies to Approve',  hint: 'awaiting review',                value: summary?.pending_companies,                    to: '/admin/companies' },
+        { label: 'Platinum Requests',     hint: 'companies asking for Platinum',  value: summary?.pending_company_premium_requests,     to: '/admin/premium?tab=companies' },
+        { label: 'Premium Verifications', hint: 'payslips to review',             value: summary?.pending_candidate_premium_requests,   to: '/admin/premium?tab=candidates' },
+        { label: 'Jobs Awaiting Fee',     hint: 'posted but not paid for',        value: summary?.pending_payment_jobs,                 to: '/admin/jobs' },
+        { label: 'Interview Requests',    hint: 'waiting for approval',           value: pendingActions?.interview_requests,            to: '/hr/interview-requests' },
+        { label: 'Offer Requests',        hint: 'waiting for approval',           value: pendingActions?.offer_requests,                to: '/admin/requests' },
+        { label: 'Outstanding Invoices',  hint: outstandingAmount,                value: outstandingInvoices,                           to: '/admin/payments' },
+        { label: 'Unassigned Companies',  hint: 'no executive yet',               value: pendingActions?.unassigned_companies,          to: '/admin/companies?filter=unassigned' },
+    ];
+    const needCount = attention.filter((a) => Number(a.value || 0) > 0).length;
+
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
             <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">Admin Dashboard</h2>
-                <p className="text-sm text-gray-500 mt-1">Platform-wide overview</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Admin Dashboard</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                    {needCount > 0 ? `${needCount} ${needCount === 1 ? 'thing needs' : 'things need'} your attention.` : 'Nothing is waiting on you right now.'}
+                </p>
             </div>
 
-            {/* KPI grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                {kpis.map((k) => <Kpi key={k.label} {...k} />)}
-            </div>
-
-            {/* Needs your attention: built from the summary, so it shows even if the
-                pending-actions calls below fail */}
             <div className="mb-8">
-                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Needs Your Attention</h3>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    {[
-                        { label: 'Platinum Requests', hint: 'companies waiting for approval', value: summary?.pending_company_premium_requests, to: '/admin/premium?tab=companies', tone: 'yellow' },
-                        { label: 'Premium Verifications', hint: 'candidates waiting for payslip review', value: summary?.pending_candidate_premium_requests, to: '/admin/premium?tab=candidates', tone: 'green' },
-                        { label: 'Jobs Awaiting Fee', hint: 'posted but not yet paid for', value: summary?.pending_payment_jobs, to: '/admin/jobs', tone: 'amber' },
-                    ].map(({ label, hint, value, to, tone }) => {
-                        const n = Number(value || 0);
-                        const tones = {
-                            yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:border-yellow-400',
-                            green: 'bg-green-50 border-green-200 text-green-700 hover:border-green-400',
-                            amber: 'bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400',
-                        };
-                        return (
-                            <button
-                                key={label}
-                                onClick={() => navigate(to)}
-                                className={`rounded-xl border p-4 text-left transition ${tones[tone]} ${n > 0 ? 'ring-2 ring-offset-1 ring-red-300' : ''}`}
-                            >
-                                <p className="text-xs uppercase tracking-wide mb-1 opacity-80">{label}</p>
-                                <p className="text-3xl font-bold">{n}</p>
-                                <p className="text-xs mt-1 opacity-70">{n > 0 ? `${hint}, click to review` : 'nothing waiting'}</p>
-                            </button>
-                        );
-                    })}
+                <h3 className="section-title">Needs Your Attention</h3>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+                    {attention.map(({ to, ...a }) => <Attention key={a.label} {...a} onClick={() => navigate(to)} />)}
                 </div>
             </div>
 
-            {/* Platform Pending Actions */}
-            {pendingActions && (
-                <div className="mb-8">
-                    <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Platform Pending Actions</h3>
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <button onClick={() => navigate('/hr/interview-requests')}
-                            className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-left hover:border-blue-400 transition">
-                            <p className="text-xs text-blue-500 uppercase tracking-wide mb-1">Interview Requests</p>
-                            <p className="text-3xl font-bold text-blue-700">{pendingActions.interview_requests}</p>
-                            <p className="text-xs text-blue-400 mt-1">pending</p>
-                        </button>
-                        <button onClick={() => navigate('/admin/requests')}
-                            className="bg-indigo-50 border border-indigo-200 rounded-xl p-4 text-left hover:border-indigo-400 transition">
-                            <p className="text-xs text-indigo-500 uppercase tracking-wide mb-1">Offer Letter Requests</p>
-                            <p className="text-3xl font-bold text-indigo-700">{pendingActions.offer_requests}</p>
-                            <p className="text-xs text-indigo-400 mt-1">pending</p>
-                        </button>
-                        <button onClick={() => navigate('/admin/payments')}
-                            className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 text-left hover:border-yellow-400 transition">
-                            <p className="text-xs text-yellow-600 uppercase tracking-wide mb-1">Outstanding Invoices</p>
-                            <p className="text-3xl font-bold text-yellow-700">
-                                {(parseInt(invoiceSummary?.pending_count || 0) + parseInt(invoiceSummary?.partial_count || 0))}
-                            </p>
-                            {invoiceSummary?.total_outstanding && (
-                                <p className="text-xs text-yellow-500 mt-1">₹{parseFloat(invoiceSummary.total_outstanding).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</p>
-                            )}
-                        </button>
-                        <button onClick={() => navigate('/admin/companies?filter=unassigned')}
-                            className="bg-red-50 border border-red-200 rounded-xl p-4 text-left hover:border-red-400 transition">
-                            <p className="text-xs text-red-500 uppercase tracking-wide mb-1">Unassigned Companies</p>
-                            <p className="text-3xl font-bold text-red-700">{pendingActions.unassigned_companies}</p>
-                            <p className="text-xs text-red-400 mt-1">no executive</p>
-                        </button>
-                    </div>
+            <div className="mb-8">
+                <h3 className="section-title">Platform Overview</h3>
+                <div className="grid grid-cols-1 min-[420px]:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3 sm:gap-4">
+                    {kpis.map((k) => <Kpi key={k.label} {...k} />)}
                 </div>
-            )}
+            </div>
 
             {/* Quick actions + audit feed */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                 {/* Quick actions */}
-                <div className="bg-white rounded-lg p-5 shadow-sm">
-                    <h3 className="text-sm font-semibold text-gray-700 mb-4">Quick Actions</h3>
-                    <div className="space-y-2">
+                <div className="card-p">
+                    <h3 className="text-sm font-semibold text-gray-800 mb-3">Quick Actions</h3>
+                    <div className="space-y-1">
                         {[
                             { label: 'Review Pending Companies', to: '/admin/companies', badge: summary?.pending_companies },
                             { label: 'Premium Requests',         to: '/admin/premium',
@@ -174,11 +164,11 @@ export default function AdminDashboard() {
                             <button
                                 key={to}
                                 onClick={() => navigate(to)}
-                                className="w-full flex items-center justify-between px-3 py-2 text-sm text-gray-700 hover:bg-indigo-50 hover:text-indigo-700 rounded transition-colors"
+                                className="w-full flex items-center justify-between px-3 py-2.5 text-sm text-gray-700 hover:bg-brand-50 hover:text-brand-700 rounded-lg transition-colors"
                             >
                                 <span>{label}</span>
                                 {badge > 0 && (
-                                    <span className="bg-red-500 text-white text-xs rounded-full px-2 py-0.5">
+                                    <span className="bg-warning-100 text-warning-800 text-xs font-semibold rounded-full px-2 py-0.5">
                                         {badge}
                                     </span>
                                 )}
@@ -188,12 +178,12 @@ export default function AdminDashboard() {
                 </div>
 
                 {/* Recent audit feed */}
-                <div className="lg:col-span-2 bg-white rounded-lg p-5 shadow-sm">
+                <div className="lg:col-span-2 card-p">
                     <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-sm font-semibold text-gray-700">Recent Activity</h3>
+                        <h3 className="text-sm font-semibold text-gray-800">Recent Activity</h3>
                         <button
                             onClick={() => navigate('/admin/audit-log')}
-                            className="text-xs text-indigo-600 hover:underline"
+                            className="text-xs text-brand-600 hover:underline"
                         >
                             View all →
                         </button>

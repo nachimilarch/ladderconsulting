@@ -9,6 +9,7 @@ import NextStepCard from '../../components/candidate/NextStepCard';
 import JourneyStepper from '../../components/candidate/JourneyStepper';
 import AssistantPanel from '../../components/candidate/AssistantPanel';
 import { buildJourney, profileChecklist } from '../../components/candidate/journey';
+import { matchBadgeCls } from '../../utils/matchScore';
 
 const list = (res, ...keys) => {
     if (res?.status !== 'fulfilled') return [];
@@ -18,7 +19,6 @@ const list = (res, ...keys) => {
     return [];
 };
 
-const scoreCls = (s) => (s >= 70 ? 'bg-green-100 text-green-700' : s >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700');
 
 const Glance = ({ to, label, value, sub, tone }) => (
     <Link to={to} className={`rounded-2xl border p-4 hover:shadow-sm transition ${tone}`}>
@@ -121,7 +121,7 @@ export default function CandidateDashboard() {
                         label="Applications"
                         value={applications.length}
                         sub={applications.length ? `${inProgress} in progress · ${shortlisted} shortlisted` : 'None yet. Find a job to apply to.'}
-                        tone="bg-purple-50 border-purple-100 text-purple-800"
+                        tone="bg-white border-gray-100 text-gray-800 shadow-card"
                     />
                     <Glance
                         to="/candidate/interviews"
@@ -130,14 +130,14 @@ export default function CandidateDashboard() {
                         sub={journey.nextInterview
                             ? `Next: ${new Date(journey.nextInterview.slot_datetime).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' })}`
                             : 'Nothing scheduled'}
-                        tone="bg-blue-50 border-blue-100 text-blue-800"
+                        tone="bg-white border-gray-100 text-gray-800 shadow-card"
                     />
                     <Glance
                         to="/candidate/applications"
                         label="Offers"
                         value={journey.counts.pendingOffers}
                         sub={journey.counts.pendingOffers ? 'Waiting for your reply' : 'No offers waiting'}
-                        tone={journey.counts.pendingOffers ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-green-50 border-green-100 text-green-800'}
+                        tone={journey.counts.pendingOffers ? 'bg-warning-50 border-warning-200 text-warning-800' : 'bg-white border-gray-100 text-gray-800 shadow-card'}
                     />
                 </div>
             </div>
@@ -199,7 +199,7 @@ export default function CandidateDashboard() {
                                         {job.already_applied ? 'You applied' : 'View details →'}
                                     </span>
                                 </div>
-                                <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${scoreCls(job.match_score)}`}>{job.match_score}% match</span>
+                                <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${matchBadgeCls(job.match_score)}`}>{job.match_score}% match</span>
                             </button>
                         ))}
                         <Link to="/candidate/jobs" className="text-xs text-indigo-600 hover:underline self-start">Browse all jobs →</Link>

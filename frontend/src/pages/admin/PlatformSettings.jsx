@@ -481,7 +481,7 @@ export default function PlatformSettings() {
     if (loading) return <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>;
 
     return (
-        <div className="p-8 max-w-3xl">
+        <div className="p-4 sm:p-6 lg:p-8 max-w-3xl">
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">Platform Settings</h2>

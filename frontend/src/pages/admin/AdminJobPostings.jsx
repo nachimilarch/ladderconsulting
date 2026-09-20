@@ -65,7 +65,7 @@ export default function AdminJobPostings() {
     };
 
     return (
-        <div className="p-6 max-w-7xl mx-auto">
+        <div className="p-4 sm:p-6 max-w-7xl mx-auto">
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Job Postings</h1>
@@ -75,13 +75,13 @@ export default function AdminJobPostings() {
             </div>
 
             {/* Filters */}
-            <div className="flex gap-3 mb-5">
+            <div className="flex flex-wrap gap-3 mb-5">
                 <input
                     type="text"
                     value={search}
                     onChange={e => setSearch(e.target.value)}
                     placeholder="Search title or company…"
-                    className="border border-gray-300 rounded-xl px-3 py-2 text-sm flex-1 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                    className="border border-gray-300 rounded-xl px-3 py-2 text-sm flex-1 min-w-[200px] focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 />
                 <select
                     value={statusFilter}
@@ -103,7 +103,7 @@ export default function AdminJobPostings() {
                     <p className="text-gray-500 text-sm">No job postings found.</p>
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
                     <table className="w-full text-sm">
                         <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                             <tr>

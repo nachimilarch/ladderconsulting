@@ -121,17 +121,17 @@ export default function CompanyPayments() {
                         </div>
                         <span className="text-xs text-gray-500 italic">Pay full or partial via Cashfree</span>
                     </div>
-                    <div className="grid grid-cols-3 gap-3 mb-4">
-                        <div className="bg-white rounded-xl p-3 text-center">
-                            <p className="text-[11px] text-gray-400 uppercase tracking-wide">Total Due</p>
+                    <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-4">
+                        <div className="bg-white rounded-xl p-2 sm:p-3 text-center">
+                            <p className="text-[11px] text-gray-400 uppercase tracking-tight sm:tracking-wide">Total Due</p>
                             <p className="text-lg font-bold text-gray-800">{fmtINR(pfSummary.summary.total_due)}</p>
                         </div>
-                        <div className="bg-white rounded-xl p-3 text-center">
+                        <div className="bg-white rounded-xl p-2 sm:p-3 text-center">
                             <p className="text-[11px] text-green-500 uppercase tracking-wide">Paid</p>
                             <p className="text-lg font-bold text-green-700">{fmtINR(pfSummary.summary.total_paid)}</p>
                         </div>
-                        <div className="bg-white rounded-xl p-3 text-center">
-                            <p className="text-[11px] text-orange-500 uppercase tracking-wide">Outstanding</p>
+                        <div className="bg-white rounded-xl p-2 sm:p-3 text-center">
+                            <p className="text-[11px] text-orange-500 uppercase tracking-tight sm:tracking-wide">Outstanding</p>
                             <p className="text-lg font-bold text-orange-700">{fmtINR(pfSummary.summary.outstanding)}</p>
                         </div>
                     </div>

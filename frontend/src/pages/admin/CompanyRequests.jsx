@@ -78,7 +78,7 @@ export default function CompanyRequests() {
     const isActionable = selected && ['pending', 'in_progress'].includes(selected.status) && !selected.grant_id;
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">Offer Letter Requests</h2>
@@ -101,7 +101,7 @@ export default function CompanyRequests() {
 
             <div className="flex gap-6">
                 {/* List */}
-                <div className="flex-1 bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="flex-1 bg-white rounded-lg shadow-sm overflow-x-auto">
                     {loading ? (
                         <p className="p-6 text-gray-400 text-sm">Loading…</p>
                     ) : requests.length === 0 ? (

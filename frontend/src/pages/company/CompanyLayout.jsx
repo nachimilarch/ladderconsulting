@@ -70,6 +70,7 @@ export default function CompanyLayout() {
         if (!form.company_name.trim()) { toast.error('Company name is required'); return; }
         if (!form.industry)            { toast.error('Please select an industry'); return; }
         if (!form.headquarters.trim()) { toast.error('Location / HQ is required'); return; }
+        if (!/^\+?[0-9]{7,15}$/.test(form.contact_phone.replace(/\s/g, ''))) { toast.error('Enter a valid contact phone number'); return; }
         setSaving(true);
         try {
             await companyAPI.updateProfile(form);
@@ -87,7 +88,7 @@ export default function CompanyLayout() {
 
     return (
         <div className="min-h-screen flex flex-col bg-gray-50">
-            <nav className="bg-white border-b border-gray-100 px-6 py-3 flex items-center justify-between shrink-0 shadow-sm">
+            <nav className="bg-white border-b border-gray-100 px-4 sm:px-6 py-3 flex items-center justify-between shrink-0 shadow-sm">
                 <div className="flex items-center gap-3">
                     <img src="/logo-icon.png" alt="LadderStep" className="w-9 h-9 object-contain shrink-0" />
                     <div>
@@ -175,8 +176,8 @@ export default function CompanyLayout() {
                     </div>
                 )}
 
-                <main className="flex-1 overflow-auto p-6">
-                    <Outlet />
+                <main className="flex-1 min-w-0 overflow-auto p-4 sm:p-6">
+                    <Outlet context={{ onboardingOpen: !onboardChecked || showOnboarding }} />
                 </main>
             </div>
 
@@ -251,8 +252,9 @@ export default function CompanyLayout() {
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Phone</label>
+                                    <label className="block text-xs font-semibold text-gray-600 mb-1">Contact Phone <span className="text-red-500">*</span></label>
                                     <input
+                                        type="tel"
                                         value={form.contact_phone}
                                         onChange={e => setForm(f => ({ ...f, contact_phone: e.target.value }))}
                                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
@@ -287,7 +289,7 @@ export default function CompanyLayout() {
             )}
 
             {/* Product tour */}
-            <CompanyTour />
+            <CompanyTour hold={!onboardChecked || showOnboarding} />
             <ChatbotWidget />
         </div>
     );

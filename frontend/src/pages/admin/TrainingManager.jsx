@@ -290,7 +290,7 @@ export default function TrainingManager() {
 
     // ─────────────────────────────────────────────────────────────────────────
     return (
-        <div className="max-w-6xl mx-auto p-8">
+        <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
             <h1 className="text-2xl font-bold text-gray-900 mb-6">Training Manager</h1>
 
             {/* Tabs */}
@@ -643,7 +643,7 @@ export default function TrainingManager() {
                         {assignments.length === 0 ? (
                             <EmptyState text="No training assignments yet." />
                         ) : (
-                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
                                 <table className="w-full text-sm">
                                     <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                                         <tr>

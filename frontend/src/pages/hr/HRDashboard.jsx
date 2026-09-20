@@ -10,30 +10,22 @@ const REFRESH_INTERVAL = 30000; // 30 seconds
 const fmtINR = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 const fmtTime = (d) => d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-function KpiCard({ label, value, icon, sub, tone, to }) {
-    const tones = {
-        blue:   'bg-blue-50 border-blue-100 text-blue-700',
-        green:  'bg-green-50 border-green-100 text-green-700',
-        yellow: 'bg-yellow-50 border-yellow-100 text-yellow-700',
-        red:    'bg-red-50 border-red-100 text-red-700',
-        indigo: 'bg-indigo-50 border-indigo-100 text-indigo-700',
-        amber:  'bg-amber-50 border-amber-100 text-amber-700',
-        violet: 'bg-violet-50 border-violet-100 text-violet-700',
-    };
+// Neutral by default; amber only when `alert` says somebody needs to act.
+function KpiCard({ label, value, icon, sub, alert = false, to }) {
     const inner = (
         <>
-            <div className="flex items-center justify-between mb-1">
-                <span className="text-xl">{icon}</span>
-                {to && <span className="text-[10px] opacity-60">→</span>}
+            <div className="flex items-center justify-between mb-1.5">
+                <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg ${alert ? 'bg-warning-100' : 'bg-brand-50'}`}>{icon}</span>
+                {to && <span className={`text-xs ${alert ? 'text-warning-700' : 'text-gray-300'}`}>→</span>}
             </div>
-            <div className="text-2xl font-bold">{value ?? '—'}</div>
-            <div className="text-xs font-medium mt-0.5 opacity-80">{label}</div>
-            {sub && <div className="text-[11px] opacity-60 mt-0.5">{sub}</div>}
+            <div className={`text-2xl font-bold ${alert ? 'text-warning-800' : 'text-gray-900'}`}>{value ?? '—'}</div>
+            <div className={`text-xs font-medium mt-0.5 ${alert ? 'text-warning-800' : 'text-gray-500'}`}>{label}</div>
+            {sub && <div className={`text-[11px] mt-0.5 ${alert ? 'text-warning-700' : 'text-gray-400'}`}>{sub}</div>}
         </>
     );
-    const cls = `rounded-2xl border p-4 ${tones[tone] || tones.blue}`;
+    const cls = `rounded-2xl border p-4 ${alert ? 'bg-warning-50 border-warning-200' : 'bg-white border-gray-100 shadow-card'}`;
     return to
-        ? <Link to={to} className={`${cls} hover:shadow-sm transition`}>{inner}</Link>
+        ? <Link to={to} className={`${cls} hover:shadow-card-hover transition`}>{inner}</Link>
         : <div className={cls}>{inner}</div>;
 }
 
@@ -124,17 +116,17 @@ export default function HRDashboard() {
                     {/* Real-time hiring KPIs */}
                     {k && (
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
-                            <KpiCard label="Total Hires"         value={k.hires_total}              icon="🎯" tone="green"  sub={`${k.hires_this_month} this month`} />
-                            <KpiCard label="Active Jobs"         value={k.active_jobs}              icon="💼" tone="blue" />
-                            <KpiCard label="Applications"        value={k.total_applications}       icon="📥" tone="violet" sub={`${k.candidates_sourced} sourced`} />
-                            <KpiCard label="Fees Collected"      value={fmtINR(k.placement_fees_collected)} icon="💰" tone="green" />
-                            <KpiCard label="Interview Requests"  value={k.pending_interview_requests} icon="🗓" tone="amber"
+                            <KpiCard label="Total Hires"         value={k.hires_total}              icon="🎯" sub={`${k.hires_this_month} this month`} />
+                            <KpiCard label="Active Jobs"         value={k.active_jobs}              icon="💼" />
+                            <KpiCard label="Applications"        value={k.total_applications}       icon="📥" sub={`${k.candidates_sourced} sourced`} />
+                            <KpiCard label="Fees Collected"      value={fmtINR(k.placement_fees_collected)} icon="💰" />
+                            <KpiCard label="Interview Requests"  value={k.pending_interview_requests} icon="🗓" alert={k.pending_interview_requests > 0}
                                 sub="Pending approval" to="/hr/interviews" />
-                            <KpiCard label="Offer Requests"      value={k.pending_offer_requests}   icon="📋" tone="indigo"
+                            <KpiCard label="Offer Requests"      value={k.pending_offer_requests}   icon="📋" alert={k.pending_offer_requests > 0}
                                 sub="Pending approval" to="/hr/offer-requests" />
-                            <KpiCard label="Upcoming Interviews" value={k.upcoming_interviews}      icon="📅" tone="blue"
+                            <KpiCard label="Upcoming Interviews" value={k.upcoming_interviews}      icon="📅"
                                 sub={k.awaiting_candidate_confirmation > 0 ? `${k.awaiting_candidate_confirmation} unconfirmed` : undefined} />
-                            <KpiCard label="Outstanding Invoices" value={fmtINR(k.outstanding_amount)} icon="🧾" tone="red"
+                            <KpiCard label="Outstanding Invoices" value={fmtINR(k.outstanding_amount)} icon="🧾" alert={Number(k.outstanding_amount) > 0}
                                 sub={`${k.pending_invoices} invoice${k.pending_invoices !== 1 ? 's' : ''}`} to="/hr/invoices" />
                         </div>
                     )}
@@ -143,10 +135,10 @@ export default function HRDashboard() {
                     {stats && (
                         <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
                             {isAdmin && (
-                                <KpiCard label="Total Employees" value={stats.total_employees} icon="👥" tone="blue" />
+                                <KpiCard label="Total Employees" value={stats.total_employees} icon="👥" />
                             )}
-                            <KpiCard label="Tasks Pending"       value={stats.tasks_pending}        icon="⏳" tone="red" />
-                            <KpiCard label="Completed This Week" value={stats.tasks_completed_week} icon="✅" tone="green" />
+                            <KpiCard label="Tasks Pending"       value={stats.tasks_pending}        icon="⏳" alert={Number(stats.tasks_pending) > 0} />
+                            <KpiCard label="Completed This Week" value={stats.tasks_completed_week} icon="✅" />
                         </div>
                     )}
 
@@ -170,23 +162,23 @@ export default function HRDashboard() {
 
                     {/* Pending offer requests */}
                     {hiring?.pending_actions?.offer_requests?.length > 0 && (
-                        <div className="bg-indigo-50 border border-indigo-200 rounded-2xl p-5 mb-5">
+                        <div className="bg-warning-50 border border-warning-200 rounded-2xl p-5 mb-5">
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-indigo-800 text-sm">
+                                <h3 className="font-semibold text-warning-800 text-sm">
                                     📋 Offer Requests Pending ({hiring.pending_actions.offer_requests.length})
                                 </h3>
-                                <Link to="/hr/offer-requests" className="text-xs text-indigo-600 hover:underline">View all</Link>
+                                <Link to="/hr/offer-requests" className="text-xs text-warning-700 hover:underline">View all</Link>
                             </div>
                             <div className="space-y-2">
                                 {hiring.pending_actions.offer_requests.slice(0, 3).map(r => (
                                     <Link key={r.id} to={`/hr/offer-requests/${r.id}`}
-                                        className="flex items-start justify-between bg-white rounded-xl px-4 py-3 border border-indigo-100 hover:border-indigo-300 transition">
+                                        className="flex items-start justify-between bg-white rounded-xl px-4 py-3 border border-warning-100 hover:border-warning-300 transition">
                                         <div>
                                             <p className="text-sm font-medium text-gray-800">{r.company_name}</p>
                                             <p className="text-xs text-gray-500 mt-0.5">{r.candidate_name} — {r.job_title}</p>
                                         </div>
                                         {r.placement_fee_amount != null && (
-                                            <span className="text-xs text-indigo-700 font-medium shrink-0 ml-4">
+                                            <span className="text-xs text-warning-800 font-medium shrink-0 ml-4">
                                                 ₹{parseFloat(r.placement_fee_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
                                             </span>
                                         )}
@@ -198,17 +190,17 @@ export default function HRDashboard() {
 
                     {/* Pending interview requests */}
                     {hiring?.pending_actions?.interview_requests?.length > 0 && (
-                        <div className="bg-blue-50 border border-blue-200 rounded-2xl p-5 mb-5">
+                        <div className="bg-warning-50 border border-warning-200 rounded-2xl p-5 mb-5">
                             <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-blue-800 text-sm">
+                                <h3 className="font-semibold text-warning-800 text-sm">
                                     🗓 Interview Requests Pending ({hiring.pending_actions.interview_requests.length})
                                 </h3>
-                                <Link to="/hr/interviews" className="text-xs text-blue-600 hover:underline">View all</Link>
+                                <Link to="/hr/interviews" className="text-xs text-warning-700 hover:underline">View all</Link>
                             </div>
                             <div className="space-y-2">
                                 {hiring.pending_actions.interview_requests.slice(0, 3).map(r => (
                                     <Link key={r.id} to={`/hr/interview-requests/${r.id}`}
-                                        className="flex items-start justify-between bg-white rounded-xl px-4 py-3 border border-blue-100 hover:border-blue-300 transition">
+                                        className="flex items-start justify-between bg-white rounded-xl px-4 py-3 border border-warning-100 hover:border-warning-300 transition">
                                         <div>
                                             <p className="text-sm font-medium text-gray-800">{r.company_name}</p>
                                             <p className="text-xs text-gray-500 mt-0.5">{r.candidate_name} — {r.job_title}</p>

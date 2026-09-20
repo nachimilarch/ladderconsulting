@@ -15,7 +15,7 @@ export default function AdminPremiumRequests() {
     const tab = params.get('tab') === 'candidates' ? 'candidates' : 'companies';
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-1">Premium Requests</h2>
             <p className="text-sm text-gray-500 mb-6">
                 Companies asking for Platinum and candidates waiting for Premium verification, across the whole platform.

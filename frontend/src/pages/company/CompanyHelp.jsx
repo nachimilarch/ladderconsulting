@@ -22,10 +22,10 @@ const SECTIONS = [
             },
             {
                 n: 3,
-                title: 'Choose a Resume Package',
-                desc: 'To access candidate profiles and resumes you need a resume package. Head to Talent Pool to choose: Single (₹999), 4-Pack (₹3,999), or request a Platinum engagement (fee at hire).',
-                link: '/company/talent',
-                linkLabel: 'Explore Talent Pool →',
+                title: 'Post Your First Job',
+                desc: 'Each job you post costs ₹3,999 to go live. Platinum companies post for free and pay only a placement fee at hire. You can request Platinum from Job Postings.',
+                link: '/company/jobs',
+                linkLabel: 'Go to Job Postings →',
             },
         ],
     },
@@ -38,7 +38,7 @@ const SECTIONS = [
             {
                 n: 1,
                 title: 'Browse All Candidates',
-                desc: 'The Talent Pool lists every active candidate on the platform. Filter by experience, skills, location, or notice period. Search by name or keyword.',
+                desc: 'The Talent Pool lists every active candidate on the platform. Filter by experience, skills, location, or notice period. Premium candidates (⭐) are verified high earners and are always listed first.',
                 link: '/company/talent',
                 linkLabel: 'Open Talent Pool →',
             },
@@ -49,13 +49,13 @@ const SECTIONS = [
             },
             {
                 n: 3,
-                title: 'Unlock a Candidate Resume',
-                desc: 'Click "Unlock Resume" on any candidate card. Single/Pack credits deduct one credit and give you the original PDF resume immediately. Platinum candidates get a privacy-redacted resume; full details are shared only after a hire.',
+                title: 'Express Interest',
+                desc: 'Click "Express Interest" on a candidate you like and pick the job. Your assigned LadderStep executive is notified and takes care of the introduction.',
             },
             {
                 n: 4,
-                title: 'Add to Hiring Pipeline',
-                desc: 'After unlocking (Single/Pack), an "Add to Pipeline" button appears. This creates an application for the candidate on your selected job posting so they enter your hiring workflow.',
+                title: 'Add to Your Pipeline',
+                desc: 'Once you have a live job posting, an "Add to Pipeline" button replaces Express Interest. The candidate is added to that job\'s applications so you can shortlist them.',
             },
         ],
     },
@@ -68,7 +68,7 @@ const SECTIONS = [
             {
                 n: 1,
                 title: 'Create a Job Posting',
-                desc: 'Go to Job Postings → New Job. Fill in the title, description, location, experience range, salary range, and openings. The more detailed your description, the better the AI matching.',
+                desc: 'Go to Job Postings → New Job. Fill in the title, description, location, experience range, salary range, and openings. The more detailed your description, the better the matching. Standard companies pay ₹3,999 to publish each job; Platinum companies publish for free.',
                 link: '/company/jobs',
                 linkLabel: 'Go to Job Postings →',
             },
@@ -105,7 +105,7 @@ const SECTIONS = [
             {
                 n: 2,
                 title: 'Review Candidate Profiles',
-                desc: 'Unlocked candidates show their full name, contact, resume, and skills. Locked candidates show masked information until you purchase an unlock.',
+                desc: 'Once you have a live job posting you see full names, contact details, resumes and skills. Before that, personal details are masked. Premium candidates (⭐) are highlighted and listed first.',
             },
             {
                 n: 3,
@@ -160,7 +160,7 @@ const SECTIONS = [
             {
                 n: 2,
                 title: 'Executive Approval & Placement Fee',
-                desc: 'The executive reviews the offer and approves it. A placement fee invoice is generated at this stage (Platinum companies only — Single/Pack hires have the fee waived). You\'ll see it in Payments.',
+                desc: 'The executive reviews the offer and approves it. A placement fee invoice is generated at this stage: one month\'s CTC (8.33% of annual CTC), or your contracted rate. You\'ll see it in Payments.',
             },
             {
                 n: 3,
@@ -182,15 +182,15 @@ const SECTIONS = [
         steps: [
             {
                 n: 1,
-                title: 'Resume Packages',
-                desc: 'Single (₹999 / 1 resume) and 4-Pack (₹3,999 / 4 resumes) are one-time purchases paid via Cashfree. Credits never expire and apply to any candidate on the platform.',
+                title: 'Job Posting Fees',
+                desc: 'Standard companies pay ₹3,999 (plus GST) per job posted, online through Cashfree. The job goes live as soon as the payment clears. Platinum companies pay no per-job fee.',
                 link: '/company/payments',
                 linkLabel: 'Go to Payments →',
             },
             {
                 n: 2,
                 title: 'Placement Fee Invoices',
-                desc: 'Platinum companies are billed a placement fee when an offer is approved. The fee is calculated as: Annual CTC × your agreed placement fee %. You can pay in full or part from Payments.',
+                desc: 'A placement fee is billed when an offer is approved: annual CTC × 8.33% (one month\'s CTC), or your contracted rate. You can pay in full or in part from Payments.',
             },
             {
                 n: 3,
@@ -212,12 +212,12 @@ const FAQS = [
         a: 'Typically 1–2 business days. You\'ll receive an email once your account is approved. If you haven\'t heard back in 2 days, contact your LadderStep executive directly.',
     },
     {
-        q: 'What is the difference between Single/Pack and Platinum?',
-        a: 'Single and Pack are pre-paid credits — you pay per resume and no placement fee is charged at hire. Platinum gives you unlimited resume access (privacy-redacted) at no upfront cost, but a placement fee (% of CTC) applies when you hire a candidate.',
+        q: 'What is the difference between Standard and Platinum?',
+        a: 'Standard companies pay ₹3,999 for each job they post. Platinum companies post as many jobs as they like at no upfront cost. Both pay the placement fee (8.33% of annual CTC) when they hire. Ask your executive, or use the button on the Job Postings page, to request Platinum.',
     },
     {
-        q: 'Can I post jobs without a resume package?',
-        a: 'Yes — you can post jobs and view application summaries. However, you cannot see full candidate profiles, resumes, or contact details until you have an active package.',
+        q: 'What are Premium (⭐) candidates?',
+        a: 'Premium candidates have had their salary verified by our team (₹6 LPA and above). They are marked with a star and always appear first, then everyone else in order of how well they match your job. Every company can see and hire them, whatever your tier.',
     },
     {
         q: 'Why can\'t I directly schedule an interview?',
@@ -226,6 +226,10 @@ const FAQS = [
     {
         q: 'What happens if a candidate declines the offer?',
         a: 'The application moves back to "Interviewed" status. You can submit a new offer request at a revised CTC, or close the application and move to the next candidate.',
+    },
+    {
+        q: 'What does the AI assistant do?',
+        a: 'The assistant (₹299 per month) can draft a job post, improve the wording of a job you have already posted, and find the best-matching candidates for a job. It always shows you a preview and waits for your OK before anything changes. Open it with the chat button at the bottom right.',
     },
     {
         q: 'How is the AI fit score calculated?',
@@ -250,7 +254,7 @@ export default function CompanyHelp() {
     return (
         <div className="max-w-4xl mx-auto pb-16">
             {/* Hero */}
-            <div className="rounded-2xl bg-indigo-50 border border-indigo-100 px-8 py-10 mb-10">
+            <div className="rounded-2xl bg-indigo-50 border border-indigo-100 px-5 sm:px-8 py-7 sm:py-10 mb-8 sm:mb-10">
                 <div className="flex items-center gap-3 mb-3">
                     <span className="text-3xl">📖</span>
                     <h1 className="text-2xl font-bold text-indigo-900">Company Portal Guide</h1>
@@ -270,10 +274,10 @@ export default function CompanyHelp() {
             </div>
 
             {/* Hiring workflow banner */}
-            <div className="bg-white border border-gray-200 rounded-xl px-6 py-5 mb-10">
+            <div className="bg-white border border-gray-200 rounded-xl px-4 sm:px-6 py-5 mb-8 sm:mb-10">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">End-to-End Hiring Flow</p>
                 <div className="flex flex-wrap items-center gap-1 text-sm">
-                    {['Post Job', 'Browse Talent', 'Unlock Resume', 'Shortlist', 'Request Interview', 'Exec Approves', 'Candidate Confirms', 'Submit Offer', 'Exec Approves', 'Offer Accepted ✓'].map((step, i, arr) => (
+                    {['Post Job', 'Browse Talent', 'Express Interest', 'Shortlist', 'Request Interview', 'Exec Approves', 'Candidate Confirms', 'Submit Offer', 'Exec Approves', 'Offer Accepted ✓'].map((step, i, arr) => (
                         <span key={i} className="flex items-center gap-1">
                             <span className="bg-indigo-50 text-indigo-700 rounded-md px-2 py-0.5 font-medium text-xs whitespace-nowrap">{step}</span>
                             {i < arr.length - 1 && <span className="text-gray-300 text-xs">→</span>}
@@ -290,7 +294,7 @@ export default function CompanyHelp() {
                     <div key={section.id} id={section.id} className="mb-6">
                         <button
                             onClick={() => setActiveSection(open ? null : section.id)}
-                            className={`w-full flex items-center justify-between px-6 py-4 rounded-xl border-2 text-left transition-all ${
+                            className={`w-full flex items-center justify-between px-4 sm:px-6 py-4 rounded-xl border-2 text-left transition-all ${
                                 open ? `${c.bg} ${c.border}` : 'bg-white border-gray-200 hover:border-gray-300'
                             }`}
                         >
@@ -306,7 +310,7 @@ export default function CompanyHelp() {
                         </button>
 
                         {open && (
-                            <div className={`border-2 border-t-0 ${c.border} rounded-b-xl px-6 pt-4 pb-6 ${c.bg}`}>
+                            <div className={`border-2 border-t-0 ${c.border} rounded-b-xl px-4 sm:px-6 pt-4 pb-6 ${c.bg}`}>
                                 <div className="space-y-4">
                                     {section.steps.map(step => (
                                         <div key={step.n} className="flex gap-4">

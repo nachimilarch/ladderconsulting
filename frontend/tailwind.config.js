@@ -19,6 +19,68 @@ const ladderViolet = {
   950: '#251849',
 };
 
+// Status colours. Every portal speaks the same language: green = done/good,
+// amber = waiting/needs a look, red = failed/blocked. Tailwind's yellow, orange,
+// emerald and rose are folded into these so a "pending" badge is the same amber
+// on every page instead of a mix of yellow and orange.
+const success = {
+  50:  '#effaf4',
+  100: '#d6f2e2',
+  200: '#b0e5c8',
+  300: '#7fd2a8',
+  400: '#4ab984',
+  500: '#2a9d69',
+  600: '#1e8557',
+  700: '#1a6b47',
+  800: '#17553a',
+  900: '#144631',
+  950: '#08281c',
+};
+
+const warning = {
+  50:  '#fffaeb',
+  100: '#fef0c7',
+  200: '#fedf89',
+  300: '#fec84b',
+  400: '#fdb022',
+  500: '#f79009',
+  600: '#dc6803',
+  700: '#b54708',
+  800: '#93370d',
+  900: '#7a2e0e',
+  950: '#4e1d09',
+};
+
+const danger = {
+  50:  '#fef3f3',
+  100: '#fee4e4',
+  200: '#fdcccc',
+  300: '#faa5a5',
+  400: '#f47070',
+  500: '#e84545',
+  600: '#d32f2f',
+  700: '#b02525',
+  800: '#912323',
+  900: '#782424',
+  950: '#420f0f',
+};
+
+// Second accent for things that must be told apart from the brand violet
+// (e.g. "offer sent" next to "interview scheduled"). Leans magenta, not blue.
+const plum = {
+  50:  '#fcf4fd',
+  100: '#f7e6fa',
+  200: '#efcdf4',
+  300: '#e3a7ea',
+  400: '#d277dc',
+  500: '#ba4ec6',
+  600: '#9e38ab',
+  700: '#812f89',
+  800: '#6a2971',
+  900: '#57245c',
+  950: '#3a0f3d',
+};
+
 // Cool slate neutrals — calmer, more premium than default gray
 const slate = {
   50:  '#f8fafc',
@@ -45,7 +107,20 @@ export default {
         brand: ladderViolet,
         blue: ladderViolet,
         indigo: ladderViolet,
+        violet: ladderViolet,
         gray: slate,
+        success,
+        warning,
+        danger,
+        green: success,
+        emerald: success,
+        yellow: warning,
+        amber: warning,
+        orange: warning,
+        red: danger,
+        rose: danger,
+        purple: plum,
+        fuchsia: plum,
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],

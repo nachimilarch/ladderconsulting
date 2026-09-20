@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
 import { companyJobAPI, candidateResumeAPI } from '../../api/company';
+import { matchTextCls } from '../../utils/matchScore';
 
 function CandidateProfileDrawer({ app, onClose }) {
     const skills = (() => {
@@ -62,12 +63,6 @@ const STATUS_COLORS = {
     rejected:            'bg-red-100 text-red-600',
 };
 
-const SCORE_COLOR = (score) => {
-    if (!score) return 'text-gray-400';
-    if (score >= 70) return 'text-green-600';
-    if (score >= 40) return 'text-yellow-600';
-    return 'text-red-500';
-};
 
 export default function ShortlistView() {
     const [jobs, setJobs] = useState([]);
@@ -121,7 +116,7 @@ export default function ShortlistView() {
         } catch (err) {
             const code = err.response?.data?.code;
             if (code === 'ACTIVATION_REQUIRED') {
-                toast.error('Please activate your account to shortlist candidates.');
+                toast.error('Post a job first (or go Platinum) to shortlist candidates.');
                 setActivationRequired(true);
             } else {
                 toast.error(err.response?.data?.message || 'Failed to shortlist candidate.');
@@ -170,7 +165,7 @@ export default function ShortlistView() {
         } catch (err) {
             const code = err.response?.data?.code;
             if (code === 'ACTIVATION_REQUIRED') {
-                toast.error('Please activate your account to advance candidates.');
+                toast.error('Post a job first (or go Platinum) to move candidates forward.');
                 setActivationRequired(true);
             } else {
                 toast.error(err.response?.data?.message || 'Failed to update status.');
@@ -200,10 +195,10 @@ export default function ShortlistView() {
                 <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 flex items-start gap-2">
                     <span className="text-amber-500 text-lg mt-0.5">🔒</span>
                     <div>
-                        <p className="text-sm font-semibold text-amber-700">Account activation required</p>
-                        <p className="text-xs text-amber-600">
-                            Pay the one-time ₹3,999 listing fee to shortlist candidates and view full profiles.{' '}
-                            <a href="/company/talent" className="underline font-medium">Activate now →</a>
+                        <p className="text-sm font-semibold text-warning-800">Post a job to unlock shortlisting</p>
+                        <p className="text-xs text-warning-700">
+                            Publish a job (₹3,999, or free on Platinum) to shortlist candidates and see their full profiles.{' '}
+                            <a href="/company/jobs" className="underline font-medium">Go to Job Postings →</a>
                         </p>
                     </div>
                 </div>
@@ -267,12 +262,12 @@ export default function ShortlistView() {
                         const isPremium = Number(app.is_premium) === 1;
 
                         return (
-                            <div key={app.id} className={`rounded-2xl border shadow-sm p-5 ${
+                            <div key={app.id} className={`rounded-2xl border shadow-sm p-4 sm:p-5 ${
                                 hiredHere ? 'bg-white border-green-300'
                                 : isPremium ? 'bg-yellow-50/50 border-yellow-300 ring-1 ring-yellow-200'
                                 : 'bg-white border-gray-100'
                             }`}>
-                                <div className="flex items-start justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap mb-1">
                                             <h3 className="font-semibold text-gray-900">{app.candidate_name}</h3>
@@ -291,7 +286,7 @@ export default function ShortlistView() {
                                                 {app.status.replace('_', ' ')}
                                             </span>
                                             {app.match_score > 0 && (
-                                                <span className={`text-xs font-bold ${SCORE_COLOR(app.match_score)}`}>
+                                                <span className={`text-xs font-bold ${matchTextCls(app.match_score)}`}>
                                                     {app.match_score}% match
                                                 </span>
                                             )}
@@ -361,7 +356,7 @@ export default function ShortlistView() {
                                         )}
                                     </div>
 
-                                    <div className="flex flex-col gap-2 shrink-0 items-end">
+                                    <div className="flex flex-row flex-wrap items-center sm:flex-col sm:items-end gap-2 shrink-0 pt-3 sm:pt-0 border-t border-gray-100 sm:border-0">
                                         {/* Status update */}
                                         <select
                                             value={app.status}

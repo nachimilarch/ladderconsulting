@@ -87,7 +87,7 @@ export default function CandidateManagement() {
     };
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Candidate Management</h2>
 
             {/* Filters */}
@@ -119,7 +119,7 @@ export default function CandidateManagement() {
 
             <div className="flex gap-6">
                 {/* Table */}
-                <div className="flex-1 bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="flex-1 bg-white rounded-lg shadow-sm overflow-x-auto">
                     {loading ? (
                         <p className="p-6 text-gray-400 text-sm">Loading…</p>
                     ) : candidates.length === 0 ? (

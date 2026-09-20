@@ -182,11 +182,11 @@ export default function CompanyApprovals() {
     };
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Company Approvals</h2>
 
             {/* Tabs */}
-            <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
+            <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit max-w-full overflow-x-auto">
                 {STATUS_TABS.map((t) => (
                     <button
                         key={t}
@@ -202,7 +202,7 @@ export default function CompanyApprovals() {
 
             <div className="flex gap-6">
                 {/* List */}
-                <div className="flex-1 bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="flex-1 bg-white rounded-lg shadow-sm overflow-x-auto">
                     {loading ? (
                         <p className="p-6 text-gray-400 text-sm">Loading…</p>
                     ) : companies.length === 0 ? (

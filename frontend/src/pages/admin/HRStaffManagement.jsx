@@ -81,7 +81,7 @@ export default function HRStaffManagement() {
     };
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">HR Staff Management</h2>
                 <button
@@ -92,7 +92,7 @@ export default function HRStaffManagement() {
                 </button>
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
                 {loading ? (
                     <p className="p-6 text-gray-400 text-sm">Loading…</p>
                 ) : (Array.isArray(staff) ? staff : []).length === 0 ? (

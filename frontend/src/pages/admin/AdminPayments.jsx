@@ -189,7 +189,7 @@ export default function AdminPayments() {
     const streams = (invSummary?.by_type || []).filter(t => Number(t.invoice_count) > 0);
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-1">Payments, Subscriptions & Placement Fees</h2>
             <p className="text-sm text-gray-500 mb-6">All financial activity across the platform — companies and candidates</p>
 

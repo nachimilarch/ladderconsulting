@@ -109,7 +109,7 @@ export default function OutreachAnalytics() {
 
             {/* Campaign table */}
             {campaigns.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
                     <div className="px-5 py-4 border-b border-gray-50">
                         <h3 className="font-semibold text-gray-800 text-sm">All Campaigns</h3>
                     </div>

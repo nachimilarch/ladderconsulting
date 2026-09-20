@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useOutletContext } from 'react-router-dom';
 import { companyAPI, talentPoolAPI } from '../../api/company';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
 
@@ -56,21 +56,15 @@ const STATUS_CONFIG = {
     rejected:            { label: 'Rejected',            cls: 'bg-red-100 text-red-600' },
 };
 
-const KPI = ({ title, value, icon, color }) => {
-    const colors = {
-        blue:   'bg-blue-50 border-blue-100 text-blue-700',
-        green:  'bg-green-50 border-green-100 text-green-700',
-        purple: 'bg-purple-50 border-purple-100 text-purple-700',
-        amber:  'bg-amber-50 border-amber-100 text-amber-700',
-    };
-    return (
-        <div className={`rounded-2xl border p-5 ${colors[color]}`}>
-            <div className="text-2xl mb-2">{icon}</div>
-            <div className="text-2xl font-bold">{value ?? '—'}</div>
-            <div className="text-xs font-medium mt-0.5 opacity-80">{title}</div>
+const KPI = ({ title, value, icon }) => (
+    <div className="card-p flex items-center gap-3">
+        <span className="w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center text-xl shrink-0">{icon}</span>
+        <div className="min-w-0">
+            <div className="text-2xl font-bold text-gray-900 leading-tight">{value ?? '—'}</div>
+            <div className="text-xs font-medium text-gray-500">{title}</div>
         </div>
-    );
-};
+    </div>
+);
 
 export default function CompanyDashboard() {
     const [data, setData] = useState(null);
@@ -78,6 +72,8 @@ export default function CompanyDashboard() {
     const [needsPhone, setNeedsPhone] = useState(false);
     const [tierStatus, setTierStatus] = useState(null);
     const [aiStatus, setAiStatus] = useState(null);
+    // The welcome form in the layout collects the phone too; ask again only once it is closed.
+    const { onboardingOpen = false } = useOutletContext() || {};
 
     const fetchDashboard = () => {
         companyAPI.getDashboard()
@@ -88,10 +84,6 @@ export default function CompanyDashboard() {
 
     useEffect(() => {
         fetchDashboard();
-        // Check if phone is missing and show modal
-        companyAPI.getProfile()
-            .then(({ data }) => { if (!data.company?.contact_phone) setNeedsPhone(true); })
-            .catch(() => {});
         talentPoolAPI.activationStatus().then(({ data }) => setTierStatus(data)).catch(() => {});
         aiSubscriptionAPI.status().then(({ data }) => setAiStatus(data)).catch(() => {});
 
@@ -99,6 +91,13 @@ export default function CompanyDashboard() {
         document.addEventListener('visibilitychange', onVisible);
         return () => document.removeEventListener('visibilitychange', onVisible);
     }, []);
+
+    useEffect(() => {
+        if (onboardingOpen) return;
+        companyAPI.getProfile()
+            .then(({ data }) => setNeedsPhone(!data.company?.contact_phone))
+            .catch(() => {});
+    }, [onboardingOpen]);
 
     if (loading) {
         return (
@@ -115,7 +114,7 @@ export default function CompanyDashboard() {
             {needsPhone && <PhoneModal onSave={() => setNeedsPhone(false)} />}
             <div className="mb-6 flex items-start justify-between gap-4">
                 <div>
-                    <h1 className="text-2xl font-bold text-gray-900">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
                         {company.company_name || 'Company Dashboard'}
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
@@ -132,11 +131,11 @@ export default function CompanyDashboard() {
             </div>
 
             {/* KPI Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-                <KPI title="Active Jobs"    value={jobs.active_jobs}             icon="💼" color="blue" />
-                <KPI title="Total Applied"  value={applications.total_applications} icon="📋" color="purple" />
-                <KPI title="Shortlisted"    value={applications.shortlisted}     icon="⭐" color="green" />
-                <KPI title="Offers Sent"    value={applications.offers_sent}     icon="📨" color="amber" />
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
+                <KPI title="Active Jobs"    value={jobs.active_jobs}                icon="💼" />
+                <KPI title="Total Applied"  value={applications.total_applications} icon="📋" />
+                <KPI title="Shortlisted"    value={applications.shortlisted}        icon="⭐" />
+                <KPI title="Offers Sent"    value={applications.offers_sent}        icon="📨" />
             </div>
 
             {/* Account status strip */}
@@ -149,7 +148,7 @@ export default function CompanyDashboard() {
                     ) : tierStatus?.activated ? (
                         <span className="text-gray-700">Standard tier — <span className="text-indigo-600 font-medium">go Platinum →</span></span>
                     ) : (
-                        <span className="text-gray-500">Not yet activated — <span className="text-indigo-600 font-medium">post a job to activate →</span></span>
+                        <span className="text-gray-500">No live job yet — <span className="text-indigo-600 font-medium">post a job to see full profiles →</span></span>
                     )}
                 </Link>
                 <Link to="/company/profile" className={`flex-1 min-w-[220px] rounded-2xl border px-4 py-3 text-sm hover:shadow-sm transition ${
@@ -192,7 +191,8 @@ export default function CompanyDashboard() {
                             View all →
                         </Link>
                     </div>
-                    <table className="w-full text-sm">
+                    <div className="overflow-x-auto">
+                    <table className="w-full text-sm min-w-[480px]">
                         <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
                             <tr>
                                 {['Candidate', 'Job', 'Status', 'Applied'].map(h => (
@@ -220,6 +220,7 @@ export default function CompanyDashboard() {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             )}
         </div>

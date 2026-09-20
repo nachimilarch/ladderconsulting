@@ -116,7 +116,7 @@ export default function AdminEmailTemplates() {
             ) : filtered.length === 0 ? (
                 <div className="text-center py-16 text-gray-400">No templates found.</div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200 text-sm">
                         <thead className="bg-gray-50">
                             <tr>

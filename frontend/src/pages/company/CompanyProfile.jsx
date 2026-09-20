@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { companyAPI } from '../../api/company';
 import PremiumTierCard from '../../components/company/PremiumTierCard';
 import AiSubscriptionCard from '../../components/AiSubscriptionCard';
@@ -68,12 +69,14 @@ export default function CompanyProfile() {
     const [saving,   setSaving]   = useState(false);
     const [msg,      setMsg]      = useState({ type: '', text: '' });
     const [showPhoneModal, setShowPhoneModal] = useState(false);
+    const { onboardingOpen = false } = useOutletContext() || {};
     const [form, setForm] = useState({
         company_name: '', industry: '', size: '', website: '',
         headquarters: '', description: '', contact_phone: '',
     });
 
     useEffect(() => {
+        if (onboardingOpen) return;
         companyAPI.getProfile()
             .then(({ data }) => {
                 const c = data.company || {};
@@ -92,7 +95,7 @@ export default function CompanyProfile() {
             })
             .catch(() => setMsg({ type: 'error', text: 'Failed to load profile.' }))
             .finally(() => setLoading(false));
-    }, []);
+    }, [onboardingOpen]);
 
     const flash = (type, text) => {
         setMsg({ type, text });

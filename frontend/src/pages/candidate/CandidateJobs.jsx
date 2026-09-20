@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { jobAPI, applicationAPI } from '../../api/candidate';
 import JobDetailModal from '../../components/candidate/JobDetailModal';
 import AiAssistantPromo from '../../components/AiAssistantPromo';
+import { matchBadgeCls } from '../../utils/matchScore';
 
 const JOB_TYPE_MAP = {
     full_time:  { label: 'Full Time',   cls: 'badge-blue' },
@@ -17,7 +18,6 @@ const formatSalary = (min, max) => {
     return min ? `From ${fmt(min)}` : `Up to ${fmt(max)}`;
 };
 
-const scoreCls = (s) => (s >= 70 ? 'bg-green-100 text-green-700' : s >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700');
 
 export default function CandidateJobs() {
     const [jobs, setJobs]       = useState([]);
@@ -179,7 +179,7 @@ export default function CandidateJobs() {
                                             <div className="flex items-start justify-between gap-2 mb-1">
                                                 <h3 className="font-semibold text-gray-900 leading-snug">{job.title}</h3>
                                                 {score > 0 && (
-                                                    <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${scoreCls(score)}`}>{score}% match</span>
+                                                    <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${matchBadgeCls(score)}`}>{score}% match</span>
                                                 )}
                                             </div>
                                             <div className="flex items-center gap-2 mb-2 flex-wrap">

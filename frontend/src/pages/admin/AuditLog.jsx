@@ -73,7 +73,7 @@ export default function AuditLog() {
     const totalPages = Math.ceil(total / PAGE_SIZE);
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-2xl font-bold text-gray-800">Audit Log</h2>
@@ -88,7 +88,7 @@ export default function AuditLog() {
             </div>
 
             {/* Filters */}
-            <div className="flex gap-3 mb-6">
+            <div className="flex flex-wrap gap-3 mb-6">
                 <select
                     value={entityFilter}
                     onChange={(e) => { setEntityFilter(e.target.value); setPage(1); }}
@@ -104,11 +104,11 @@ export default function AuditLog() {
                     placeholder="Filter by action…"
                     value={actionFilter}
                     onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
-                    className="border border-gray-300 rounded px-3 py-2 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="border border-gray-300 rounded px-3 py-2 text-sm w-full sm:w-48 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </div>
 
-            <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+            <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
                 {loading ? (
                     <p className="p-6 text-gray-400 text-sm">Loading…</p>
                 ) : logs.length === 0 ? (

@@ -1,14 +1,13 @@
 import { Link } from 'react-router-dom';
 import { JOB_TYPE, WORK_MODE, salaryRange } from './chatFormat';
+import { matchBadgeCls } from '../../utils/matchScore';
 
 // null = the engine couldn't score it (e.g. the profile has no skills yet).
 export function MatchBadge({ score }) {
     if (score === null || score === undefined) {
         return <span className="text-[10px] font-medium px-2 py-1 rounded-full bg-gray-100 text-gray-500 whitespace-nowrap">Not scored yet</span>;
     }
-    const cls = score >= 70 ? 'bg-green-100 text-green-700'
-        : score >= 40 ? 'bg-amber-100 text-amber-700'
-        : 'bg-orange-100 text-orange-700';
+    const cls = matchBadgeCls(score);
     return <span className={`text-[11px] font-bold px-2 py-1 rounded-full whitespace-nowrap ${cls}`}>{score}% match</span>;
 }
 

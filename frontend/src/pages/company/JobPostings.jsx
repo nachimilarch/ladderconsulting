@@ -199,6 +199,42 @@ export default function JobPostings() {
 
     const f = (key) => (e) => setForm({ ...form, [key]: e.target.value });
 
+    const renderStatus = (job) => (
+        job.status === 'pending_payment' ? (
+            <span className={`text-xs font-medium px-2 py-1 rounded-lg ${STATUS_COLORS.pending_payment}`}>
+                Awaiting Payment
+            </span>
+        ) : (
+            <select
+                value={job.status}
+                onChange={e => handleStatusChange(job.id, e.target.value)}
+                className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_COLORS[job.status]}`}
+            >
+                <option value="draft">Draft</option>
+                <option value="active">Active</option>
+                <option value="paused">Paused</option>
+                <option value="closed">Closed</option>
+            </select>
+        )
+    );
+
+    const renderActions = (job, size = 'text-xs') => (
+        <>
+            {job.status === 'pending_payment' ? (
+                <button onClick={() => handlePayNow(job.id)}
+                    disabled={payingJobId === job.id}
+                    className={`text-indigo-600 hover:underline font-medium disabled:opacity-60 ${size}`}>
+                    {payingJobId === job.id ? 'Redirecting…' : 'Pay ₹3,999'}
+                </button>
+            ) : (
+                <button onClick={() => openEdit(job)}
+                    className={`text-indigo-600 hover:underline ${size}`}>Edit</button>
+            )}
+            <button onClick={() => handleDelete(job.id)}
+                className={`text-red-500 hover:underline ${size}`}>Delete</button>
+        </>
+    );
+
     return (
         <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -226,62 +262,60 @@ export default function JobPostings() {
                     </button>
                 </div>
             ) : (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                            <tr>
-                                {['Job Title', 'Type', 'Location', 'Openings', 'Applicants', 'Status', 'Actions'].map(h => (
-                                    <th key={h} className="px-4 py-3 text-left">{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {jobs.map(job => (
-                                <tr key={job.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3">
-                                        <div className="font-medium text-gray-800">{job.title}</div>
-                                        </td>
-                                    <td className="px-4 py-3 text-gray-600 capitalize">{job.job_type?.replace('_', ' ')}</td>
-                                    <td className="px-4 py-3 text-gray-600">{job.location || '—'}</td>
-                                    <td className="px-4 py-3 text-gray-600">{job.openings}</td>
-                                    <td className="px-4 py-3 text-gray-600">{job.applicant_count}</td>
-                                    <td className="px-4 py-3">
-                                        {job.status === 'pending_payment' ? (
-                                            <span className={`text-xs font-medium px-2 py-1 rounded-lg ${STATUS_COLORS.pending_payment}`}>
-                                                Awaiting Payment
-                                            </span>
-                                        ) : (
-                                            <select
-                                                value={job.status}
-                                                onChange={e => handleStatusChange(job.id, e.target.value)}
-                                                className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_COLORS[job.status]}`}
-                                            >
-                                                <option value="draft">Draft</option>
-                                                <option value="active">Active</option>
-                                                <option value="paused">Paused</option>
-                                                <option value="closed">Closed</option>
-                                            </select>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3 flex gap-2 items-center">
-                                        {job.status === 'pending_payment' ? (
-                                            <button onClick={() => handlePayNow(job.id)}
-                                                disabled={payingJobId === job.id}
-                                                className="text-indigo-600 hover:underline text-xs font-medium disabled:opacity-60">
-                                                {payingJobId === job.id ? 'Redirecting…' : 'Pay ₹3,999'}
-                                            </button>
-                                        ) : (
-                                            <button onClick={() => openEdit(job)}
-                                                className="text-indigo-600 hover:underline text-xs">Edit</button>
-                                        )}
-                                        <button onClick={() => handleDelete(job.id)}
-                                            className="text-red-500 hover:underline text-xs">Delete</button>
-                                    </td>
+                <>
+                    {/* Phones: one card per job */}
+                    <div className="md:hidden flex flex-col gap-3">
+                        {jobs.map(job => (
+                            <div key={job.id} className="card-p">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <div className="font-semibold text-gray-900 leading-snug">{job.title}</div>
+                                        <div className="text-xs text-gray-500 mt-0.5 capitalize">
+                                            {[job.job_type?.replace('_', ' '), job.location].filter(Boolean).join(' · ')}
+                                        </div>
+                                    </div>
+                                    <div className="shrink-0">{renderStatus(job)}</div>
+                                </div>
+                                <div className="flex items-center gap-4 text-xs text-gray-500 mt-3">
+                                    <span><b className="text-gray-900">{job.applicant_count}</b> applicants</span>
+                                    <span><b className="text-gray-900">{job.openings}</b> {job.openings === 1 ? 'opening' : 'openings'}</span>
+                                </div>
+                                <div className="flex items-center gap-5 mt-3 pt-3 border-t border-gray-100">
+                                    {renderActions(job, 'text-sm py-1')}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                <tr>
+                                    {['Job Title', 'Type', 'Location', 'Openings', 'Applicants', 'Status', 'Actions'].map(h => (
+                                        <th key={h} className="px-4 py-3 text-left">{h}</th>
+                                    ))}
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {jobs.map(job => (
+                                    <tr key={job.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <div className="font-medium text-gray-800">{job.title}</div>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600 capitalize">{job.job_type?.replace('_', ' ')}</td>
+                                        <td className="px-4 py-3 text-gray-600">{job.location || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-600">{job.openings}</td>
+                                        <td className="px-4 py-3 text-gray-600">{job.applicant_count}</td>
+                                        <td className="px-4 py-3">{renderStatus(job)}</td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex gap-3 items-center">{renderActions(job)}</div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
 
             {/* Create / Edit Modal */}

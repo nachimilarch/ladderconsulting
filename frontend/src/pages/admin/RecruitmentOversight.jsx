@@ -52,7 +52,7 @@ export default function RecruitmentOversight() {
     if (loading) return <div className="flex items-center justify-center h-full text-gray-400">Loading…</div>;
 
     return (
-        <div className="p-8">
+        <div className="p-4 sm:p-6 lg:p-8">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">Recruitment Oversight</h2>
 
             {/* Stats bar */}
@@ -83,7 +83,7 @@ export default function RecruitmentOversight() {
             </div>
 
             {tab === 'Pipeline' && (
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
                     {(Array.isArray(pipeline) ? pipeline : []).length === 0 ? (
                         <p className="p-6 text-gray-400 text-sm">No pipeline data.</p>
                     ) : (
@@ -112,7 +112,7 @@ export default function RecruitmentOversight() {
             )}
 
             {tab === 'Placements' && (
-                <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+                <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
                     {(Array.isArray(placements) ? placements : []).length === 0 ? (
                         <p className="p-6 text-gray-400 text-sm">No placements yet.</p>
                     ) : (
