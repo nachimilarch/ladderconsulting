@@ -8,12 +8,41 @@ const MAX_PENDING = 8;
 let chain = Promise.resolve();
 let pending = 0;
 
+// The chat assistant has priority. A background job does not START while a chat request is
+// in flight or just finished (a short quiet gap), so people asking the assistant something
+// are not queued behind a resume or a fit note that has not begun yet. It waits at most
+// MAX_WAIT_MS, then runs anyway. (A job already running still holds the model.)
+const QUIET_MS = 20 * 1000;
+const MAX_WAIT_MS = 5 * 60 * 1000;
+let activeChats = 0;
+let lastChatEnd = 0;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Call when a chat request starts; call the returned function when it ends (safe to call twice).
+function chatStarted() {
+    activeChats += 1;
+    let done = false;
+    return () => {
+        if (done) return;
+        done = true;
+        activeChats -= 1;
+        lastChatEnd = Date.now();
+    };
+}
+
+async function waitForQuiet() {
+    const startedWaiting = Date.now();
+    while ((activeChats > 0 || Date.now() - lastChatEnd < QUIET_MS) && Date.now() - startedWaiting < MAX_WAIT_MS) {
+        await sleep(2000);
+    }
+}
+
 // Returns false when the queue is full. Errors are logged, never thrown.
 function enqueue(label, fn) {
     if (pending >= MAX_PENDING) return false;
     pending += 1;
     chain = chain
-        .then(fn)
+        .then(async () => { await waitForQuiet(); return fn(); })
         .catch((err) => console.error(`[llm:${label}]`, err.message))
         .finally(() => { pending -= 1; });
     return true;
@@ -51,4 +80,4 @@ const CONTROL_CHARS = new RegExp('[\\u0000-\\u001f\\u007f]+', 'g');
 const cleanText = (s, max) =>
     String(s ?? '').replace(CONTROL_CHARS, ' ').replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
 
-module.exports = { enqueue, isEnabled, parseJsonReply, cleanText };
+module.exports = { enqueue, chatStarted, isEnabled, parseJsonReply, cleanText };

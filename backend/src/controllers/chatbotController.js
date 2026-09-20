@@ -5,6 +5,7 @@ const { hasActiveAiSubscription } = require('../utils/aiSubscription');
 const jobController = require('../controllers/jobController');
 const { updateCandidateProfileFields } = require('../utils/candidateProfile');
 const { applyToJob } = require('../utils/candidateApplications');
+const { chatStarted } = require('../services/llmJobs');
 
 const MAX_TOOL_ITERATIONS = 4;
 
@@ -340,6 +341,8 @@ exports.sendMessage = async (req, res) => {
     // parses `data:` lines so it ignores these.
     const heartbeat = setInterval(() => res.write(': keep-alive\n\n'), 10000);
     res.on('close', () => clearInterval(heartbeat));
+    // Tell the background queue a chat is in flight so it holds new jobs back.
+    res.on('close', chatStarted());
 
     try {
         await db.query(
