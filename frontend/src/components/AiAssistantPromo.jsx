@@ -4,12 +4,12 @@
 // this is just making sure everyone actually notices it exists). Clicking it
 // dispatches the same event ChatbotWidget listens for to open itself, rather
 // than duplicating any chat UI here.
-export const OPEN_CHATBOT_EVENT = 'ladderstep:open-chatbot';
+import { askAssistant } from '../utils/assistant';
 
-export default function AiAssistantPromo({ text }) {
+export default function AiAssistantPromo({ text, prompt }) {
     return (
         <button
-            onClick={() => window.dispatchEvent(new CustomEvent(OPEN_CHATBOT_EVENT))}
+            onClick={() => askAssistant(prompt)}
             className="w-full flex items-center justify-between gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-3 mb-6 text-sm text-left hover:bg-indigo-100 transition"
         >
             <span className="text-indigo-800">

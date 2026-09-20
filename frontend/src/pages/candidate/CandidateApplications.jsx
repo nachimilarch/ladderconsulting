@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { applicationAPI } from '../../api/candidate';
 import { candidateInterviewAPI } from '../../api/interview';
+import ApplicationProgress from '../../components/candidate/ApplicationProgress';
 
 const STATUS_CONFIG = {
     applied:              { label: 'Applied',              cls: 'bg-blue-100 text-blue-700' },
@@ -179,10 +180,10 @@ export default function CandidateApplications() {
                             <div key={app.id} className={`bg-white rounded-2xl border border-gray-100 shadow-sm p-5 transition-opacity ${
                                 app.status === 'withdrawn' ? 'opacity-60' : ''
                             }`}>
-                                <div className="flex items-start justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap mb-1">
-                                            <h3 className="font-semibold text-gray-900 truncate">{app.title}</h3>
+                                            <h3 className="font-semibold text-gray-900">{app.title}</h3>
                                             <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${statusInfo.cls}`}>
                                                 {statusInfo.label}
                                             </span>
@@ -198,6 +199,8 @@ export default function CandidateApplications() {
                                                 day: 'numeric', month: 'short', year: 'numeric',
                                             })}</span>
                                         </div>
+
+                                        <ApplicationProgress status={app.status} />
 
                                         {/* Offer details when pending */}
                                         {offerPending && (
@@ -216,13 +219,13 @@ export default function CandidateApplications() {
                                                     <button
                                                         onClick={() => handleOfferAccept(offer)}
                                                         disabled={offerAction === offer.offer_id}
-                                                        className="text-xs bg-green-600 text-white px-4 py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-60 font-medium">
+                                                        className="flex-1 sm:flex-none text-sm sm:text-xs bg-green-600 text-white px-4 py-2.5 sm:py-1.5 rounded-lg hover:bg-green-700 disabled:opacity-60 font-medium">
                                                         {offerAction === offer.offer_id ? '...' : 'Accept Offer'}
                                                     </button>
                                                     <button
                                                         onClick={() => { setDeclineOffer(offer); setDeclineReason(''); }}
                                                         disabled={offerAction === offer.offer_id}
-                                                        className="text-xs bg-red-50 text-red-600 border border-red-200 px-4 py-1.5 rounded-lg hover:bg-red-100 disabled:opacity-60">
+                                                        className="flex-1 sm:flex-none text-sm sm:text-xs bg-red-50 text-red-600 border border-red-200 px-4 py-2.5 sm:py-1.5 rounded-lg hover:bg-red-100 disabled:opacity-60">
                                                         Decline
                                                     </button>
                                                 </div>
@@ -244,7 +247,7 @@ export default function CandidateApplications() {
 
                                     {canWithdraw && !offerPending && (
                                         <button onClick={() => handleWithdraw(app)} disabled={withdrawing === app.id}
-                                            className="shrink-0 text-xs text-red-500 border border-red-200 rounded-lg px-3 py-1.5 hover:bg-red-50 disabled:opacity-50 transition">
+                                            className="shrink-0 self-start text-xs text-red-500 border border-red-200 rounded-lg px-3 py-2 sm:py-1.5 hover:bg-red-50 disabled:opacity-50 transition">
                                             {withdrawing === app.id ? 'Withdrawing...' : 'Withdraw'}
                                         </button>
                                     )}

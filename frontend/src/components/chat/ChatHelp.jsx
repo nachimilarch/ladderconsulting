@@ -19,10 +19,11 @@ const LIMITS = {
     company: "I can't contact candidates, schedule interviews or send offers yet. Use the menu for those.",
 };
 
-export default function ChatHelp({ persona, onAsk, disabled }) {
+// preview: shown before subscribing, so no tap-to-try buttons, just what they would get.
+export default function ChatHelp({ persona, onAsk, disabled, preview = false }) {
     return (
         <div className="bg-white border border-gray-200 rounded-2xl shadow-sm p-3.5 w-full">
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2.5">What I can help with</p>
+            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2.5">{preview ? 'What you get' : 'What I can help with'}</p>
             <div className="space-y-3">
                 {(CAPABILITIES[persona] || []).map((c) => (
                     <div key={c.title} className="flex gap-2.5">
@@ -30,13 +31,15 @@ export default function ChatHelp({ persona, onAsk, disabled }) {
                         <div className="min-w-0">
                             <p className="text-[13px] font-semibold text-gray-800 leading-tight">{c.title}</p>
                             <p className="text-xs text-gray-500 mt-0.5 leading-snug">{c.text}</p>
-                            <button
-                                onClick={() => onAsk?.(c.example)}
-                                disabled={disabled}
-                                className="mt-1.5 text-xs px-2.5 py-1 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50/60 hover:bg-indigo-100 disabled:opacity-50 transition"
-                            >
-                                Try: “{c.example}”
-                            </button>
+                            {!preview && (
+                                <button
+                                    onClick={() => onAsk?.(c.example)}
+                                    disabled={disabled}
+                                    className="mt-1.5 text-xs px-2.5 py-1.5 rounded-full border border-indigo-200 text-indigo-700 bg-indigo-50/60 hover:bg-indigo-100 disabled:opacity-50 transition"
+                                >
+                                    Try: “{c.example}”
+                                </button>
+                            )}
                         </div>
                     </div>
                 ))}

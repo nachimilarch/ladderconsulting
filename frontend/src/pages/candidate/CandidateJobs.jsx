@@ -17,6 +17,8 @@ const formatSalary = (min, max) => {
     return min ? `From ${fmt(min)}` : `Up to ${fmt(max)}`;
 };
 
+const scoreCls = (s) => (s >= 70 ? 'bg-green-100 text-green-700' : s >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700');
+
 export default function CandidateJobs() {
     const [jobs, setJobs]       = useState([]);
     const [loading, setLoading] = useState(true);
@@ -27,6 +29,8 @@ export default function CandidateJobs() {
     const [applyMsg, setApplyMsg] = useState({});    // { [jobId]: { type, text } }
     const [isHired, setIsHired]   = useState(false); // candidate hired → off the market
     const [detailJobId, setDetailJobId] = useState(null); // open full-requirement modal
+    const [recommended, setRecommended] = useState([]); // jobs ranked by live match %, best first
+    const [tab, setTab] = useState(null);               // 'recommended' | 'all' (chosen once matches load)
     const limit = 10;
 
     const load = useCallback(() => {
@@ -50,17 +54,28 @@ export default function CandidateJobs() {
         return () => clearTimeout(t);
     }, [load]);
 
+    // Match % for every active job, scored against this candidate's skills.
+    useEffect(() => {
+        jobAPI.getMatched({ page: 1, limit: 50 })
+            .then(({ data }) => {
+                const ranked = (data.jobs || []).filter((j) => j.match_computed && j.match_score > 0);
+                setRecommended(ranked);
+                setTab(ranked.length ? 'recommended' : 'all');
+            })
+            .catch(() => setTab('all'));
+    }, []);
+
+    const scoreById = Object.fromEntries(recommended.map((j) => [j.id, j.match_score]));
+
     const handleApply = async (jobId) => {
         setApplying(jobId);
         setApplyMsg(m => ({ ...m, [jobId]: null }));
         try {
             await applicationAPI.apply(jobId, {});
             // Optimistically mark as applied
-            setJobs(prev => prev.map(j =>
-                j.id === jobId
-                    ? { ...j, already_applied: 1, application_status: 'applied' }
-                    : j
-            ));
+            const markApplied = (j) => (j.id === jobId ? { ...j, already_applied: 1, application_status: 'applied' } : j);
+            setJobs(prev => prev.map(markApplied));
+            setRecommended(prev => prev.map(markApplied));
             setApplyMsg(m => ({ ...m, [jobId]: { type: 'success', text: 'Application submitted!' } }));
         } catch (err) {
             const msg = err.response?.data?.message || 'Application failed';
@@ -70,13 +85,20 @@ export default function CandidateJobs() {
         }
     };
 
-    const totalPages = Math.ceil(total / limit);
+    const isRecommended = tab === 'recommended';
+    const q = search.trim().toLowerCase();
+    const shown = isRecommended
+        ? recommended.filter((j) => !q || `${j.title} ${j.company_name}`.toLowerCase().includes(q))
+        : jobs;
+    const count = isRecommended ? shown.length : total;
+    const totalPages = isRecommended ? 1 : Math.ceil(total / limit);
+    const busy = loading || tab === null;
 
     return (
         <div className="max-w-4xl mx-auto animate-slide-up">
             <div className="page-header">
                 <h1 className="page-title">Browse Jobs</h1>
-                <span className="text-sm text-gray-500">{total} job{total !== 1 ? 's' : ''} found</span>
+                <span className="text-sm text-gray-500">{count} job{count !== 1 ? 's' : ''} {isRecommended ? 'for you' : 'found'}</span>
             </div>
 
             {isHired && (
@@ -87,7 +109,30 @@ export default function CandidateJobs() {
             )}
 
             {!isHired && (
-                <AiAssistantPromo text="ask it to find jobs that match your profile, or apply to one for you." />
+                <AiAssistantPromo
+                    text="ask it to find jobs that match your profile, or apply to one for you."
+                    prompt="Find jobs that match me"
+                />
+            )}
+
+            {/* Recommended (ranked by fit) vs. everything */}
+            {recommended.length > 0 && (
+                <div className="flex gap-1 p-1 bg-gray-100 rounded-xl mb-4 w-full sm:w-fit">
+                    {[
+                        { id: 'recommended', label: '⭐ Recommended for you' },
+                        { id: 'all', label: 'All jobs' },
+                    ].map((t) => (
+                        <button
+                            key={t.id}
+                            onClick={() => { setTab(t.id); setPage(1); }}
+                            className={`flex-1 sm:flex-none px-4 py-2.5 sm:py-2 rounded-lg text-sm font-medium transition ${
+                                tab === t.id ? 'bg-white shadow text-indigo-700' : 'text-gray-500 hover:text-gray-700'
+                            }`}
+                        >
+                            {t.label}
+                        </button>
+                    ))}
+                </div>
             )}
 
             {/* Search */}
@@ -97,30 +142,31 @@ export default function CandidateJobs() {
                     placeholder="Search job title or company…"
                     value={search}
                     onChange={e => { setSearch(e.target.value); setPage(1); }}
-                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    className="w-full border border-gray-300 rounded-lg px-4 py-3 sm:py-2 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
             </div>
 
-            {loading ? (
+            {busy ? (
                 <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
                     Loading jobs...
                 </div>
-            ) : jobs.length === 0 ? (
+            ) : shown.length === 0 ? (
                 <div className="card-p text-center py-16">
                     <div className="text-4xl mb-3">🔍</div>
                     <h3 className="text-lg font-semibold text-gray-700 mb-1">No jobs found</h3>
                     <p className="text-sm text-gray-500">
-                        {search ? 'Try a different search term.' : 'No active job postings right now — check back soon.'}
+                        {search ? 'Try a different search term.' : 'No active job postings right now. Check back soon.'}
                     </p>
                 </div>
             ) : (
                 <>
                     <div className="flex flex-col gap-4">
-                        {jobs.map((job) => {
+                        {shown.map((job) => {
                             const isApplied   = Boolean(job.already_applied);
                             const isApplying  = applying === job.id;
                             const typeInfo    = JOB_TYPE_MAP[job.job_type] || { label: job.job_type, cls: 'badge-gray' };
                             const msg         = applyMsg[job.id];
+                            const score       = scoreById[job.id];
 
                             return (
                                 <div
@@ -128,27 +174,28 @@ export default function CandidateJobs() {
                                     onClick={() => setDetailJobId(job.id)}
                                     className="card-p hover:shadow-md hover:border-indigo-200 transition-all duration-200 cursor-pointer"
                                 >
-                                    <div className="flex items-start justify-between gap-4">
+                                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 sm:gap-4">
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                                <h3 className="font-semibold text-gray-900 truncate">{job.title}</h3>
+                                            <div className="flex items-start justify-between gap-2 mb-1">
+                                                <h3 className="font-semibold text-gray-900 leading-snug">{job.title}</h3>
+                                                {score > 0 && (
+                                                    <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${scoreCls(score)}`}>{score}% match</span>
+                                                )}
+                                            </div>
+                                            <div className="flex items-center gap-2 mb-2 flex-wrap">
                                                 <span className={typeInfo.cls}>{typeInfo.label}</span>
                                                 {job.work_mode && (
-                                                    <span className="badge-gray capitalize">
-                                                        {job.work_mode.replace('_', '-')}
-                                                    </span>
+                                                    <span className="badge-gray capitalize">{job.work_mode.replace('_', '-')}</span>
                                                 )}
                                             </div>
                                             <div className="text-sm text-gray-600 mb-2">
                                                 {job.company_name}
-                                                {job.location && (
-                                                    <span className="text-gray-400"> • {job.location}</span>
-                                                )}
+                                                {job.location && <span className="text-gray-400"> • {job.location}</span>}
                                             </div>
                                             <p className="text-sm text-gray-500 line-clamp-2 mb-3">
                                                 {job.description}
                                             </p>
-                                            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-gray-500">
                                                 <span>💰 {formatSalary(job.salary_min, job.salary_max)}</span>
                                                 {job.experience_min != null && (
                                                     <span>
@@ -156,8 +203,7 @@ export default function CandidateJobs() {
                                                         {job.experience_max ? `–${job.experience_max}` : '+'} yrs
                                                     </span>
                                                 )}
-                                                <span>📅 {new Date(job.created_at).toLocaleDateString()}</span>
-                                                <span className="text-indigo-600 font-medium ml-auto">View full details →</span>
+                                                <span className="text-indigo-600 font-medium sm:ml-auto">View full details →</span>
                                             </div>
 
                                             {/* Per-job feedback message */}
@@ -170,8 +216,8 @@ export default function CandidateJobs() {
                                             )}
                                         </div>
 
-                                        {/* Apply / Applied */}
-                                        <div className="shrink-0 flex flex-col items-end gap-2" onClick={e => e.stopPropagation()}>
+                                        {/* Apply / Applied: full-width tap target on phones */}
+                                        <div className="shrink-0 sm:flex sm:flex-col sm:items-end gap-2" onClick={e => e.stopPropagation()}>
                                             {isHired ? (
                                                 <span className="badge-gray whitespace-nowrap">Hired</span>
                                             ) : isApplied ? (
@@ -180,7 +226,7 @@ export default function CandidateJobs() {
                                                 <button
                                                     onClick={() => handleApply(job.id)}
                                                     disabled={isApplying}
-                                                    className="px-4 py-1.5 bg-indigo-600 text-white text-xs font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition whitespace-nowrap"
+                                                    className="w-full sm:w-auto px-4 py-3 sm:py-1.5 bg-indigo-600 text-white text-sm sm:text-xs font-semibold sm:font-medium rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition whitespace-nowrap"
                                                 >
                                                     {isApplying ? 'Applying…' : 'Apply Now'}
                                                 </button>
@@ -219,9 +265,11 @@ export default function CandidateJobs() {
                 <JobDetailModal
                     jobId={detailJobId}
                     onClose={() => setDetailJobId(null)}
-                    onApplied={(id) => setJobs(prev => prev.map(j =>
-                        j.id === id ? { ...j, already_applied: 1, application_status: 'applied' } : j
-                    ))}
+                    onApplied={(id) => {
+                        const markApplied = (j) => (j.id === id ? { ...j, already_applied: 1, application_status: 'applied' } : j);
+                        setJobs(prev => prev.map(markApplied));
+                        setRecommended(prev => prev.map(markApplied));
+                    }}
                 />
             )}
         </div>

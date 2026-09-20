@@ -1,256 +1,237 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { profileAPI, jobAPI, aiAPI, candidatePremiumAPI } from '../../api/candidate';
+import { profileAPI, jobAPI, aiAPI, applicationAPI, candidatePremiumAPI } from '../../api/candidate';
+import { candidateInterviewAPI } from '../../api/interview';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import JobDetailModal from '../../components/candidate/JobDetailModal';
+import NextStepCard from '../../components/candidate/NextStepCard';
+import JourneyStepper from '../../components/candidate/JourneyStepper';
+import AssistantPanel from '../../components/candidate/AssistantPanel';
+import { buildJourney, profileChecklist } from '../../components/candidate/journey';
+
+const list = (res, ...keys) => {
+    if (res?.status !== 'fulfilled') return [];
+    const d = res.value.data;
+    if (Array.isArray(d?.data)) return d.data;
+    for (const k of keys) if (Array.isArray(d?.[k])) return d[k];
+    return [];
+};
+
+const scoreCls = (s) => (s >= 70 ? 'bg-green-100 text-green-700' : s >= 40 ? 'bg-yellow-100 text-yellow-700' : 'bg-orange-100 text-orange-700');
+
+const Glance = ({ to, label, value, sub, tone }) => (
+    <Link to={to} className={`rounded-2xl border p-4 hover:shadow-sm transition ${tone}`}>
+        <p className="text-[11px] uppercase tracking-wide font-semibold opacity-70">{label}</p>
+        <p className="text-3xl font-bold mt-1 leading-none">{value}</p>
+        <p className="text-xs mt-1.5 opacity-80 leading-snug">{sub}</p>
+    </Link>
+);
 
 export default function CandidateDashboard() {
     const { user } = useAuth();
-    const [profile, setProfile] = useState(null);
-    const [stats, setStats] = useState({ skills: 0, education: 0, experience: 0, hasResume: false, completeness: 0 });
     const [loading, setLoading] = useState(true);
+    const [stats, setStats] = useState({ skills: 0, education: 0, experience: 0, hasResume: false, completeness: 0 });
+    const [applications, setApplications] = useState([]);
+    const [interviews, setInterviews] = useState([]);
+    const [offers, setOffers] = useState([]);
     const [topJobs, setTopJobs] = useState([]);
-    const [rematching, setRematching] = useState(false);
+    const [premium, setPremium] = useState(null);
+    const [ai, setAi] = useState(null);
     const [detailJobId, setDetailJobId] = useState(null);
-    const [premiumStatus, setPremiumStatus] = useState(null);
-    const [aiStatus, setAiStatus] = useState(null);
+    const [rematching, setRematching] = useState(false);
 
-    const fetchProfile = () => {
-        profileAPI.get()
-            .then(({ data }) => {
-                setProfile(data.profile);
+    const load = () =>
+        Promise.allSettled([
+            profileAPI.get(),
+            applicationAPI.getAll(),
+            candidateInterviewAPI.getMyInterviews(),
+            candidateInterviewAPI.getMyOffers(),
+            jobAPI.getMatched({ page: 1, limit: 3 }),
+            candidatePremiumAPI.status(),
+            aiSubscriptionAPI.status(),
+        ]).then(([prof, apps, ivs, offs, matched, prem, sub]) => {
+            if (prof.status === 'fulfilled') {
+                const d = prof.value.data;
                 setStats({
-                    skills: data.skills?.length || 0,
-                    education: data.education?.length || 0,
-                    experience: data.experience_years || 0,
-                    hasResume: !!data.resume,
-                    completeness: data.profile_complete_pct || 0,
+                    skills: d.skills?.length || 0,
+                    education: d.education?.length || 0,
+                    experience: d.experience_years || 0,
+                    hasResume: !!d.resume,
+                    completeness: d.profile_complete_pct || 0,
                 });
-            })
-            .catch(() => {})
-            .finally(() => setLoading(false));
-    };
+            }
+            setApplications(list(apps, 'applications'));
+            setInterviews(list(ivs, 'interviews'));
+            setOffers(list(offs, 'offers'));
+            setTopJobs(list(matched, 'jobs').filter((j) => j.match_computed && j.match_score > 0).slice(0, 3));
+            setPremium(prem.status === 'fulfilled' ? prem.value.data : null);
+            setAi(sub.status === 'fulfilled' ? sub.value.data : null);
+        }).finally(() => setLoading(false));
 
     useEffect(() => {
-        fetchProfile();
-        candidatePremiumAPI.status().then(({ data }) => setPremiumStatus(data)).catch(() => {});
-        aiSubscriptionAPI.status().then(({ data }) => setAiStatus(data)).catch(() => {});
-
-        const onVisible = () => { if (document.visibilityState === 'visible') fetchProfile(); };
+        load();
+        // Coming back from another tab (e.g. after confirming something) refreshes the picture.
+        const onVisible = () => { if (document.visibilityState === 'visible') load(); };
         document.addEventListener('visibilitychange', onVisible);
         return () => document.removeEventListener('visibilitychange', onVisible);
     }, []);
 
-    useEffect(() => {
-        jobAPI.getMatched({ page: 1, limit: 10 })
-            .then(({ data }) => {
-                // Only show jobs with a computed match score
-                const scored = (data.jobs || []).filter(j => j.match_computed && j.match_score > 0);
-                setTopJobs(scored.slice(0, 3));
-            })
-            .catch(() => {});
-    }, []);
-
-    const handleRetriggerMatch = async () => {
+    const refreshMatches = async () => {
         setRematching(true);
         try {
             await aiAPI.triggerResumeMatch();
-            const { data } = await jobAPI.getMatched({ page: 1, limit: 10 });
-            const scored = (data.jobs || []).filter(j => j.match_computed && j.match_score > 0);
-            setTopJobs(scored.slice(0, 3));
-        } catch {
-            // silently ignore — AI may be unavailable
-        } finally {
-            setRematching(false);
-        }
+            const res = await jobAPI.getMatched({ page: 1, limit: 3 });
+            setTopJobs((res.data?.jobs || []).filter((j) => j.match_computed && j.match_score > 0).slice(0, 3));
+        } catch { /* the AI may be unavailable; the list just stays as it was */ }
+        finally { setRematching(false); }
     };
 
-    const completeness = stats.completeness;
-
-    const quickActions = [
-        { label: 'Complete Profile', to: '/candidate/profile', icon: '👤', desc: 'Add your details and experience', color: 'blue' },
-        { label: 'Browse Jobs', to: '/candidate/jobs', icon: '💼', desc: 'Find jobs matched to your skills', color: 'green' },
-        { label: 'My Applications', to: '/candidate/applications', icon: '📋', desc: 'Track your application status', color: 'purple' },
-        { label: 'Interviews', to: '/candidate/interviews', icon: '🗓', desc: 'View scheduled interviews', color: 'amber' },
-        { label: 'Documents', to: '/candidate/documents', icon: '📁', desc: 'Upload IDs, payslips, certificates', color: 'blue' },
-        { label: 'Go Premium', to: '/candidate/premium', icon: '⭐', desc: 'Get a ⭐ badge and be listed first', color: 'amber' },
-    ];
-
     if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64">
-                <div className="text-gray-400 text-sm">Loading dashboard...</div>
-            </div>
-        );
+        return <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading your dashboard…</div>;
     }
 
+    const journey = buildJourney({ hasResume: stats.hasResume, completeness: stats.completeness, applications, interviews, offers });
+    const checklist = profileChecklist(stats);
+    const inProgress = applications.filter((a) => !['withdrawn', 'rejected', 'hired'].includes(a.status)).length;
+    const shortlisted = applications.filter((a) => ['shortlisted', 'interview_scheduled', 'interviewed'].includes(a.status)).length;
+    const aiOn = ['active', 'grace'].includes(ai?.subscription?.status);
+    const firstName = (user?.name || '').trim().split(' ')[0];
+    const done = checklist.every((c) => c.done);
+
     return (
-        <div className="max-w-5xl mx-auto animate-slide-up">
-            {/* Welcome header */}
-            <div className="mb-8">
-                <h1 className="text-2xl font-bold text-gray-900">
-                    Welcome back, {user?.name || 'Candidate'} 👋
-                </h1>
-                <p className="text-sm text-gray-500 mt-1">
-                    Here's an overview of your profile and job search progress.
-                </p>
+        <div className="max-w-4xl mx-auto animate-slide-up space-y-5">
+            <div>
+                <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Hi{firstName ? `, ${firstName}` : ''} 👋</h1>
+                <p className="text-sm text-gray-500 mt-1">Here's where you stand and what to do next.</p>
             </div>
 
-            {/* Status strip */}
-            <div className="flex flex-col sm:flex-row gap-3 mb-6">
-                <Link to="/candidate/premium" className={`flex-1 rounded-2xl border px-5 py-3 text-sm hover:shadow-sm transition ${
-                    premiumStatus?.is_premium ? 'bg-green-50 border-green-100' : 'bg-gradient-to-r from-yellow-50 to-indigo-50 border-yellow-100'
-                }`}>
-                    {premiumStatus?.is_premium ? (
-                        <span className="font-semibold text-green-700">⭐ Premium profile active — listed first to every company</span>
-                    ) : premiumStatus?.request?.status === 'pending' ? (
-                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium verification pending</span> — your executive is reviewing it.</span>
-                    ) : premiumStatus?.request?.status === 'approved' ? (
-                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium approved</span> — pay ₹999 to activate →</span>
-                    ) : (
-                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Go Premium</span> — earning ₹6 LPA+? Get verified and be listed first to every company.</span>
-                    )}
-                </Link>
-                <Link to="/candidate/profile" className={`flex-1 rounded-2xl border px-5 py-3 text-sm hover:shadow-sm transition ${
-                    aiStatus?.subscription?.status === 'active' ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-gray-100'
-                }`}>
-                    {aiStatus?.subscription?.status === 'active' ? (
-                        <span className="font-semibold text-indigo-700">✨ AI Assistant active</span>
-                    ) : (
-                        <span className="text-gray-500">✨ AI Assistant — <span className="text-indigo-600 font-medium">subscribe for ₹{aiStatus?.amount || 299}/mo →</span></span>
-                    )}
-                </Link>
-            </div>
+            <NextStepCard next={journey.next} />
 
-            {/* Profile Completeness Card */}
-            <div className="card-p mb-6">
-                <div className="flex items-center justify-between mb-3">
-                    <div>
-                        <h3 className="font-semibold text-gray-800">Profile Completeness</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                            {completeness >= 80
-                                ? 'Great job! Your profile is looking strong.'
-                                : 'Complete your profile to get better job matches.'}
-                        </p>
-                    </div>
-                    <span className={`text-2xl font-bold ${
-                        completeness >= 80 ? 'text-green-600' :
-                        completeness >= 50 ? 'text-yellow-600' : 'text-red-500'
-                    }`}>
-                        {completeness}%
-                    </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2.5">
-                    <div
-                        className={`h-2.5 rounded-full transition-all duration-500 ${
-                            completeness >= 80 ? 'bg-green-500' :
-                            completeness >= 50 ? 'bg-yellow-500' : 'bg-red-500'
-                        }`}
-                        style={{ width: `${completeness}%` }}
+            <JourneyStepper steps={journey.steps} />
+
+            <AssistantPanel subscribed={aiOn} price={ai?.amount} />
+
+            {/* At a glance */}
+            <div>
+                <h2 className="section-title">At a glance</h2>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Glance
+                        to="/candidate/applications"
+                        label="Applications"
+                        value={applications.length}
+                        sub={applications.length ? `${inProgress} in progress · ${shortlisted} shortlisted` : 'None yet. Find a job to apply to.'}
+                        tone="bg-purple-50 border-purple-100 text-purple-800"
+                    />
+                    <Glance
+                        to="/candidate/interviews"
+                        label="Interviews"
+                        value={journey.counts.upcoming}
+                        sub={journey.nextInterview
+                            ? `Next: ${new Date(journey.nextInterview.slot_datetime).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', weekday: 'short', day: 'numeric', month: 'short' })}`
+                            : 'Nothing scheduled'}
+                        tone="bg-blue-50 border-blue-100 text-blue-800"
+                    />
+                    <Glance
+                        to="/candidate/applications"
+                        label="Offers"
+                        value={journey.counts.pendingOffers}
+                        sub={journey.counts.pendingOffers ? 'Waiting for your reply' : 'No offers waiting'}
+                        tone={journey.counts.pendingOffers ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-green-50 border-green-100 text-green-800'}
                     />
                 </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                <div className="kpi-card bg-blue-50 border-blue-100">
-                    <div className="kpi-title text-blue-600">Skills</div>
-                    <div className="kpi-value text-blue-700">{stats.skills}</div>
-                </div>
-                <div className="kpi-card bg-green-50 border-green-100">
-                    <div className="kpi-title text-green-600">Education</div>
-                    <div className="kpi-value text-green-700">{stats.education}</div>
-                </div>
-                <div className="kpi-card bg-purple-50 border-purple-100">
-                    <div className="kpi-title text-purple-600">Experience</div>
-                    <div className="kpi-value text-purple-700">
-                        {stats.experience > 0 ? `${stats.experience}y` : '—'}
+            {/* Profile checklist */}
+            <div className="card-p">
+                <div className="flex items-center justify-between mb-2">
+                    <div>
+                        <h3 className="font-semibold text-gray-800">Profile strength</h3>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                            {done ? 'Great job! Your profile is looking strong.' : 'A complete profile gets better matches.'}
+                        </p>
                     </div>
+                    <span className={`text-2xl font-bold ${stats.completeness >= 80 ? 'text-green-600' : stats.completeness >= 50 ? 'text-yellow-600' : 'text-red-500'}`}>
+                        {stats.completeness}%
+                    </span>
                 </div>
-                <div className="kpi-card bg-amber-50 border-amber-100">
-                    <div className="kpi-title text-amber-600">Resume</div>
-                    <div className="kpi-value text-amber-700">
-                        {stats.hasResume ? '✓' : '✗'}
-                    </div>
+                <div className="w-full bg-gray-100 rounded-full h-2.5 mb-4">
+                    <div
+                        className={`h-2.5 rounded-full transition-all duration-500 ${stats.completeness >= 80 ? 'bg-green-500' : stats.completeness >= 50 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                        style={{ width: `${stats.completeness}%` }}
+                    />
                 </div>
+                <ul className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1">
+                    {checklist.map((c) => (
+                        <li key={c.label}>
+                            <Link to="/candidate/profile" className="flex items-center gap-2.5 py-1.5 text-sm group">
+                                <span className={`w-5 h-5 rounded-full text-[11px] font-bold flex items-center justify-center shrink-0 ${c.done ? 'bg-green-500 text-white' : 'border-2 border-gray-300 text-transparent'}`}>✓</span>
+                                <span className={c.done ? 'text-gray-500' : 'text-gray-800 font-medium group-hover:text-indigo-700'}>{c.label}</span>
+                                {c.hint && <span className="ml-auto text-xs text-gray-400">{c.hint}</span>}
+                            </Link>
+                        </li>
+                    ))}
+                </ul>
             </div>
 
-            {/* Quick Actions */}
-            <h2 className="section-title">Quick Actions</h2>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {quickActions.map(({ label, to, icon, desc }) => (
-                    <Link key={to} to={to} className="nav-tile">
-                        <div className="nav-tile-icon">{icon}</div>
-                        <div>
-                            <div className="nav-tile-label">{label}</div>
-                            <div className="text-xs text-gray-500 mt-0.5">{desc}</div>
-                        </div>
-                    </Link>
-                ))}
-            </div>
-
-            {/* Top Matched Jobs */}
-            <div className="mt-8">
+            {/* Top matches */}
+            <div>
                 <div className="flex items-center justify-between mb-3">
-                    <h2 className="section-title mb-0">Top Job Matches</h2>
+                    <h2 className="section-title mb-0">Top job matches</h2>
                     {stats.hasResume && (
-                        <button
-                            onClick={handleRetriggerMatch}
-                            disabled={rematching}
-                            className="text-xs text-indigo-600 hover:underline disabled:opacity-50"
-                        >
-                            {rematching ? 'Refreshing...' : 'Refresh matches'}
+                        <button onClick={refreshMatches} disabled={rematching} className="text-xs text-indigo-600 hover:underline disabled:opacity-50">
+                            {rematching ? 'Refreshing…' : 'Refresh matches'}
                         </button>
                     )}
                 </div>
-
                 {topJobs.length > 0 ? (
                     <div className="flex flex-col gap-3">
-                        {topJobs.map(job => (
-                            <div
+                        {topJobs.map((job) => (
+                            <button
                                 key={job.id}
                                 onClick={() => setDetailJobId(job.id)}
-                                className="card-p flex items-center justify-between gap-4 cursor-pointer hover:shadow-md hover:border-indigo-200 transition-all"
+                                className="card-p flex items-center justify-between gap-3 text-left hover:shadow-md hover:border-indigo-200 transition-all"
                             >
-                                <div className="flex-1 min-w-0">
+                                <div className="min-w-0 flex-1">
                                     <p className="font-semibold text-gray-900 truncate">{job.title}</p>
-                                    <p className="text-xs text-gray-500 truncate">
-                                        {job.company_name}{job.location ? ` • ${job.location}` : ''}
-                                    </p>
-                                    <span className="text-[11px] text-indigo-600 font-medium">View full details →</span>
+                                    <p className="text-xs text-gray-500 truncate">{job.company_name}{job.location ? ` • ${job.location}` : ''}</p>
+                                    <span className="text-[11px] text-indigo-600 font-medium">
+                                        {job.already_applied ? 'You applied' : 'View details →'}
+                                    </span>
                                 </div>
-                                <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${
-                                    job.match_score >= 80 ? 'bg-green-100 text-green-700' :
-                                    job.match_score >= 60 ? 'bg-yellow-100 text-yellow-700' :
-                                    'bg-red-100 text-red-600'
-                                }`}>
-                                    {job.match_score}% match
-                                </span>
-                            </div>
+                                <span className={`shrink-0 text-xs font-bold px-2.5 py-1 rounded-full ${scoreCls(job.match_score)}`}>{job.match_score}% match</span>
+                            </button>
                         ))}
-                        <Link to="/candidate/jobs" className="text-xs text-indigo-600 hover:underline mt-1 inline-block">
-                            Browse all jobs →
-                        </Link>
-                    </div>
-                ) : stats.hasResume ? (
-                    <div className="card-p text-center py-8 text-sm text-gray-500">
-                        <p className="mb-2">Match scores are being computed.</p>
-                        <p className="text-xs text-gray-400">Apply to jobs and scores will appear here once processed.</p>
+                        <Link to="/candidate/jobs" className="text-xs text-indigo-600 hover:underline self-start">Browse all jobs →</Link>
                     </div>
                 ) : (
                     <div className="card-p text-center py-8 text-sm text-gray-500">
-                        <Link to="/candidate/profile" className="text-indigo-600 hover:underline font-medium">
-                            Upload your resume
-                        </Link>
-                        <span> to see jobs matched to your skills.</span>
+                        {stats.hasResume
+                            ? <>No strong matches yet. Add more skills to your profile, or <Link to="/candidate/jobs" className="text-indigo-600 font-medium hover:underline">browse all jobs</Link>.</>
+                            : <><Link to="/candidate/profile" className="text-indigo-600 font-medium hover:underline">Upload your resume</Link> to see jobs matched to your skills.</>}
                     </div>
                 )}
             </div>
 
-            {detailJobId && (
-                <JobDetailModal jobId={detailJobId} onClose={() => setDetailJobId(null)} />
-            )}
+            {/* Boosters */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
+                <Link to="/candidate/premium" className={`rounded-2xl border px-5 py-3.5 text-sm hover:shadow-sm transition ${premium?.is_premium ? 'bg-green-50 border-green-100' : 'bg-gradient-to-r from-yellow-50 to-indigo-50 border-yellow-100'}`}>
+                    {premium?.is_premium ? (
+                        <span className="font-semibold text-green-700">⭐ Premium active: you're listed first to every company</span>
+                    ) : premium?.request?.status === 'pending' ? (
+                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium verification pending</span>. Your executive is reviewing it.</span>
+                    ) : premium?.request?.status === 'approved' ? (
+                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium approved</span>. Pay ₹999 to activate →</span>
+                    ) : (
+                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Go Premium</span>: earning ₹6 LPA+? Get verified and be listed first.</span>
+                    )}
+                </Link>
+                <Link to="/candidate/documents" className="rounded-2xl border border-gray-100 bg-white px-5 py-3.5 text-sm hover:shadow-sm transition text-gray-600">
+                    📁 <span className="font-semibold text-gray-800">Documents</span>: upload IDs, payslips and certificates →
+                </Link>
+            </div>
+
+            {detailJobId && <JobDetailModal jobId={detailJobId} onClose={() => setDetailJobId(null)} />}
         </div>
     );
 }

@@ -7,7 +7,7 @@ import ChatbotActionCard from './ChatbotActionCard';
 import ChatMarkdown from './chat/ChatMarkdown';
 import { JobMatchCards, CandidateMatchCards } from './chat/ChatCards';
 import ChatHelp from './chat/ChatHelp';
-import { OPEN_CHATBOT_EVENT } from './AiAssistantPromo';
+import { OPEN_CHATBOT_EVENT } from '../utils/assistant';
 
 const GREETING = {
     candidate: (name) => `Hi${name ? ` ${name}` : ''}! 👋 I'm your LadderStep assistant. I can polish your profile, find jobs that suit you, and even apply for you. What would you like to start with?`,
@@ -100,7 +100,8 @@ function TypingIndicator({ note }) {
 
 // Floating chatbot launcher + panel. Mounted in CompanyLayout/CandidateLayout
 // only — the chatbot personas are company + candidate, per spec (not hr/admin).
-export default function ChatbotWidget() {
+// mobileLauncher=false hides the floating button below `md` (the layout supplies its own, e.g. a tab-bar button).
+export default function ChatbotWidget({ mobileLauncher = true }) {
     const { user } = useAuth();
     const persona = user?.role === 'company' ? 'company' : user?.role === 'candidate' ? 'candidate' : null;
     const firstName = (user?.name || '').trim().split(' ')[0];
@@ -115,6 +116,7 @@ export default function ChatbotWidget() {
     const [sending, setSending] = useState(false);
     const [streamingText, setStreamingText] = useState('');
     const [waitSecs, setWaitSecs] = useState(0);
+    const [pendingPrompt, setPendingPrompt] = useState(null); // a message another button asked us to send
     const scrollRef = useRef(null);
 
     useEffect(() => {
@@ -128,7 +130,7 @@ export default function ChatbotWidget() {
                 if (cancelled) return;
                 const isSubscribed = sub?.subscription && ['active', 'grace'].includes(sub.subscription.status);
                 setSubscribed(!!isSubscribed);
-                if (!isSubscribed) return;
+                if (!isSubscribed) { setPendingPrompt(null); return; }
 
                 const { data: convos } = await chatbotAPI.listConversations();
                 let convId = convos?.data?.[0]?.id;
@@ -163,7 +165,10 @@ export default function ChatbotWidget() {
     // per layout, so a DOM event is simpler than threading context through.
     useEffect(() => {
         if (!persona) return;
-        const openFromPromo = () => setOpen(true);
+        const openFromPromo = (e) => {
+            setOpen(true);
+            if (e.detail?.text) setPendingPrompt(e.detail.text);
+        };
         window.addEventListener(OPEN_CHATBOT_EVENT, openFromPromo);
         return () => window.removeEventListener(OPEN_CHATBOT_EVENT, openFromPromo);
     }, [persona]);
@@ -174,9 +179,17 @@ export default function ChatbotWidget() {
         return () => clearInterval(t);
     }, [sending]);
 
+    // Send a message that a dashboard button handed over, once the chat is ready.
+    useEffect(() => {
+        if (pendingPrompt && open && !loadingGate && subscribed && conversationId && !sending) {
+            sendText(pendingPrompt);
+        }
+    }, [pendingPrompt, open, loadingGate, subscribed, conversationId, sending]); // eslint-disable-line react-hooks/exhaustive-deps
+
     if (!persona) return null;
 
-    const sendText = async (raw) => {
+    async function sendText(raw) {
+        setPendingPrompt(null);
         const text = (raw || '').trim();
         if (!text || sending || !conversationId) return;
 
@@ -246,7 +259,7 @@ export default function ChatbotWidget() {
             setStreamingText('');
             setSending(false);
         }
-    };
+    }
 
     const handleSubmit = (e) => { e.preventDefault(); sendText(input); };
 
@@ -278,15 +291,20 @@ export default function ChatbotWidget() {
         <>
             <button
                 onClick={() => setOpen(o => !o)}
-                className="fixed bottom-5 right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition flex items-center justify-center text-2xl"
+                className={`fixed bottom-5 right-4 sm:right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition items-center justify-center text-2xl ${
+                    mobileLauncher ? (open ? 'hidden sm:flex' : 'flex') : 'hidden md:flex'
+                }`}
                 aria-label="AI Assistant"
             >
                 {open ? '×' : '✨'}
             </button>
 
             {open && (
-                <div className="fixed bottom-24 right-5 z-40 w-[26rem] max-w-[92vw] h-[36rem] max-h-[78vh] bg-white rounded-2xl shadow-2xl border border-gray-100 flex flex-col overflow-hidden">
-                    <div className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex items-center gap-3 shrink-0">
+                <div className="fixed z-50 inset-0 sm:inset-auto sm:bottom-24 sm:right-5 sm:w-[26rem] h-[100dvh] sm:h-[36rem] sm:max-h-[78vh] bg-white sm:rounded-2xl sm:shadow-2xl sm:border sm:border-gray-100 flex flex-col overflow-hidden">
+                    <div
+                        className="px-4 py-3 bg-gradient-to-r from-indigo-600 to-violet-600 text-white flex items-center gap-3 shrink-0"
+                        style={{ paddingTop: 'max(0.75rem, env(safe-area-inset-top))' }}
+                    >
                         <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg">✨</div>
                         <div className="flex-1 min-w-0">
                             <p className="font-semibold text-sm leading-tight">LadderStep Assistant</p>
@@ -314,7 +332,7 @@ export default function ChatbotWidget() {
                                 New chat
                             </button>
                         )}
-                        <button onClick={() => setOpen(false)} className="text-white/80 hover:text-white text-xl leading-none">×</button>
+                        <button onClick={() => setOpen(false)} aria-label="Close assistant" className="text-white/80 hover:text-white text-2xl leading-none w-9 h-9 -mr-2 flex items-center justify-center">×</button>
                     </div>
 
                     {loadingGate ? (
@@ -324,6 +342,7 @@ export default function ChatbotWidget() {
                             <p className="text-sm text-gray-600 mb-3">
                                 Hi{firstName ? ` ${firstName}` : ''}! 👋 Turn on the AI Assistant and I'll help with your day-to-day work right here in the chat.
                             </p>
+                            <div className="mb-3"><ChatHelp persona={persona} preview /></div>
                             <AiSubscriptionCard />
                         </div>
                     ) : (
@@ -398,19 +417,19 @@ export default function ChatbotWidget() {
                                 )}
                             </div>
 
-                            <div className="border-t border-gray-100 bg-white shrink-0">
+                            <div className="border-t border-gray-100 bg-white shrink-0" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                                 <form onSubmit={handleSubmit} className="p-2.5 pb-1.5 flex gap-2">
                                     <input
                                         value={input}
                                         onChange={e => setInput(e.target.value)}
                                         placeholder="Type your message…"
                                         disabled={sending || !conversationId}
-                                        className="flex-1 border border-gray-200 rounded-full px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
+                                        className="flex-1 min-w-0 border border-gray-200 rounded-full px-4 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 disabled:opacity-60"
                                     />
                                     <button
                                         type="submit"
                                         disabled={sending || !input.trim() || !conversationId}
-                                        className="bg-indigo-600 text-white w-9 h-9 rounded-full text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center"
+                                        className="bg-indigo-600 text-white w-11 h-11 sm:w-9 sm:h-9 shrink-0 rounded-full text-sm font-medium hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center"
                                         aria-label="Send"
                                     >
                                         ➤

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { profileAPI, resumeAPI } from '../../api/candidate';
 import AiSubscriptionCard from '../../components/AiSubscriptionCard';
+import AiAssistantPromo from '../../components/AiAssistantPromo';
 import toast from 'react-hot-toast';
 
 const EMPTY_FORM = {
@@ -162,7 +163,11 @@ export default function CandidateProfile() {
 
     return (
         <div className="max-w-3xl mx-auto">
-            <h1 className="text-2xl font-bold text-gray-800 mb-6">My Profile</h1>
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 mb-4">My Profile</h1>
+            <AiAssistantPromo
+                text="let it rewrite your headline and summary so they stand out."
+                prompt="Polish my profile"
+            />
 
             {/* ── Extracted banner ─────────────────────────────────────────── */}
             {extracted && (

@@ -165,19 +165,19 @@ export default function CandidatePremium() {
                     <form onSubmit={handleSubmit}>
                         <p className="text-sm font-semibold text-gray-900 mb-1">2. Declare your current annual CTC</p>
                         <p className="text-xs text-gray-400 mb-2">Minimum ₹{MIN_CTC.toLocaleString('en-IN')}/year to qualify.</p>
-                        <div className="flex gap-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
                             <input
                                 type="number"
                                 min={0}
                                 value={ctc}
                                 onChange={e => setCtc(e.target.value)}
                                 placeholder="e.g. 800000"
-                                className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                className="flex-1 min-w-0 border border-gray-300 rounded-lg px-3 py-2.5 text-base sm:text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500"
                             />
                             <button
                                 type="submit"
                                 disabled={submitting || payslipCount < 1}
-                                className="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition whitespace-nowrap"
+                                className="w-full sm:w-auto bg-indigo-600 text-white text-sm font-medium px-4 py-2.5 sm:py-2 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition whitespace-nowrap"
                             >
                                 {submitting ? '…' : 'Submit for Review'}
                             </button>

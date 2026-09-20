@@ -164,6 +164,58 @@ const SECTIONS = [
             },
         ],
     },
+    {
+        id: 'ai-assistant',
+        icon: '✨',
+        title: 'AI Assistant',
+        color: 'indigo',
+        steps: [
+            {
+                n: 1,
+                title: 'Tap "Ask AI" and say what you need',
+                desc: 'Use the ✨ button (the middle button on your phone) and ask in plain words: "Polish my profile", "Find jobs that match me", "Help me apply to a job", or "What should I improve?". Tap the ? in the chat to see everything it can do.',
+            },
+            {
+                n: 2,
+                title: 'You stay in control',
+                desc: 'The assistant never changes anything by itself. It shows you a preview card first, and nothing is saved or sent until you tap "Looks good, confirm". Tap "Not now" to cancel.',
+            },
+            {
+                n: 3,
+                title: 'Applying with AI',
+                desc: 'Ask it to find matching jobs, then tap "Apply with my profile" on a job card. It prepares the application for you to confirm. You can also apply yourself from Browse Jobs at any time.',
+                link: '/candidate/jobs',
+                linkLabel: 'Browse jobs →',
+            },
+            {
+                n: 4,
+                title: 'Turning it on',
+                desc: 'The AI Assistant is a ₹299/month add-on that you can cancel any time. Open the assistant and tap Subscribe, or manage it from the bottom of your profile page. It can\'t upload resumes or schedule interviews yet — use the menu for those.',
+                link: '/candidate/profile',
+                linkLabel: 'Go to My Profile →',
+            },
+        ],
+    },
+    {
+        id: 'premium',
+        icon: '⭐',
+        title: 'Premium Profile',
+        color: 'amber',
+        steps: [
+            {
+                n: 1,
+                title: 'What you get',
+                desc: 'Verified candidates earning ₹6 LPA or more get a ⭐ Premium badge and are always listed first to every company, ahead of other candidates and ranked by how well you match each job. Premium candidates can apply to any job.',
+            },
+            {
+                n: 2,
+                title: 'How to get verified',
+                desc: 'Upload your payslips and declare your annual CTC on the Premium page, then submit. A LadderStep executive reviews your payslips. Once approved, pay the one-time ₹999 fee and your badge goes live.',
+                link: '/candidate/premium',
+                linkLabel: 'Go to Premium →',
+            },
+        ],
+    },
 ];
 
 const FAQS = [
@@ -177,7 +229,7 @@ const FAQS = [
     },
     {
         q: 'Will companies see my contact details before unlocking?',
-        a: 'No. Companies only see a masked version of your profile (name and contact redacted) unless they purchase a resume unlock. This protects your privacy until both sides are serious.',
+        a: 'Not until the company has activated its account by posting a paid job or joining Platinum. Until then companies only see a masked version of your profile with your name and contact details hidden. Your documents are only shared through your LadderStep executive.',
     },
     {
         q: 'What happens if I am sourced for a job I didn\'t apply to?',
@@ -190,6 +242,10 @@ const FAQS = [
     {
         q: 'Can I update my resume after applying to a job?',
         a: 'Yes — upload a new resume any time from My Profile. The new resume becomes your primary resume and is used for future applications. Existing applications retain the resume that was attached when you applied.',
+    },
+    {
+        q: 'Where do I see interview invites and offers?',
+        a: 'Tap the 🔔 bell at the top of any page. You get a notification for interview invitations, offers and new applications your executive creates for you. Your dashboard\'s "Your next step" card also points to whatever needs your attention first.',
     },
     {
         q: 'My profile looks incomplete. What should I fill in first?',
