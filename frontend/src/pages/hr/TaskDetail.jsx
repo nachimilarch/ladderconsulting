@@ -79,7 +79,7 @@ export default function TaskDetail() {
     if (isAdmin) STATUSES.push('cancelled');
 
     return (
-        <div className="max-w-3xl mx-auto p-6 space-y-6">
+        <div className="max-w-3xl mx-auto space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <Link to="/hr/tasks" className="text-sm text-indigo-600 hover:underline">← Tasks</Link>
                 {isAdmin && (

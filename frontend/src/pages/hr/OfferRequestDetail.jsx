@@ -131,7 +131,7 @@ export default function OfferRequestDetail() {
     const [payStatusLabel, payStatusCls] = PAY_STATUS[payable?.status] || ['—', 'bg-gray-100 text-gray-500'];
 
     return (
-        <div className="max-w-3xl mx-auto p-6 space-y-6">
+        <div className="max-w-3xl mx-auto space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <Link to="/hr/offer-requests" className="text-sm text-indigo-600 hover:underline">← Offer Requests</Link>
                 <span className={`text-xs font-semibold px-3 py-1 rounded-full ${STATUS_COLORS[req.status] || 'bg-gray-100 text-gray-500'}`}>

@@ -5,7 +5,7 @@ import { profileAPI, jobAPI, aiAPI, applicationAPI, candidatePremiumAPI } from '
 import { candidateInterviewAPI } from '../../api/interview';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import JobDetailModal from '../../components/candidate/JobDetailModal';
-import NextStepCard from '../../components/candidate/NextStepCard';
+import NextStepCard from '../../components/common/NextStepCard';
 import JourneyStepper from '../../components/candidate/JourneyStepper';
 import AssistantPanel from '../../components/candidate/AssistantPanel';
 import { buildJourney, profileChecklist } from '../../components/candidate/journey';

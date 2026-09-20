@@ -91,7 +91,7 @@ export default function AssignedCompanies() {
     return (
         <div className="max-w-5xl mx-auto">
             <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-800">
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
                     {isAdmin ? 'All Companies' : 'My Companies'}
                 </h2>
                 <p className="text-sm text-gray-500 mt-0.5">
@@ -136,7 +136,7 @@ export default function AssignedCompanies() {
                         >
                             {/* Header row — always visible */}
                             <button
-                                className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50 transition"
+                                className="w-full flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 px-4 sm:px-5 py-4 text-left hover:bg-gray-50 transition"
                                 onClick={() => setExpanded(expanded === c.id ? null : c.id)}
                             >
                                 <div className="flex items-center gap-3 min-w-0">
@@ -156,7 +156,7 @@ export default function AssignedCompanies() {
                                         <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">No JDs</span>
                                     )}
                                 </div>
-                                <div className="flex items-center gap-3 shrink-0 ml-4">
+                                <div className="flex flex-wrap items-center gap-2 sm:gap-3 sm:shrink-0 sm:ml-4">
                                     {industryBadge(c.industry)}
                                     {(c.job_count ?? 0) === 0 && (
                                         <button

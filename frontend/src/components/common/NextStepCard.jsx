@@ -3,12 +3,12 @@ import { askAssistant } from '../../utils/assistant';
 
 const TONES = {
     indigo: 'from-indigo-600 to-violet-600',
-    amber: 'from-amber-500 to-orange-500',
+    amber: 'from-warning-500 to-warning-600',
     blue: 'from-sky-600 to-indigo-600',
-    green: 'from-emerald-500 to-teal-600',
+    green: 'from-success-500 to-success-700',
 };
 
-// The one thing the candidate should do right now (computed in journey.js).
+// The one thing the person should do right now (candidate: journey.js, hiring staff: hrWorkflow.js).
 export default function NextStepCard({ next }) {
     return (
         <div className={`rounded-2xl bg-gradient-to-br ${TONES[next.tone] || TONES.indigo} text-white p-5 sm:p-6 shadow-md`}>

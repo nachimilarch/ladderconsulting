@@ -38,7 +38,7 @@ export default function OfferRequests() {
     const pendingCount = requests.filter(r => r.status === 'pending').length;
 
     return (
-        <div className="max-w-5xl mx-auto p-6">
+        <div className="max-w-5xl mx-auto">
             <div className="flex items-center justify-between mb-6 flex-wrap gap-3">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Offer Letter Requests</h1>

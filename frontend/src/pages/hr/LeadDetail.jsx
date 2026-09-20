@@ -101,7 +101,7 @@ export default function LeadDetail() {
     if (!lead) return <div className="p-6 text-gray-500">Lead not found.</div>;
 
     return (
-        <div className="max-w-4xl mx-auto p-6 space-y-6">
+        <div className="max-w-4xl mx-auto space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
                 <Link to="/hr/leads" className="text-sm text-indigo-600 hover:underline">← Lead Pipeline</Link>
                 <div className="flex gap-2">

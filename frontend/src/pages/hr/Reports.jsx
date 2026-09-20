@@ -23,15 +23,15 @@ const STAGE_COLORS = {
 };
 
 function Kpi({ label, value, sub, tone = 'blue' }) {
+    // Informational figures share the brand tint; amber is for things waiting on someone.
     const tones = {
-        blue: 'bg-blue-50 text-blue-700', green: 'bg-green-50 text-green-700',
-        amber: 'bg-amber-50 text-amber-700', violet: 'bg-violet-50 text-violet-700',
-        red: 'bg-red-50 text-red-600', gray: 'bg-gray-50 text-gray-700',
+        blue: 'bg-brand-50 text-brand-700', green: 'bg-brand-50 text-brand-700', violet: 'bg-brand-50 text-brand-700',
+        amber: 'bg-warning-50 text-warning-800', red: 'bg-warning-50 text-warning-800', gray: 'bg-gray-50 text-gray-700',
     };
     return (
         <div className="card-p">
             <div className={`inline-flex text-[11px] font-medium px-2 py-0.5 rounded-full mb-2 ${tones[tone]}`}>{label}</div>
-            <div className="text-3xl font-bold text-gray-900 leading-none">{value}</div>
+            <div className="text-2xl sm:text-3xl font-bold text-gray-900 leading-none">{value}</div>
             {sub && <div className="text-xs text-gray-500 mt-1">{sub}</div>}
         </div>
     );
@@ -121,7 +121,7 @@ export default function Reports() {
     const totalPipeline = (data.pipeline || []).reduce((s, p) => s + Number(p.count), 0);
 
     return (
-        <div ref={printRef} className="max-w-6xl mx-auto p-6 print:p-0">
+        <div ref={printRef} className="max-w-6xl mx-auto print:p-0">
             {/* Header */}
             <div className="mb-6 flex items-start justify-between gap-4 flex-wrap print:mb-4">
                 <div>

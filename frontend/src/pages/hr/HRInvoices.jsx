@@ -110,6 +110,7 @@ const TYPE_LABELS = {
     resume_unlock:   'Resume Unlock (legacy)',
 };
 
+const fmtDay = (d) => (d ? new Date(d).toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const fmtINR = (n) => `₹${parseFloat(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 
 const EMPTY_FORM = {
@@ -306,10 +307,10 @@ export default function HRInvoices() {
                                     <p className="font-semibold text-gray-900 text-lg">{fmtINR(inv.amount)}</p>
                                     <p className="text-sm text-gray-600">{inv.company_name}</p>
                                     {inv.candidate_name && <p className="text-xs text-gray-500">Candidate: {inv.candidate_name}</p>}
-                                    <div className="flex gap-4 text-xs text-gray-400 mt-1">
+                                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-400 mt-1">
                                         <span>Paid: {fmtINR(inv.amount_paid)}</span>
                                         <span>Outstanding: {fmtINR(parseFloat(inv.amount) - parseFloat(inv.amount_paid))}</span>
-                                        {inv.due_date && <span>Due: {inv.due_date}</span>}
+                                        {inv.due_date && <span>Due: {fmtDay(inv.due_date)}</span>}
                                     </div>
                                 </div>
                                 <div className="flex flex-col gap-2 shrink-0 items-end">

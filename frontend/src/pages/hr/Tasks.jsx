@@ -88,7 +88,7 @@ export default function Tasks() {
     };
 
     return (
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Tasks</h2>
                 {isAdmin && (
@@ -175,61 +175,104 @@ export default function Tasks() {
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading...</div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                            <tr>
-                                {['Title', 'Assigned To', 'Priority', 'Due Date', 'Status', 'Actions'].map(h => (
-                                    <th key={h} className="px-4 py-3 text-left">{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {tasks.map(task => (
-                                <tr key={task.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3">
-                                        <Link to={`/hr/tasks/${task.id}`}
-                                            className="font-medium text-gray-800 hover:text-indigo-600">{task.title}</Link>
+                <>
+                    {/* Phones: one card per task */}
+                    <div className="md:hidden flex flex-col gap-3">
+                        {tasks.map(task => (
+                            <div key={task.id} className="card-p">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <Link to={`/hr/tasks/${task.id}`} className="font-semibold text-gray-900 leading-snug">{task.title}</Link>
                                         {task.description && (
-                                            <p className="text-xs text-gray-400 truncate max-w-xs">{task.description}</p>
+                                            <p className="text-xs text-gray-400 mt-0.5 line-clamp-2">{task.description}</p>
                                         )}
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-600">{task.assigned_to_name || '—'}</td>
-                                    <td className="px-4 py-3">
-                                        <span className={`font-medium capitalize text-xs ${PRIORITY_COLORS[task.priority]}`}>
-                                            {task.priority}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-500">
-                                        {task.due_date ? new Date(task.due_date).toLocaleDateString('en-IN') : '—'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <select value={task.status} onChange={e => handleStatusChange(task.id, e.target.value)}
-                                            className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_COLORS[task.status]}`}>
-                                            <option value="pending">Pending</option>
-                                            <option value="in_progress">In Progress</option>
-                                            <option value="completed">Completed</option>
-                                            {isAdmin && <option value="cancelled">Cancelled</option>}
-                                        </select>
-                                    </td>
-                                    <td className="px-4 py-3 flex gap-2 items-center">
-                                        <Link to={`/hr/tasks/${task.id}`}
-                                            className="text-indigo-500 hover:underline text-xs">View</Link>
-                                        <button onClick={() => setNoteTaskId(task.id === noteTaskId ? null : task.id)}
-                                            className="text-blue-500 hover:underline text-xs">Note</button>
-                                        {isAdmin && (
-                                            <button onClick={() => handleDelete(task.id)}
-                                                className="text-red-500 hover:underline text-xs">Del</button>
-                                        )}
-                                    </td>
+                                    </div>
+                                    <span className={`shrink-0 font-medium capitalize text-xs ${PRIORITY_COLORS[task.priority]}`}>{task.priority}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    {task.assigned_to_name || 'Unassigned'}
+                                    {task.due_date && ` · due ${new Date(task.due_date).toLocaleDateString('en-IN')}`}
+                                </p>
+                                <div className="flex items-center gap-4 mt-3 pt-3 border-t border-gray-100">
+                                    <select value={task.status} onChange={e => handleStatusChange(task.id, e.target.value)}
+                                        className={`text-xs font-medium px-2 py-1.5 rounded-lg border-0 cursor-pointer ${STATUS_COLORS[task.status]}`}>
+                                        <option value="pending">Pending</option>
+                                        <option value="in_progress">In Progress</option>
+                                        <option value="completed">Completed</option>
+                                        {isAdmin && <option value="cancelled">Cancelled</option>}
+                                    </select>
+                                    <button onClick={() => setNoteTaskId(task.id === noteTaskId ? null : task.id)}
+                                        className="text-indigo-600 hover:underline text-sm ml-auto py-1">Note</button>
+                                    {isAdmin && (
+                                        <button onClick={() => handleDelete(task.id)}
+                                            className="text-red-500 hover:underline text-sm py-1">Delete</button>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {!tasks.length && (
+                            <div className="card-p text-center text-sm text-gray-400 py-8">No tasks found.</div>
+                        )}
+                    </div>
+
+                    <div className="hidden md:block bg-white rounded-xl shadow-sm border border-gray-100 overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                <tr>
+                                    {['Title', 'Assigned To', 'Priority', 'Due Date', 'Status', 'Actions'].map(h => (
+                                        <th key={h} className="px-4 py-3 text-left">{h}</th>
+                                    ))}
                                 </tr>
-                            ))}
-                            {!tasks.length && (
-                                <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">No tasks found.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {tasks.map(task => (
+                                    <tr key={task.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <Link to={`/hr/tasks/${task.id}`}
+                                                className="font-medium text-gray-800 hover:text-indigo-600">{task.title}</Link>
+                                            {task.description && (
+                                                <p className="text-xs text-gray-400 truncate max-w-xs">{task.description}</p>
+                                            )}
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-600">{task.assigned_to_name || '—'}</td>
+                                        <td className="px-4 py-3">
+                                            <span className={`font-medium capitalize text-xs ${PRIORITY_COLORS[task.priority]}`}>
+                                                {task.priority}
+                                            </span>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500">
+                                            {task.due_date ? new Date(task.due_date).toLocaleDateString('en-IN') : '—'}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <select value={task.status} onChange={e => handleStatusChange(task.id, e.target.value)}
+                                                className={`text-xs font-medium px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_COLORS[task.status]}`}>
+                                                <option value="pending">Pending</option>
+                                                <option value="in_progress">In Progress</option>
+                                                <option value="completed">Completed</option>
+                                                {isAdmin && <option value="cancelled">Cancelled</option>}
+                                            </select>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex gap-3 items-center">
+                                                <Link to={`/hr/tasks/${task.id}`}
+                                                    className="text-indigo-500 hover:underline text-xs">View</Link>
+                                                <button onClick={() => setNoteTaskId(task.id === noteTaskId ? null : task.id)}
+                                                    className="text-indigo-500 hover:underline text-xs">Note</button>
+                                                {isAdmin && (
+                                                    <button onClick={() => handleDelete(task.id)}
+                                                        className="text-red-500 hover:underline text-xs">Del</button>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {!tasks.length && (
+                                    <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">No tasks found.</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
 
             {/* Inline Note */}

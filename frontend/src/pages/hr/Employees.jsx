@@ -37,7 +37,7 @@ export default function Employees() {
     const departments = [...new Set(employees.map(e => e.department).filter(Boolean))];
 
     return (
-        <div className="max-w-6xl mx-auto p-6">
+        <div className="max-w-6xl mx-auto">
             <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-gray-800">Employees</h2>
                 {isAdmin && (
@@ -69,55 +69,89 @@ export default function Employees() {
             {loading ? (
                 <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading...</div>
             ) : (
-                <div className="bg-white rounded-xl shadow-sm overflow-x-auto border border-gray-100">
-                    <table className="w-full text-sm">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                            <tr>
-                                {['Name', 'Code', 'Department', 'Designation', 'Date Joined', 'Status', 'Actions'].map(h => (
-                                    <th key={h} className="px-4 py-3 text-left">{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {employees.map(emp => (
-                                <tr key={emp.id} className="hover:bg-gray-50">
-                                    <td className="px-4 py-3">
-                                        <p className="font-medium text-gray-800">{emp.name}</p>
-                                        <p className="text-xs text-gray-400">{emp.email}</p>
-                                    </td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs">{emp.employee_code || '—'}</td>
-                                    <td className="px-4 py-3 text-gray-600">{emp.department || '—'}</td>
-                                    <td className="px-4 py-3 text-gray-600">{emp.designation || '—'}</td>
-                                    <td className="px-4 py-3 text-gray-500 text-xs">
-                                        {emp.date_joined ? new Date(emp.date_joined).toLocaleDateString('en-IN') : '—'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <span className={`px-2 py-1 rounded-full text-xs font-medium ${emp.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
-                                            {emp.status}
-                                        </span>
-                                    </td>
-                                    <td className="px-4 py-3 flex gap-2">
-                                        <Link to={`/hr/employees/${emp.id}`}
-                                            className="text-indigo-600 hover:underline text-xs">View</Link>
-                                        {isAdmin && (
-                                            <>
-                                                <button onClick={() => { setEditing(emp); setModalOpen(true); }}
-                                                    className="text-blue-600 hover:underline text-xs">Edit</button>
-                                                <button onClick={() => handleDelete(emp.id)}
-                                                    className="text-red-500 hover:underline text-xs">Delete</button>
-                                            </>
-                                        )}
-                                    </td>
+                <>
+                    {/* Phones: one card per employee */}
+                    <div className="md:hidden flex flex-col gap-3">
+                        {employees.map(emp => (
+                            <div key={emp.id} className="card-p">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-gray-900 truncate">{emp.name}</p>
+                                        <p className="text-xs text-gray-400 truncate">{emp.email}</p>
+                                    </div>
+                                    <span className={emp.status === 'active' ? 'badge-green' : 'badge-gray'}>{emp.status}</span>
+                                </div>
+                                <p className="text-xs text-gray-500 mt-2">
+                                    {[emp.designation, emp.department, emp.employee_code].filter(Boolean).join(' · ') || '—'}
+                                </p>
+                                <div className="flex items-center gap-5 mt-3 pt-3 border-t border-gray-100 text-sm">
+                                    <Link to={`/hr/employees/${emp.id}`} className="text-indigo-600 hover:underline py-1">View</Link>
+                                    {isAdmin && (
+                                        <>
+                                            <button onClick={() => { setEditing(emp); setModalOpen(true); }}
+                                                className="text-indigo-600 hover:underline py-1">Edit</button>
+                                            <button onClick={() => handleDelete(emp.id)}
+                                                className="text-red-500 hover:underline py-1">Delete</button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        ))}
+                        {!employees.length && (
+                            <div className="card-p text-center text-sm text-gray-400 py-8">No employees found.</div>
+                        )}
+                    </div>
+
+                    <div className="hidden md:block bg-white rounded-xl shadow-sm overflow-x-auto border border-gray-100">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                <tr>
+                                    {['Name', 'Code', 'Department', 'Designation', 'Date Joined', 'Status', 'Actions'].map(h => (
+                                        <th key={h} className="px-4 py-3 text-left">{h}</th>
+                                    ))}
                                 </tr>
-                            ))}
-                            {!employees.length && (
-                                <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">
-                                    No employees found.
-                                </td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                </div>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {employees.map(emp => (
+                                    <tr key={emp.id} className="hover:bg-gray-50">
+                                        <td className="px-4 py-3">
+                                            <p className="font-medium text-gray-800">{emp.name}</p>
+                                            <p className="text-xs text-gray-400">{emp.email}</p>
+                                        </td>
+                                        <td className="px-4 py-3 text-gray-500 text-xs">{emp.employee_code || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-600">{emp.department || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-600">{emp.designation || '—'}</td>
+                                        <td className="px-4 py-3 text-gray-500 text-xs">
+                                            {emp.date_joined ? new Date(emp.date_joined).toLocaleDateString('en-IN') : '—'}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <span className={emp.status === 'active' ? 'badge-green' : 'badge-gray'}>{emp.status}</span>
+                                        </td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex gap-3">
+                                                <Link to={`/hr/employees/${emp.id}`}
+                                                    className="text-indigo-600 hover:underline text-xs">View</Link>
+                                                {isAdmin && (
+                                                    <>
+                                                        <button onClick={() => { setEditing(emp); setModalOpen(true); }}
+                                                            className="text-indigo-600 hover:underline text-xs">Edit</button>
+                                                        <button onClick={() => handleDelete(emp.id)}
+                                                            className="text-red-500 hover:underline text-xs">Delete</button>
+                                                    </>
+                                                )}
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {!employees.length && (
+                                    <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">
+                                        No employees found.
+                                    </td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </>
             )}
 
             {modalOpen && (

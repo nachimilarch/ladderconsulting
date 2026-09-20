@@ -79,7 +79,7 @@ export default function LeadPipeline() {
     const byStage = (stage) => leads.filter(l => l.stage === stage);
 
     return (
-        <div className="max-w-full p-6">
+        <div className="max-w-full">
             <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
                 <h2 className="text-2xl font-bold text-gray-800">Lead Pipeline</h2>
                 <div className="flex gap-3 flex-wrap">

@@ -1,233 +1,145 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { employeeAPI, reportAPI } from '../../api/hr';
-import { hrPremiumAPI } from '../../api/hrPremium';
-import { premiumCandidateReviewAPI } from '../../api/premiumCandidateReview';
+import { employeeAPI } from '../../api/hr';
+import NextStepCard from '../../components/common/NextStepCard';
+import WorkflowStepper from '../../components/hr/WorkflowStepper';
+import { buildHrWorkflow, inr } from '../../components/hr/hrWorkflow';
 
-const REFRESH_INTERVAL = 30000; // 30 seconds
-
-const fmtINR = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
 const fmtTime = (d) => d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-// Neutral by default; amber only when `alert` says somebody needs to act.
-function KpiCard({ label, value, icon, sub, alert = false, to }) {
-    const inner = (
-        <>
-            <div className="flex items-center justify-between mb-1.5">
-                <span className={`w-9 h-9 rounded-xl flex items-center justify-center text-lg ${alert ? 'bg-warning-100' : 'bg-brand-50'}`}>{icon}</span>
-                {to && <span className={`text-xs ${alert ? 'text-warning-700' : 'text-gray-300'}`}>→</span>}
-            </div>
-            <div className={`text-2xl font-bold ${alert ? 'text-warning-800' : 'text-gray-900'}`}>{value ?? '—'}</div>
-            <div className={`text-xs font-medium mt-0.5 ${alert ? 'text-warning-800' : 'text-gray-500'}`}>{label}</div>
-            {sub && <div className={`text-[11px] mt-0.5 ${alert ? 'text-warning-700' : 'text-gray-400'}`}>{sub}</div>}
-        </>
-    );
-    const cls = `rounded-2xl border p-4 ${alert ? 'bg-warning-50 border-warning-200' : 'bg-white border-gray-100 shadow-card'}`;
-    return to
-        ? <Link to={to} className={`${cls} hover:shadow-card-hover transition`}>{inner}</Link>
-        : <div className={cls}>{inner}</div>;
-}
+// Numbers about the business: neutral cards, no colour. Amber is kept for things waiting on you.
+const Glance = ({ label, value, sub, icon }) => (
+    <div className="card-p">
+        <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-base shrink-0">{icon}</span>
+            <p className="text-xs font-medium text-gray-500 leading-tight">{label}</p>
+        </div>
+        <p className="text-2xl font-bold text-gray-900 leading-tight">{value ?? '—'}</p>
+        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </div>
+);
 
 export default function HRDashboard() {
     const { user } = useAuth();
+    const { hiring, premium, loaded, updatedAt, refresh } = useOutletContext();
     const isAdmin = user?.role === 'admin';
-
-    const [stats, setStats] = useState(null);
-    const [hiring, setHiring] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [lastRefreshed, setLastRefreshed] = useState(null);
-    const [premiumCounts, setPremiumCounts] = useState({ company: 0, candidate: 0 });
-
-    const fetchAll = useCallback(async () => {
-        try {
-            const [statsRes, hiringRes] = await Promise.allSettled([
-                employeeAPI.getStats(),
-                reportAPI.hiring(),
-            ]);
-            if (statsRes.status === 'fulfilled') setStats(statsRes.value.data?.data || null);
-            if (hiringRes.status === 'fulfilled') setHiring(hiringRes.value.data?.data || null);
-            setLastRefreshed(new Date());
-        } catch (_) {}
-        setLoading(false);
-    }, []);
-
-    const fetchPremiumCounts = useCallback(async () => {
-        const [companyRes, candidateRes] = await Promise.allSettled([
-            hrPremiumAPI.list(),
-            premiumCandidateReviewAPI.list('pending'),
-        ]);
-        setPremiumCounts({
-            company: companyRes.status === 'fulfilled' ? (companyRes.value.data?.data || []).filter(r => !r.is_read).length : 0,
-            candidate: candidateRes.status === 'fulfilled' ? (candidateRes.value.data?.data || []).length : 0,
-        });
-    }, []);
+    const [tasksPending, setTasksPending] = useState(0);
 
     useEffect(() => {
-        fetchAll();
-        fetchPremiumCounts();
-        // Auto-refresh every 30 seconds
-        const timer = setInterval(() => { fetchAll(); fetchPremiumCounts(); }, REFRESH_INTERVAL);
-        // Refresh when tab becomes visible
-        const onVisible = () => { if (document.visibilityState === 'visible') { fetchAll(); fetchPremiumCounts(); } };
-        document.addEventListener('visibilitychange', onVisible);
-        return () => {
-            clearInterval(timer);
-            document.removeEventListener('visibilitychange', onVisible);
-        };
-    }, [fetchAll, fetchPremiumCounts]);
+        employeeAPI.getStats()
+            .then((r) => setTasksPending(Number(r.data?.data?.tasks_pending || 0)))
+            .catch(() => {});
+    }, []);
 
-    const k = hiring?.kpis;
+    if (!loaded) {
+        return <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading your dashboard…</div>;
+    }
 
-    const quickLinks = [
-        { label: 'Tasks',              to: '/hr/tasks',          icon: '✅' },
-        { label: 'Reports',            to: '/hr/reports',        icon: '📊' },
-        { label: 'Offer Requests',     to: '/hr/offer-requests', icon: '📋' },
-        { label: 'Interviews',         to: '/hr/interviews',     icon: '🗓' },
-        { label: 'Resume Sourcing',    to: '/hr/sourcing',       icon: '📄' },
-        { label: 'My Companies',       to: '/hr/companies',      icon: '🏢' },
-        { label: 'Company Premium',    to: '/hr/premium-requests', icon: '⭐', badge: premiumCounts.company },
-        { label: 'Candidate Premium',  to: '/hr/premium-candidate-requests', icon: '🌟', badge: premiumCounts.candidate },
-        { label: 'Invoices',           to: '/hr/invoices',       icon: '🧾' },
-        { label: 'Outreach',           to: '/outreach',          icon: '📡' },
+    const k = hiring?.kpis || {};
+    const { steps, next, waiting } = buildHrWorkflow({ hiring, premium, tasksPending, isAdmin });
+    const firstName = (user?.name || '').trim().split(' ')[0];
+
+    const tools = [
+        { label: 'Tasks',             to: '/hr/tasks',                      icon: '✅', badge: tasksPending },
+        { label: 'Reports',           to: '/hr/reports',                    icon: '📈' },
+        { label: 'Outreach',          to: '/outreach',                      icon: '📡' },
+        { label: 'Company Premium',   to: '/hr/premium-requests',           icon: '⭐', badge: premium.company },
+        { label: 'Candidate Premium', to: '/hr/premium-candidate-requests', icon: '🌟', badge: premium.candidate },
     ];
 
     return (
-        <div className="max-w-5xl mx-auto">
-            <div className="mb-6 flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Hiring Dashboard</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">
-                        {isAdmin ? 'All-company view' : 'Your assigned companies'}
-                        {lastRefreshed && (
-                            <span className="ml-2 text-gray-400">· Updated {fmtTime(lastRefreshed)}</span>
-                        )}
+        <div className="max-w-4xl mx-auto animate-slide-up space-y-5">
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Hi{firstName ? `, ${firstName}` : ''} 👋</h1>
+                    <p className="text-sm text-gray-500 mt-1">
+                        {isAdmin ? 'All companies' : 'Your assigned companies'}. Here's what needs you today.
                     </p>
                 </div>
-                <button onClick={fetchAll} className="text-xs text-indigo-600 hover:underline">
-                    Refresh
-                </button>
+                <div className="text-right shrink-0">
+                    <button onClick={refresh} className="text-xs text-indigo-600 hover:underline">Refresh</button>
+                    {updatedAt && <p className="text-[11px] text-gray-400 mt-0.5">Updated {fmtTime(updatedAt)}</p>}
+                </div>
             </div>
 
-            {loading ? (
-                <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading…</div>
-            ) : (
-                <>
-                    {/* Real-time hiring KPIs */}
-                    {k && (
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 mb-6">
-                            <KpiCard label="Total Hires"         value={k.hires_total}              icon="🎯" sub={`${k.hires_this_month} this month`} />
-                            <KpiCard label="Active Jobs"         value={k.active_jobs}              icon="💼" />
-                            <KpiCard label="Applications"        value={k.total_applications}       icon="📥" sub={`${k.candidates_sourced} sourced`} />
-                            <KpiCard label="Fees Collected"      value={fmtINR(k.placement_fees_collected)} icon="💰" />
-                            <KpiCard label="Interview Requests"  value={k.pending_interview_requests} icon="🗓" alert={k.pending_interview_requests > 0}
-                                sub="Pending approval" to="/hr/interviews" />
-                            <KpiCard label="Offer Requests"      value={k.pending_offer_requests}   icon="📋" alert={k.pending_offer_requests > 0}
-                                sub="Pending approval" to="/hr/offer-requests" />
-                            <KpiCard label="Upcoming Interviews" value={k.upcoming_interviews}      icon="📅"
-                                sub={k.awaiting_candidate_confirmation > 0 ? `${k.awaiting_candidate_confirmation} unconfirmed` : undefined} />
-                            <KpiCard label="Outstanding Invoices" value={fmtINR(k.outstanding_amount)} icon="🧾" alert={Number(k.outstanding_amount) > 0}
-                                sub={`${k.pending_invoices} invoice${k.pending_invoices !== 1 ? 's' : ''}`} to="/hr/invoices" />
-                        </div>
-                    )}
+            <NextStepCard next={next} />
 
-                    {/* HR task KPIs (from employeeAPI.getStats) */}
-                    {stats && (
-                        <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
-                            {isAdmin && (
-                                <KpiCard label="Total Employees" value={stats.total_employees} icon="👥" />
-                            )}
-                            <KpiCard label="Tasks Pending"       value={stats.tasks_pending}        icon="⏳" alert={Number(stats.tasks_pending) > 0} />
-                            <KpiCard label="Completed This Week" value={stats.tasks_completed_week} icon="✅" />
-                        </div>
-                    )}
+            <WorkflowStepper steps={steps} />
 
-                    {/* Pipeline snapshot */}
-                    {hiring?.pipeline?.length > 0 && (
-                        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 mb-6">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-gray-800 text-sm">Live Pipeline</h3>
-                                <Link to="/hr/reports" className="text-xs text-indigo-600 hover:underline">Full report →</Link>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
-                                {hiring.pipeline.map(p => (
-                                    <div key={p.status} className="bg-gray-50 rounded-lg px-3 py-1.5 flex items-center gap-2">
-                                        <span className="text-base font-bold text-gray-900">{p.count}</span>
-                                        <span className="text-xs text-gray-500 capitalize">{p.status.replace('_', ' ')}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Pending offer requests */}
-                    {hiring?.pending_actions?.offer_requests?.length > 0 && (
-                        <div className="bg-warning-50 border border-warning-200 rounded-2xl p-5 mb-5">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-warning-800 text-sm">
-                                    📋 Offer Requests Pending ({hiring.pending_actions.offer_requests.length})
-                                </h3>
-                                <Link to="/hr/offer-requests" className="text-xs text-warning-700 hover:underline">View all</Link>
-                            </div>
-                            <div className="space-y-2">
-                                {hiring.pending_actions.offer_requests.slice(0, 3).map(r => (
-                                    <Link key={r.id} to={`/hr/offer-requests/${r.id}`}
-                                        className="flex items-start justify-between bg-white rounded-xl px-4 py-3 border border-warning-100 hover:border-warning-300 transition">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-800">{r.company_name}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">{r.candidate_name} — {r.job_title}</p>
-                                        </div>
-                                        {r.placement_fee_amount != null && (
-                                            <span className="text-xs text-warning-800 font-medium shrink-0 ml-4">
-                                                ₹{parseFloat(r.placement_fee_amount || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}
-                                            </span>
-                                        )}
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Pending interview requests */}
-                    {hiring?.pending_actions?.interview_requests?.length > 0 && (
-                        <div className="bg-warning-50 border border-warning-200 rounded-2xl p-5 mb-5">
-                            <div className="flex items-center justify-between mb-3">
-                                <h3 className="font-semibold text-warning-800 text-sm">
-                                    🗓 Interview Requests Pending ({hiring.pending_actions.interview_requests.length})
-                                </h3>
-                                <Link to="/hr/interviews" className="text-xs text-warning-700 hover:underline">View all</Link>
-                            </div>
-                            <div className="space-y-2">
-                                {hiring.pending_actions.interview_requests.slice(0, 3).map(r => (
-                                    <Link key={r.id} to={`/hr/interview-requests/${r.id}`}
-                                        className="flex items-start justify-between bg-white rounded-xl px-4 py-3 border border-warning-100 hover:border-warning-300 transition">
-                                        <div>
-                                            <p className="text-sm font-medium text-gray-800">{r.company_name}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">{r.candidate_name} — {r.job_title}</p>
-                                        </div>
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                </>
+            {/* Waiting on you */}
+            {waiting.length > 0 && (
+                <div>
+                    <h2 className="section-title">Waiting on you ({waiting.length})</h2>
+                    <div className="card divide-y divide-gray-100 overflow-hidden">
+                        {waiting.slice(0, 6).map((w) => (
+                            <Link key={w.key} to={w.to} className="flex items-center gap-3 px-4 py-3 hover:bg-gray-50 transition">
+                                <span className="w-9 h-9 rounded-xl bg-warning-50 flex items-center justify-center text-lg shrink-0">{w.icon}</span>
+                                <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-semibold text-gray-900 truncate">{w.title}</p>
+                                    <p className="text-xs text-gray-500 truncate">{w.sub}</p>
+                                </div>
+                                <div className="text-right shrink-0">
+                                    <span className="badge-yellow">{w.kind}</span>
+                                    {w.right && <p className="text-xs font-semibold text-gray-700 mt-1">{w.right}</p>}
+                                </div>
+                            </Link>
+                        ))}
+                        {waiting.length > 6 && (
+                            <p className="px-4 py-2.5 text-xs text-gray-500 bg-gray-50">
+                                and {waiting.length - 6} more in <Link to="/hr/interviews" className="text-indigo-600 hover:underline">Interviews</Link> and <Link to="/hr/offer-requests" className="text-indigo-600 hover:underline">Offer Requests</Link>
+                            </p>
+                        )}
+                    </div>
+                </div>
             )}
 
-            {/* Quick navigation */}
-            <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Quick Access</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                {quickLinks.map(({ label, to, icon, badge }) => (
-                    <Link key={to} to={to}
-                        className="relative bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:border-indigo-300 hover:shadow-md transition flex flex-col items-center gap-2 text-center">
-                        {badge > 0 && (
-                            <span className="absolute top-2 right-2 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
-                                {badge}
-                            </span>
-                        )}
-                        <span className="text-2xl">{icon}</span>
-                        <span className="text-xs font-medium text-gray-700">{label}</span>
-                    </Link>
-                ))}
+            {/* At a glance */}
+            <div>
+                <h2 className="section-title">At a glance</h2>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Glance icon="🎯" label="Total hires"    value={k.hires_total}       sub={`${k.hires_this_month || 0} this month`} />
+                    <Glance icon="💼" label="Active jobs"    value={k.active_jobs} />
+                    <Glance icon="📥" label="Applications"   value={k.total_applications} sub={`${k.candidates_sourced || 0} sourced by us`} />
+                    <Glance icon="💰" label="Fees collected" value={inr(k.placement_fees_collected)} />
+                </div>
+            </div>
+
+            {/* Pipeline */}
+            {hiring?.pipeline?.length > 0 && (
+                <div className="card-p">
+                    <div className="flex items-center justify-between mb-3">
+                        <h3 className="font-semibold text-gray-800">Candidate pipeline</h3>
+                        <Link to="/hr/reports" className="text-xs text-indigo-600 hover:underline">Full report →</Link>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                        {hiring.pipeline.map((p) => (
+                            <div key={p.status} className="bg-gray-50 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                                <span className="text-base font-bold text-gray-900">{p.count}</span>
+                                <span className="text-xs text-gray-500 capitalize">{p.status.replace(/_/g, ' ')}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Other tools */}
+            <div className="pb-2">
+                <h2 className="section-title">More tools</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                    {tools.map(({ label, to, icon, badge }) => (
+                        <Link key={to} to={to}
+                            className="relative card p-4 hover:border-brand-200 hover:shadow-card-hover transition flex flex-col items-center gap-2 text-center">
+                            {badge > 0 && (
+                                <span className="absolute top-2 right-2 bg-warning-500 text-white text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1">
+                                    {badge}
+                                </span>
+                            )}
+                            <span className="text-2xl">{icon}</span>
+                            <span className="text-xs font-medium text-gray-700">{label}</span>
+                        </Link>
+                    ))}
+                </div>
             </div>
         </div>
     );
