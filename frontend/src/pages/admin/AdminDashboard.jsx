@@ -85,6 +85,37 @@ export default function AdminDashboard() {
                 {kpis.map((k) => <Kpi key={k.label} {...k} />)}
             </div>
 
+            {/* Needs your attention: built from the summary, so it shows even if the
+                pending-actions calls below fail */}
+            <div className="mb-8">
+                <h3 className="text-sm font-semibold text-gray-600 uppercase tracking-wide mb-3">Needs Your Attention</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {[
+                        { label: 'Platinum Requests', hint: 'companies waiting for approval', value: summary?.pending_company_premium_requests, to: '/admin/premium?tab=companies', tone: 'yellow' },
+                        { label: 'Premium Verifications', hint: 'candidates waiting for payslip review', value: summary?.pending_candidate_premium_requests, to: '/admin/premium?tab=candidates', tone: 'green' },
+                        { label: 'Jobs Awaiting Fee', hint: 'posted but not yet paid for', value: summary?.pending_payment_jobs, to: '/admin/jobs', tone: 'amber' },
+                    ].map(({ label, hint, value, to, tone }) => {
+                        const n = Number(value || 0);
+                        const tones = {
+                            yellow: 'bg-yellow-50 border-yellow-200 text-yellow-700 hover:border-yellow-400',
+                            green: 'bg-green-50 border-green-200 text-green-700 hover:border-green-400',
+                            amber: 'bg-amber-50 border-amber-200 text-amber-700 hover:border-amber-400',
+                        };
+                        return (
+                            <button
+                                key={label}
+                                onClick={() => navigate(to)}
+                                className={`rounded-xl border p-4 text-left transition ${tones[tone]} ${n > 0 ? 'ring-2 ring-offset-1 ring-red-300' : ''}`}
+                            >
+                                <p className="text-xs uppercase tracking-wide mb-1 opacity-80">{label}</p>
+                                <p className="text-3xl font-bold">{n}</p>
+                                <p className="text-xs mt-1 opacity-70">{n > 0 ? `${hint}, click to review` : 'nothing waiting'}</p>
+                            </button>
+                        );
+                    })}
+                </div>
+            </div>
+
             {/* Platform Pending Actions */}
             {pendingActions && (
                 <div className="mb-8">
@@ -130,6 +161,8 @@ export default function AdminDashboard() {
                     <div className="space-y-2">
                         {[
                             { label: 'Review Pending Companies', to: '/admin/companies', badge: summary?.pending_companies },
+                            { label: 'Premium Requests',         to: '/admin/premium',
+                              badge: Number(summary?.pending_company_premium_requests || 0) + Number(summary?.pending_candidate_premium_requests || 0) },
                             { label: 'Manage HR Staff',          to: '/admin/staff' },
                             { label: 'View Recruitment Pipeline', to: '/admin/recruitment' },
                             { label: 'Job Postings',             to: '/admin/jobs' },

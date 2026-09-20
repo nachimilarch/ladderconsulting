@@ -784,7 +784,7 @@ exports.getAnalyticsSummary = async (req, res) => {
                 (SELECT COUNT(*) FROM candidates WHERE is_premium = 1 AND deleted_at IS NULL)              AS premium_candidates,
                 (SELECT COUNT(*) FROM ai_subscriptions WHERE status IN ('active','grace') AND deleted_at IS NULL) AS active_ai_subscriptions,
                 (SELECT COUNT(*) FROM job_postings WHERE status = 'pending_payment' AND deleted_at IS NULL) AS pending_payment_jobs,
-                (SELECT COUNT(*) FROM notifications WHERE type = 'company_premium_request' AND is_read = 0 AND deleted_at IS NULL) AS pending_company_premium_requests,
+                (SELECT COUNT(*) FROM companies WHERE premium_requested_at IS NOT NULL AND company_tier = 'standard' AND deleted_at IS NULL) AS pending_company_premium_requests,
                 (SELECT COUNT(*) FROM candidate_premium_requests WHERE status = 'pending' AND deleted_at IS NULL) AS pending_candidate_premium_requests`
         );
         res.json({ success: true, data: { summary } });

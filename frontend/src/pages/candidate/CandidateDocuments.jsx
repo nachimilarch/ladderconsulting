@@ -58,7 +58,17 @@ export default function CandidateDocuments() {
         setUploading(true);
         try {
             await documentAPI.upload(fd);
-            toast.success('Document uploaded.');
+            if (docType === 'payslip') {
+                toast.success(
+                    <span>
+                        Payslip uploaded. To send your Premium request, declare your CTC on the{' '}
+                        <a href="/candidate/premium" className="underline font-semibold">Premium page →</a>
+                    </span>,
+                    { duration: 10000 }
+                );
+            } else {
+                toast.success('Document uploaded.');
+            }
             setFile(null);
             setDocType('');
             setNotes('');

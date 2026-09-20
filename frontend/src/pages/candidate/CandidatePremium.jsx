@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { candidatePremiumAPI } from '../../api/candidate';
+import { candidatePremiumAPI, documentAPI } from '../../api/candidate';
 import toast from 'react-hot-toast';
 
 const CASHFREE_SDK_URL = 'https://sdk.cashfree.com/js/v3/cashfree.js';
@@ -22,6 +22,8 @@ export default function CandidatePremium() {
     const [ctc, setCtc] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [paying, setPaying] = useState(false);
+    const [uploading, setUploading] = useState(false);
+    const fileRef = useRef(null);
 
     const load = () => {
         setLoading(true);
@@ -32,6 +34,27 @@ export default function CandidatePremium() {
     };
 
     useEffect(() => { load(); }, []);
+
+    // Payslips are uploaded right here (no detour to the Documents page) so the whole
+    // request — upload, CTC, submit — happens in one place.
+    const handleUploadPayslip = async (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('doc_type', 'payslip');
+        setUploading(true);
+        try {
+            await documentAPI.upload(fd);
+            toast.success('Payslip uploaded.');
+            load();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Upload failed.');
+        } finally {
+            setUploading(false);
+            if (fileRef.current) fileRef.current.value = '';
+        }
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -117,18 +140,27 @@ export default function CandidatePremium() {
 
                     <p className="text-sm font-semibold text-gray-900 mb-1">1. Upload your last 3 payslips</p>
                     <p className="text-xs text-gray-500 mb-2">
-                        Use the Documents page and choose "Payslip (Last 3 months)" as the type.
+                        PDF or photo, one file at a time.
                         {' '}
                         <span className={payslipCount > 0 ? 'text-green-600 font-medium' : 'text-gray-400'}>
                             {payslipCount} payslip{payslipCount !== 1 ? 's' : ''} uploaded
                         </span>
                     </p>
-                    <Link
-                        to="/candidate/documents"
-                        className="inline-block text-xs border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium mb-5"
-                    >
-                        Go to Documents →
-                    </Link>
+                    <label className={`inline-block text-xs border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition font-medium mb-1 cursor-pointer ${uploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                        {uploading ? 'Uploading…' : (payslipCount > 0 ? '+ Add another payslip' : '+ Upload a payslip')}
+                        <input
+                            ref={fileRef}
+                            type="file"
+                            accept=".pdf,.jpg,.jpeg,.png"
+                            onChange={handleUploadPayslip}
+                            className="hidden"
+                        />
+                    </label>
+                    <p className="mb-5">
+                        <Link to="/candidate/documents" className="text-[11px] text-gray-400 hover:text-indigo-600 hover:underline">
+                            Manage all my documents
+                        </Link>
+                    </p>
 
                     <form onSubmit={handleSubmit}>
                         <p className="text-sm font-semibold text-gray-900 mb-1">2. Declare your current annual CTC</p>

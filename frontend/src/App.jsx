@@ -108,6 +108,7 @@ import PlatformSettings from './pages/admin/PlatformSettings';
 import AdminEmailTemplates from './pages/admin/AdminEmailTemplates';
 import TrainingManager from './pages/admin/TrainingManager';
 import AdminJobPostings from './pages/admin/AdminJobPostings';
+import AdminPremiumRequests from './pages/admin/AdminPremiumRequests';
 
 // Company requests page
 import CompanyRequestsPage from './pages/company/CompanyRequestsPage';
@@ -238,6 +239,7 @@ export default function App() {
           <Route index element={<AdminHome />} />
           <Route path="companies" element={<CompanyApprovals />} />
           <Route path="jobs" element={<AdminJobPostings />} />
+          <Route path="premium" element={<AdminPremiumRequests />} />
           <Route path="staff" element={<HRStaffManagement />} />
           <Route path="analytics" element={<PlatformAnalytics />} />
           <Route path="audit-log" element={<AuditLog />} />

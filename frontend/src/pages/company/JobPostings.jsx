@@ -23,8 +23,6 @@ const loadCashfreeSDK = () => new Promise((resolve, reject) => {
 // request handler) — matches components/company/PremiumTierCard.jsx's pattern.
 function PlatinumBanner() {
     const [premiumRequestedAt, setPremiumRequestedAt] = useState(null);
-    const [expanded, setExpanded] = useState(false);
-    const [note, setNote] = useState('');
     const [requesting, setRequesting] = useState(false);
     const [justRequested, setJustRequested] = useState(false);
 
@@ -37,10 +35,12 @@ function PlatinumBanner() {
     const handleRequestPremium = async () => {
         setRequesting(true);
         try {
-            const { data } = await premiumAPI.request(note.trim() || undefined);
+            const { data } = await premiumAPI.request();
             toast.success(data?.message || 'Request sent.');
             setJustRequested(true);
         } catch (err) {
+            // A request that is already waiting counts as sent, not as an error.
+            if (err.response?.status === 409) setJustRequested(true);
             toast.error(err.response?.data?.message || 'Failed to send request.');
         } finally {
             setRequesting(false);
@@ -51,41 +51,25 @@ function PlatinumBanner() {
 
     return (
         <div className="bg-amber-50 border border-amber-200 rounded-2xl px-5 py-3 mb-6 text-sm">
-            <div className="flex items-center justify-between flex-wrap gap-2">
+            <div className="flex items-center justify-between flex-wrap gap-3">
                 <p className="text-gray-700">
                     <strong>₹3,999</strong> per job you post. A placement fee also applies per hire.
                 </p>
-                {!alreadyRequested && (
-                    <button onClick={() => setExpanded(x => !x)} className="text-yellow-700 font-semibold hover:underline text-xs shrink-0">
-                        {expanded ? 'Hide' : '⭐ Or go Platinum — no per-job fee →'}
+                {alreadyRequested ? (
+                    <span className="text-green-700 text-xs font-medium shrink-0">✓ Platinum request sent. Your executive will follow up.</span>
+                ) : (
+                    <button
+                        onClick={handleRequestPremium}
+                        disabled={requesting}
+                        className="shrink-0 bg-yellow-500 text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-yellow-600 disabled:opacity-60 transition"
+                    >
+                        {requesting ? 'Sending…' : '⭐ Request Platinum: no per-job fee'}
                     </button>
                 )}
-                {alreadyRequested && (
-                    <span className="text-green-700 text-xs font-medium shrink-0">✓ Platinum request sent — your executive will follow up.</span>
-                )}
             </div>
-            {expanded && !alreadyRequested && (
-                <div className="mt-3 pt-3 border-t border-amber-200">
-                    <p className="text-xs text-gray-500 mb-2">
-                        Platinum: no listing/per-job fee, full pool including Premium candidates, 8.33% placement fee per hire instead. Requires executive approval.
-                    </p>
-                    <div className="flex gap-2">
-                        <input
-                            value={note}
-                            onChange={e => setNote(e.target.value)}
-                            placeholder="Optional note for your executive…"
-                            className="flex-1 border border-gray-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                        />
-                        <button
-                            onClick={handleRequestPremium}
-                            disabled={requesting}
-                            className="border border-yellow-400 text-yellow-700 font-semibold px-4 py-1.5 rounded-lg hover:bg-yellow-100 disabled:opacity-60 transition text-xs whitespace-nowrap"
-                        >
-                            {requesting ? '…' : 'Request Platinum Access'}
-                        </button>
-                    </div>
-                </div>
-            )}
+            <p className="text-xs text-gray-500 mt-2">
+                Platinum: no listing or per-job fee, the full pool including Premium candidates, and an 8.33% placement fee per hire instead. Needs approval from your account executive.
+            </p>
         </div>
     );
 }

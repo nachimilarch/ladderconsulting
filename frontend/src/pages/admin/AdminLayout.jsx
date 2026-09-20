@@ -1,4 +1,6 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { adminAnalyticsAPI } from '../../api/admin';
 import { useAuth } from '../../context/AuthContext';
 import NotificationBell from '../../components/NotificationBell';
 
@@ -6,6 +8,7 @@ const navItems = [
     { label: 'Dashboard',  to: '/admin',           icon: '📊' },
     { label: 'Companies',  to: '/admin/companies', icon: '🏢' },
     { label: 'Job Postings', to: '/admin/jobs',   icon: '💼' },
+    { label: 'Premium Requests', to: '/admin/premium', icon: '⭐', badgeKey: 'premium' },
     { label: 'HR Staff',   to: '/admin/staff',     icon: '👥' },
     { label: 'Hiring',     to: '/hr',              icon: '🎯' },
     { label: 'Outreach',   to: '/outreach',        icon: '📡' },
@@ -19,6 +22,20 @@ const navItems = [
 export default function AdminLayout() {
     const { logout, user } = useAuth();
     const navigate = useNavigate();
+    const location = useLocation();
+    const [pendingPremium, setPendingPremium] = useState(0);
+
+    // Live count of requests waiting on an admin. Refreshed on every page change,
+    // so approving one in the queue clears the badge as soon as you move on.
+    useEffect(() => {
+        if (user?.role !== 'admin') return;
+        adminAnalyticsAPI.getSummary()
+            .then(r => {
+                const s = r.data?.data?.summary;
+                setPendingPremium(Number(s?.pending_company_premium_requests || 0) + Number(s?.pending_candidate_premium_requests || 0));
+            })
+            .catch(() => {});
+    }, [location.pathname, location.search, user?.role]);
 
     // Trainers share this shell but may only use the Training studio — filter the
     // nav so they aren't presented a wall of admin-only links that 403.
@@ -47,7 +64,7 @@ export default function AdminLayout() {
                 </div>
 
                 <nav className="flex-1 overflow-y-auto py-4">
-                    {visibleNav.map(({ label, to, icon }) => (
+                    {visibleNav.map(({ label, to, icon, badgeKey }) => (
                         <NavLink
                             key={to}
                             to={to}
@@ -62,6 +79,11 @@ export default function AdminLayout() {
                         >
                             <span>{icon}</span>
                             {label}
+                            {badgeKey === 'premium' && pendingPremium > 0 && (
+                                <span className="ml-auto bg-red-500 text-white text-[11px] font-semibold rounded-full px-2 py-0.5">
+                                    {pendingPremium}
+                                </span>
+                            )}
                         </NavLink>
                     ))}
                 </nav>

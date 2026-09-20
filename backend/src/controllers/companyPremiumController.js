@@ -116,6 +116,8 @@ exports.dismissPremiumRequest = async (req, res) => {
             `SELECT id, company_name, user_id FROM companies WHERE id = ? AND deleted_at IS NULL`,
             [meta.company_id]
         );
+        // Clear the request, otherwise the company is stuck on "request sent" and can never re-apply.
+        if (company) await db.query(`UPDATE companies SET premium_requested_at = NULL WHERE id = ?`, [company.id]);
         if (company && reason) {
             await notify(
                 company.user_id,
