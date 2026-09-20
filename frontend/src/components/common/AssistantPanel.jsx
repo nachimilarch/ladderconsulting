@@ -1,14 +1,8 @@
 import { askAssistant } from '../../utils/assistant';
 
-const PROMPTS = [
-    { icon: '✏️', label: 'Polish my profile', text: 'Polish my profile' },
-    { icon: '🔍', label: 'Find jobs that match me', text: 'Find jobs that match me' },
-    { icon: '📨', label: 'Help me apply', text: 'Help me apply to a job' },
-    { icon: '💡', label: 'What should I improve?', text: 'What should I improve on my profile?' },
-];
-
-// Tells the candidate what the AI assistant does for them, with one-tap starters.
-export default function AssistantPanel({ subscribed, price }) {
+// Tells the person what the AI assistant does for them, with one-tap starters.
+// `prompts` are { icon, label, text }; the persona-specific ones live with each dashboard.
+export default function AssistantPanel({ subscribed, price, blurb, prompts }) {
     return (
         <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-violet-50 p-5">
             <div className="flex items-start justify-between gap-3 mb-1">
@@ -17,17 +11,15 @@ export default function AssistantPanel({ subscribed, price }) {
                         <span className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white text-sm flex items-center justify-center">✨</span>
                         Let AI do the heavy lifting
                     </h3>
-                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">
-                        Your assistant can rewrite your profile, rank jobs by fit, and prepare applications for you.
-                    </p>
+                    <p className="text-xs text-gray-500 mt-1 leading-relaxed">{blurb}</p>
                 </div>
-                <span className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-full ${subscribed ? 'bg-green-100 text-green-700' : 'bg-white text-gray-500 border border-gray-200'}`}>
+                <span className={`shrink-0 text-[11px] font-semibold px-2 py-1 rounded-full ${subscribed ? 'bg-success-100 text-success-700' : 'bg-white text-gray-500 border border-gray-200'}`}>
                     {subscribed ? 'On' : `₹${price || 299}/mo`}
                 </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-4">
-                {PROMPTS.map((p) => (
+            <div className={`grid grid-cols-1 gap-2 mt-4 ${prompts.length === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+                {prompts.map((p) => (
                     <button
                         key={p.label}
                         onClick={() => askAssistant(p.text)}

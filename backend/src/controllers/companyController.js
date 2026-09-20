@@ -200,8 +200,16 @@ exports.getDashboard = async (req, res) => {
                COUNT(*) AS total_jobs,
                SUM(status='active') AS active_jobs,
                SUM(status='draft') AS draft_jobs,
-               SUM(status='closed') AS closed_jobs
+               SUM(status='closed') AS closed_jobs,
+               SUM(status='pending_payment') AS pending_payment_jobs
              FROM job_postings WHERE company_id=? AND deleted_at IS NULL`,
+            [cid]
+        );
+
+        const [[unpaidJob]] = await db.query(
+            `SELECT id, title FROM job_postings
+             WHERE company_id=? AND status='pending_payment' AND deleted_at IS NULL
+             ORDER BY created_at DESC LIMIT 1`,
             [cid]
         );
 
@@ -210,7 +218,9 @@ exports.getDashboard = async (req, res) => {
                COUNT(*) AS total_applications,
                SUM(a.status='shortlisted') AS shortlisted,
                SUM(a.status='interview_scheduled') AS interviews,
-               SUM(a.status='offer_sent') AS offers_sent
+               SUM(a.status='offer_sent') AS offers_sent,
+               SUM(a.status IN ('applied','under_review')) AS to_review,
+               SUM(a.status='hired') AS hired
              FROM applications a
              JOIN job_postings jp ON jp.id = a.job_id
              WHERE jp.company_id=? AND a.deleted_at IS NULL`,
@@ -230,8 +240,54 @@ exports.getDashboard = async (req, res) => {
             [cid]
         );
 
+        // Interview slots that still need something from the company: a slot in the future
+        // to prepare for, or one in the past with no recorded outcome.
+        const [[ivStats]] = await db.query(
+            `SELECT
+               SUM(is2.status IN ('proposed','confirmed','rescheduled') AND is2.slot_datetime >= UTC_TIMESTAMP()) AS upcoming,
+               SUM(is2.status <> 'cancelled' AND is2.slot_datetime < UTC_TIMESTAMP()
+                   AND NOT EXISTS (SELECT 1 FROM interview_outcomes io WHERE io.interview_id = is2.id AND io.deleted_at IS NULL)) AS awaiting_outcome
+             FROM interview_slots is2
+             JOIN applications a ON a.id = is2.application_id
+             JOIN job_postings jp ON jp.id = a.job_id
+             WHERE jp.company_id=? AND is2.deleted_at IS NULL`,
+            [cid]
+        );
+        const [[nextIv]] = await db.query(
+            `SELECT is2.slot_datetime, is2.mode, jp.title AS job_title, u.name AS candidate_name
+             FROM interview_slots is2
+             JOIN applications a ON a.id = is2.application_id
+             JOIN job_postings jp ON jp.id = a.job_id
+             JOIN candidates c ON c.id = a.candidate_id
+             JOIN users u ON u.id = c.user_id
+             WHERE jp.company_id=? AND is2.deleted_at IS NULL
+               AND is2.status IN ('proposed','confirmed','rescheduled') AND is2.slot_datetime >= UTC_TIMESTAMP()
+             ORDER BY is2.slot_datetime ASC LIMIT 1`,
+            [cid]
+        );
+        const [[offerStats]] = await db.query(
+            `SELECT SUM(o.status='sent') AS waiting
+             FROM offers o
+             JOIN applications a ON a.id = o.application_id
+             JOIN job_postings jp ON jp.id = a.job_id
+             WHERE jp.company_id=? AND o.deleted_at IS NULL`,
+            [cid]
+        );
+
         const maskedRecent = recentApps.map(r => ({ ...r, candidate_name: maskName(r.candidate_name) }));
-        res.json({ company, jobs: jobStats, applications: appStats, recent_applications: maskedRecent });
+        res.json({
+            company,
+            jobs: jobStats,
+            pending_payment_job: unpaidJob || null,
+            applications: appStats,
+            interviews: {
+                upcoming: Number(ivStats?.upcoming || 0),
+                awaiting_outcome: Number(ivStats?.awaiting_outcome || 0),
+                next: nextIv ? { ...nextIv, candidate_name: maskName(nextIv.candidate_name) } : null,
+            },
+            offers: { waiting: Number(offerStats?.waiting || 0) },
+            recent_applications: maskedRecent,
+        });
     } catch (err) {
         console.error('getDashboard error:', err);
         res.status(500).json({ message: 'Failed to load dashboard.' });

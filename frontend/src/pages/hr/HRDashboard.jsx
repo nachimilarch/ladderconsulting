@@ -3,8 +3,9 @@ import { Link, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { employeeAPI } from '../../api/hr';
 import NextStepCard from '../../components/common/NextStepCard';
-import WorkflowStepper from '../../components/hr/WorkflowStepper';
-import { buildHrWorkflow, inr } from '../../components/hr/hrWorkflow';
+import StepTracker from '../../components/common/StepTracker';
+import { buildHrWorkflow } from '../../components/hr/hrWorkflow';
+import { inr } from '../../utils/money';
 
 const fmtTime = (d) => d.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
@@ -65,7 +66,7 @@ export default function HRDashboard() {
 
             <NextStepCard next={next} />
 
-            <WorkflowStepper steps={steps} />
+            <StepTracker title="Your hiring workflow" steps={steps} />
 
             {/* Waiting on you */}
             {waiting.length > 0 && (

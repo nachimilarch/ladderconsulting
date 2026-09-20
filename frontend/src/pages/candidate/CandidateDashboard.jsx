@@ -6,8 +6,8 @@ import { candidateInterviewAPI } from '../../api/interview';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import JobDetailModal from '../../components/candidate/JobDetailModal';
 import NextStepCard from '../../components/common/NextStepCard';
-import JourneyStepper from '../../components/candidate/JourneyStepper';
-import AssistantPanel from '../../components/candidate/AssistantPanel';
+import StepTracker from '../../components/common/StepTracker';
+import AssistantPanel from '../../components/common/AssistantPanel';
 import { buildJourney, profileChecklist } from '../../components/candidate/journey';
 import { matchBadgeCls } from '../../utils/matchScore';
 
@@ -19,6 +19,13 @@ const list = (res, ...keys) => {
     return [];
 };
 
+
+const ASSISTANT_PROMPTS = [
+    { icon: '✏️', label: 'Polish my profile', text: 'Polish my profile' },
+    { icon: '🔍', label: 'Find jobs that match me', text: 'Find jobs that match me' },
+    { icon: '📨', label: 'Help me apply', text: 'Help me apply to a job' },
+    { icon: '💡', label: 'What should I improve?', text: 'What should I improve on my profile?' },
+];
 
 const Glance = ({ to, label, value, sub, tone }) => (
     <Link to={to} className={`rounded-2xl border p-4 hover:shadow-sm transition ${tone}`}>
@@ -108,9 +115,14 @@ export default function CandidateDashboard() {
 
             <NextStepCard next={journey.next} />
 
-            <JourneyStepper steps={journey.steps} />
+            <StepTracker title="Your journey" steps={journey.steps} />
 
-            <AssistantPanel subscribed={aiOn} price={ai?.amount} />
+            <AssistantPanel
+                subscribed={aiOn}
+                price={ai?.amount}
+                blurb="Your assistant can rewrite your profile, rank jobs by fit, and prepare applications for you."
+                prompts={ASSISTANT_PROMPTS}
+            />
 
             {/* At a glance */}
             <div>

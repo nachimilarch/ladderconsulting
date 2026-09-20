@@ -12,26 +12,30 @@ export default function useHrData(pathname) {
     const [premium, setPremium] = useState({ company: 0, candidate: 0 });
     const [loaded, setLoaded] = useState(false);
     const [updatedAt, setUpdatedAt] = useState(null);
+    const [tick, setTick] = useState(0);
 
-    const refresh = useCallback(async () => {
-        const [h, c, p] = await Promise.allSettled([
+    const refresh = useCallback(() => setTick((t) => t + 1), []);
+
+    // Refetch on every page change and whenever refresh() is called, so approving something
+    // clears its badge as soon as you move on.
+    useEffect(() => {
+        let cancelled = false;
+        Promise.allSettled([
             reportAPI.hiring(),
             hrPremiumAPI.list(),
             premiumCandidateReviewAPI.list('pending'),
-        ]);
-        if (h.status === 'fulfilled') setHiring(h.value.data?.data || null);
-        setPremium({
-            company: c.status === 'fulfilled' ? (c.value.data?.data || []).filter((r) => !r.is_read).length : 0,
-            candidate: p.status === 'fulfilled' ? (p.value.data?.data || []).length : 0,
+        ]).then(([h, c, p]) => {
+            if (cancelled) return;
+            if (h.status === 'fulfilled') setHiring(h.value.data?.data || null);
+            setPremium({
+                company: c.status === 'fulfilled' ? (c.value.data?.data || []).filter((r) => !r.is_read).length : 0,
+                candidate: p.status === 'fulfilled' ? (p.value.data?.data || []).length : 0,
+            });
+            setUpdatedAt(new Date());
+            setLoaded(true);
         });
-        setUpdatedAt(new Date());
-        setLoaded(true);
-    }, []);
-
-    // Refresh on every page change, so approving something clears its badge as soon as you move on.
-    useEffect(() => {
-        refresh();
-    }, [refresh, pathname]);
+        return () => { cancelled = true; };
+    }, [pathname, tick]);
 
     useEffect(() => {
         const timer = setInterval(refresh, POLL_MS);

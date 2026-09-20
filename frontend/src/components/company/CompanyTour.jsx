@@ -10,14 +10,14 @@ const STEPS = [
         body: "Your company hiring portal is all set. This quick tour walks you through everything — takes about 30 seconds. Let's go!",
     },
     {
-        target: '[data-tour="talent-pool"]',
-        title: '👥 Talent Pool',
-        body: 'Browse our pre-screened candidates, ranked by how well they fit one of your jobs. Premium candidates (⭐) are listed first. Express interest and your executive takes it from there.',
-    },
-    {
         target: '[data-tour="job-postings"]',
         title: '💼 Job Postings',
         body: 'Post your open roles here. Each job is ₹3,999 to go live (Platinum companies pay no per-job fee), and our executives source matching candidates for it.',
+    },
+    {
+        target: '[data-tour="talent-pool"]',
+        title: '👥 Talent Pool',
+        body: 'Browse our pre-screened candidates, ranked by how well they fit one of your jobs. Premium candidates (⭐) are listed first. Express interest and your executive takes it from there.',
     },
     {
         target: '[data-tour="shortlist"]',

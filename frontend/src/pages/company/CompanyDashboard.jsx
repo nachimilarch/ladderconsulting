@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 import { companyAPI, talentPoolAPI } from '../../api/company';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
+import NextStepCard from '../../components/common/NextStepCard';
+import StepTracker from '../../components/common/StepTracker';
+import AssistantPanel from '../../components/common/AssistantPanel';
 
 // Phone-gate: on every dashboard load, if the company has no phone, show a
 // one-field modal before anything else.  Same component as in CompanyProfile.
@@ -56,42 +60,38 @@ const STATUS_CONFIG = {
     rejected:            { label: 'Rejected',            cls: 'bg-red-100 text-red-600' },
 };
 
-const KPI = ({ title, value, icon }) => (
-    <div className="card-p flex items-center gap-3">
-        <span className="w-11 h-11 rounded-xl bg-brand-50 flex items-center justify-center text-xl shrink-0">{icon}</span>
-        <div className="min-w-0">
-            <div className="text-2xl font-bold text-gray-900 leading-tight">{value ?? '—'}</div>
-            <div className="text-xs font-medium text-gray-500">{title}</div>
+const ASSISTANT_PROMPTS = [
+    { icon: '📝', label: 'Draft a job post', text: 'Draft a job post' },
+    { icon: '✨', label: 'Improve a job', text: 'Improve one of my job descriptions' },
+    { icon: '🎯', label: 'Find matching candidates', text: 'Find candidates for my job' },
+];
+
+// Numbers about the business: neutral cards. Amber is kept for things waiting on you.
+const Glance = ({ label, value, sub, icon, to }) => (
+    <Link to={to} className="card-p hover:shadow-card-hover hover:border-brand-200 transition">
+        <div className="flex items-center gap-2 mb-1.5">
+            <span className="w-8 h-8 rounded-lg bg-brand-50 flex items-center justify-center text-base shrink-0">{icon}</span>
+            <p className="text-xs font-medium text-gray-500 leading-tight">{label}</p>
         </div>
-    </div>
+        <p className="text-2xl font-bold text-gray-900 leading-tight">{value ?? '—'}</p>
+        {sub && <p className="text-xs text-gray-400 mt-0.5">{sub}</p>}
+    </Link>
 );
 
 export default function CompanyDashboard() {
-    const [data, setData] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { user } = useAuth();
+    // The layout owns the numbers (also used for the sidebar badges) and the welcome form.
+    const { dash, loaded, refresh, workflow, onboardingOpen = false } = useOutletContext();
     const [needsPhone, setNeedsPhone] = useState(false);
     const [tierStatus, setTierStatus] = useState(null);
     const [aiStatus, setAiStatus] = useState(null);
-    // The welcome form in the layout collects the phone too; ask again only once it is closed.
-    const { onboardingOpen = false } = useOutletContext() || {};
-
-    const fetchDashboard = () => {
-        companyAPI.getDashboard()
-            .then(({ data }) => setData(data))
-            .catch(console.error)
-            .finally(() => setLoading(false));
-    };
 
     useEffect(() => {
-        fetchDashboard();
         talentPoolAPI.activationStatus().then(({ data }) => setTierStatus(data)).catch(() => {});
         aiSubscriptionAPI.status().then(({ data }) => setAiStatus(data)).catch(() => {});
-
-        const onVisible = () => { if (document.visibilityState === 'visible') fetchDashboard(); };
-        document.addEventListener('visibilitychange', onVisible);
-        return () => document.removeEventListener('visibilitychange', onVisible);
     }, []);
 
+    // The welcome form collects the phone too; ask again only once it is closed.
     useEffect(() => {
         if (onboardingOpen) return;
         companyAPI.getProfile()
@@ -99,127 +99,129 @@ export default function CompanyDashboard() {
             .catch(() => {});
     }, [onboardingOpen]);
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-64 text-gray-400 text-sm">
-                Loading dashboard...
-            </div>
-        );
+    if (!loaded) {
+        return <div className="flex items-center justify-center h-64 text-gray-400 text-sm">Loading your dashboard…</div>;
     }
 
-    const { jobs = {}, applications = {}, recent_applications = [], company = {} } = data || {};
+    const { jobs = {}, applications = {}, recent_applications = [], company = {} } = dash || {};
+    const firstName = (user?.name || '').trim().split(' ')[0];
+    const aiOn = ['active', 'grace'].includes(aiStatus?.subscription?.status);
+    const isPlatinum = tierStatus?.company_tier === 'premium';
 
     return (
-        <div className="max-w-5xl mx-auto">
+        <div className="max-w-4xl mx-auto animate-slide-up space-y-5">
             {needsPhone && <PhoneModal onSave={() => setNeedsPhone(false)} />}
-            <div className="mb-6 flex items-start justify-between gap-4">
-                <div>
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">
-                        {company.company_name || 'Company Dashboard'}
-                    </h1>
-                    <p className="text-sm text-gray-500 mt-1">
-                        {company.industry && <span>{company.industry} · </span>}
-                        Hiring Dashboard
+
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Hi{firstName ? `, ${firstName}` : ''} 👋</h1>
+                    <p className="text-sm text-gray-500 mt-1 truncate">
+                        {company.company_name}{company.industry ? ` · ${company.industry}` : ''}
                     </p>
                 </div>
-                <button
-                    onClick={fetchDashboard}
-                    className="text-xs text-indigo-600 hover:underline mt-1 shrink-0"
-                >
-                    Refresh
-                </button>
+                <button onClick={refresh} className="text-xs text-indigo-600 hover:underline mt-1 shrink-0">Refresh</button>
             </div>
 
-            {/* KPI Row */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6">
-                <KPI title="Active Jobs"    value={jobs.active_jobs}                icon="💼" />
-                <KPI title="Total Applied"  value={applications.total_applications} icon="📋" />
-                <KPI title="Shortlisted"    value={applications.shortlisted}        icon="⭐" />
-                <KPI title="Offers Sent"    value={applications.offers_sent}        icon="📨" />
+            <NextStepCard next={workflow.next} />
+
+            <StepTracker title="Your hiring journey" steps={workflow.steps} />
+
+            <AssistantPanel
+                subscribed={aiOn}
+                price={aiStatus?.amount}
+                blurb="Your assistant can draft job posts, sharpen a job description, and rank candidates by fit for you."
+                prompts={ASSISTANT_PROMPTS}
+            />
+
+            {/* At a glance */}
+            <div>
+                <h2 className="section-title">At a glance</h2>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+                    <Glance to="/company/jobs" icon="💼" label="Active jobs" value={jobs.active_jobs} />
+                    <Glance to="/company/shortlist" icon="📋" label="Applications" value={applications.total_applications}
+                        sub={Number(applications.to_review) ? `${applications.to_review} to review` : 'all reviewed'} />
+                    <Glance to="/company/shortlist" icon="⭐" label="Shortlisted" value={applications.shortlisted} />
+                    <Glance to="/company/offers" icon="📨" label="Offers out" value={dash?.offers?.waiting ?? applications.offers_sent} />
+                </div>
             </div>
 
-            {/* Account status strip */}
-            <div className="flex flex-wrap gap-3 mb-8">
+            {/* Account strip */}
+            <div className="flex flex-wrap gap-3">
                 <Link to="/company/profile" className={`flex-1 min-w-[220px] rounded-2xl border px-4 py-3 text-sm hover:shadow-sm transition ${
-                    tierStatus?.company_tier === 'premium' ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'
+                    isPlatinum ? 'bg-success-50 border-success-100' : 'bg-white border-gray-100'
                 }`}>
-                    {tierStatus?.company_tier === 'premium' ? (
-                        <span className="text-green-700 font-medium">⭐ Platinum — no per-job fee, 8.33% per hire</span>
+                    {isPlatinum ? (
+                        <span className="text-success-700 font-medium">⭐ Platinum: no per-job fee, 8.33% per hire</span>
                     ) : tierStatus?.activated ? (
-                        <span className="text-gray-700">Standard tier — <span className="text-indigo-600 font-medium">go Platinum →</span></span>
+                        <span className="text-gray-700">Standard tier: <span className="text-indigo-600 font-medium">go Platinum →</span></span>
                     ) : (
-                        <span className="text-gray-500">No live job yet — <span className="text-indigo-600 font-medium">post a job to see full profiles →</span></span>
+                        <span className="text-gray-500">No live job yet: <span className="text-indigo-600 font-medium">post a job to see full profiles →</span></span>
                     )}
                 </Link>
                 <Link to="/company/profile" className={`flex-1 min-w-[220px] rounded-2xl border px-4 py-3 text-sm hover:shadow-sm transition ${
-                    aiStatus?.subscription?.status === 'active' ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-gray-100'
+                    aiOn ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-gray-100'
                 }`}>
-                    {aiStatus?.subscription?.status === 'active' ? (
-                        <span className="text-indigo-700 font-medium">✨ AI Assistant active</span>
+                    {aiOn ? (
+                        <span className="text-indigo-700 font-medium">✨ AI Assistant is on</span>
                     ) : (
-                        <span className="text-gray-500">✨ AI Assistant — <span className="text-indigo-600 font-medium">subscribe for ₹{aiStatus?.amount || 299}/mo →</span></span>
+                        <span className="text-gray-500">✨ AI Assistant: <span className="text-indigo-600 font-medium">subscribe for ₹{aiStatus?.amount || 299}/mo →</span></span>
                     )}
                 </Link>
-            </div>
-
-            {/* Quick actions */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[
-                    { label: 'Talent Pool',      to: '/company/talent',     icon: '👥' },
-                    { label: 'Post a Job',       to: '/company/jobs',       icon: '➕' },
-                    { label: 'Review Shortlist', to: '/company/shortlist',  icon: '⭐' },
-                    { label: 'Interviews',       to: '/company/interviews', icon: '🗓' },
-                    { label: 'Offers',           to: '/company/offers',     icon: '📨' },
-                    { label: 'Payments',         to: '/company/payments',   icon: '💳' },
-                    { label: 'Training',         to: '/company/training',   icon: '🎓' },
-                    { label: 'Requests',         to: '/company/requests',   icon: '📩' },
-                ].map(({ label, to, icon }) => (
-                    <Link key={to} to={to}
-                        className="bg-white rounded-2xl border border-gray-100 p-4 hover:border-indigo-200 hover:shadow-md transition-all flex flex-col items-center gap-2 text-center shadow-sm">
-                        <span className="text-2xl">{icon}</span>
-                        <span className="text-xs font-medium text-gray-700">{label}</span>
-                    </Link>
-                ))}
             </div>
 
             {/* Recent applications */}
             {recent_applications.length > 0 && (
-                <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                    <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
-                        <h2 className="font-semibold text-gray-800 text-sm">Recent Applications</h2>
-                        <Link to="/company/shortlist" className="text-xs text-indigo-600 hover:underline">
-                            View all →
-                        </Link>
+                <div className="pb-2">
+                    <div className="flex items-center justify-between mb-3">
+                        <h2 className="section-title mb-0">Recent applications</h2>
+                        <Link to="/company/shortlist" className="text-xs text-indigo-600 hover:underline">View all →</Link>
                     </div>
-                    <div className="overflow-x-auto">
-                    <table className="w-full text-sm min-w-[480px]">
-                        <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
-                            <tr>
-                                {['Candidate', 'Job', 'Status', 'Applied'].map(h => (
-                                    <th key={h} className="px-4 py-3 text-left">{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {recent_applications.map(app => {
-                                const s = STATUS_CONFIG[app.status] || { label: app.status, cls: 'bg-gray-100 text-gray-500' };
-                                return (
-                                    <tr key={app.id} className="hover:bg-gray-50">
-                                        <td className="px-4 py-3 font-medium text-gray-800">{app.candidate_name}</td>
-                                        <td className="px-4 py-3 text-gray-600">{app.job_title}</td>
-                                        <td className="px-4 py-3">
-                                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${s.cls}`}>
-                                                {s.label}
-                                            </span>
-                                        </td>
-                                        <td className="px-4 py-3 text-gray-500 text-xs">
-                                            {new Date(app.applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+
+                    {/* Phones: one row per application */}
+                    <div className="md:hidden card divide-y divide-gray-100 overflow-hidden">
+                        {recent_applications.map(app => {
+                            const st = STATUS_CONFIG[app.status] || { label: app.status, cls: 'bg-gray-100 text-gray-500' };
+                            return (
+                                <div key={app.id} className="flex items-center justify-between gap-3 px-4 py-3">
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-semibold text-gray-900 truncate">{app.candidate_name}</p>
+                                        <p className="text-xs text-gray-500 truncate">
+                                            {app.job_title}, {new Date(app.applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                        </p>
+                                    </div>
+                                    <span className={`shrink-0 text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    <div className="hidden md:block card overflow-hidden">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-50 text-gray-500 text-xs uppercase">
+                                <tr>
+                                    {['Candidate', 'Job', 'Status', 'Applied'].map(h => (
+                                        <th key={h} className="px-4 py-3 text-left">{h}</th>
+                                    ))}
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-100">
+                                {recent_applications.map(app => {
+                                    const st = STATUS_CONFIG[app.status] || { label: app.status, cls: 'bg-gray-100 text-gray-500' };
+                                    return (
+                                        <tr key={app.id} className="hover:bg-gray-50">
+                                            <td className="px-4 py-3 font-medium text-gray-800">{app.candidate_name}</td>
+                                            <td className="px-4 py-3 text-gray-600">{app.job_title}</td>
+                                            <td className="px-4 py-3">
+                                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.cls}`}>{st.label}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-gray-500 text-xs">
+                                                {new Date(app.applied_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             )}

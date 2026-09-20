@@ -69,19 +69,19 @@ export default function PremiumTierCard() {
                         {requested || status?.premium_requested_at ? (
                             <p className="text-xs text-green-600 font-medium">✓ Request sent — your executive will follow up.</p>
                         ) : (
-                            <div className="flex gap-2">
+                            <div className="flex flex-col sm:flex-row gap-2">
                                 <input
                                     value={note}
                                     onChange={e => setNote(e.target.value)}
                                     placeholder="Optional note for your executive…"
-                                    className="flex-1 border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                                    className="flex-1 min-w-0 border border-gray-300 rounded-lg px-2.5 py-2 sm:py-1.5 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
                                 />
                                 <button
                                     onClick={handleRequest}
                                     disabled={requesting}
-                                    className="text-xs border border-indigo-200 text-indigo-700 px-3 py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
+                                    className="text-xs border border-indigo-200 text-indigo-700 px-3 py-2 sm:py-1.5 rounded-lg hover:bg-indigo-50 disabled:opacity-60 transition font-medium whitespace-nowrap"
                                 >
-                                    {requesting ? '…' : 'Request Premium'}
+                                    {requesting ? '…' : 'Request Platinum'}
                                 </button>
                             </div>
                         )}

@@ -439,14 +439,17 @@
         animation: fadeIn 0.2s ease-out;
     }
 }
-/* Candidate and hiring portals on phones: 16px form fields stop iOS zooming the page on focus. */
+/* Candidate, hiring and company portals on phones: 16px form fields stop iOS zooming the page on focus. */
 @media (max-width: 639px) {
     .candidate-portal input:not([type='checkbox']):not([type='radio']):not([type='file']),
     .candidate-portal select,
     .candidate-portal textarea,
     .staff-portal input:not([type='checkbox']):not([type='radio']):not([type='file']),
     .staff-portal select,
-    .staff-portal textarea {
+    .staff-portal textarea,
+    .company-portal input:not([type='checkbox']):not([type='radio']):not([type='file']),
+    .company-portal select,
+    .company-portal textarea {
         font-size: 16px;
     }
 }

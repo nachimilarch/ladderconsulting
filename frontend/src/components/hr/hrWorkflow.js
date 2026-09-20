@@ -1,7 +1,7 @@
 // The hiring-staff workflow in one place, so the stepper, the "next step" card and the
 // "waiting on you" list always agree: companies -> sourcing -> interviews -> offers -> placements.
 
-export const inr = (n) => `₹${Number(n || 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+import { inr } from '../../utils/money';
 
 const plural = (n, one, many) => `${n} ${n === 1 ? one : many}`;
 
