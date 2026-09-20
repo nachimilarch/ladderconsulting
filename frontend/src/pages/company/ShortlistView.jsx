@@ -264,13 +264,23 @@ export default function ShortlistView() {
                         const hiredElsewhere = Number(app.hired_elsewhere) > 0;
                         const hiredHere = app.status === 'hired';
                         const isLocked = hiredElsewhere || hiredHere;
+                        const isPremium = Number(app.is_premium) === 1;
 
                         return (
-                            <div key={app.id} className={`bg-white rounded-2xl border shadow-sm p-5 ${hiredHere ? 'border-green-300' : 'border-gray-100'}`}>
+                            <div key={app.id} className={`rounded-2xl border shadow-sm p-5 ${
+                                hiredHere ? 'bg-white border-green-300'
+                                : isPremium ? 'bg-yellow-50/50 border-yellow-300 ring-1 ring-yellow-200'
+                                : 'bg-white border-gray-100'
+                            }`}>
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 flex-wrap mb-1">
                                             <h3 className="font-semibold text-gray-900">{app.candidate_name}</h3>
+                                            {isPremium && (
+                                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300" title="Verified Premium candidate, listed first">
+                                                    ⭐ Premium
+                                                </span>
+                                            )}
                                             <button
                                                 onClick={() => setProfileDrawer(app)}
                                                 className="text-[11px] text-indigo-600 hover:underline"

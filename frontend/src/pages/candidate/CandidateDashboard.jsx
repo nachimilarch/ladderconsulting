@@ -74,7 +74,7 @@ export default function CandidateDashboard() {
         { label: 'My Applications', to: '/candidate/applications', icon: '📋', desc: 'Track your application status', color: 'purple' },
         { label: 'Interviews', to: '/candidate/interviews', icon: '🗓', desc: 'View scheduled interviews', color: 'amber' },
         { label: 'Documents', to: '/candidate/documents', icon: '📁', desc: 'Upload IDs, payslips, certificates', color: 'blue' },
-        { label: 'Go Premium', to: '/candidate/premium', icon: '⭐', desc: 'Get verified for boosted visibility', color: 'amber' },
+        { label: 'Go Premium', to: '/candidate/premium', icon: '⭐', desc: 'Get a ⭐ badge and be listed first', color: 'amber' },
     ];
 
     if (loading) {
@@ -103,13 +103,13 @@ export default function CandidateDashboard() {
                     premiumStatus?.is_premium ? 'bg-green-50 border-green-100' : 'bg-gradient-to-r from-yellow-50 to-indigo-50 border-yellow-100'
                 }`}>
                     {premiumStatus?.is_premium ? (
-                        <span className="font-semibold text-green-700">⭐ Premium profile active — boosted to Premium companies</span>
+                        <span className="font-semibold text-green-700">⭐ Premium profile active — listed first to every company</span>
                     ) : premiumStatus?.request?.status === 'pending' ? (
                         <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium verification pending</span> — your executive is reviewing it.</span>
                     ) : premiumStatus?.request?.status === 'approved' ? (
                         <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium approved</span> — pay ₹999 to activate →</span>
                     ) : (
-                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Go Premium</span> — earning ₹6 LPA+? Get verified for boosted visibility.</span>
+                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Go Premium</span> — earning ₹6 LPA+? Get verified and be listed first to every company.</span>
                     )}
                 </Link>
                 <Link to="/candidate/profile" className={`flex-1 rounded-2xl border px-5 py-3 text-sm hover:shadow-sm transition ${

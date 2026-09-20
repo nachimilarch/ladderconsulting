@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 
 // Shows the company's current tier and, for Standard-tier companies, lets them
 // request the Premium tier (8.33% placement fee per hire, replaces the ₹3,999
-// listing fee, unlocks the full candidate pool including Premium candidates).
+// per-job fee).
 export default function PremiumTierCard() {
     const [loading, setLoading] = useState(true);
     const [status, setStatus] = useState(null);
@@ -42,7 +42,7 @@ export default function PremiumTierCard() {
             <h2 className="text-base font-semibold text-gray-900 mb-1">Account Tier</h2>
             <p className="text-xs text-gray-500 mb-4">
                 {isPremium
-                    ? 'You have full access to the candidate pool, including Premium candidates.'
+                    ? 'You post jobs with no per-job fee. Every hire carries an 8.33% placement fee.'
                     : 'You’re on the Standard tier — post jobs and hire from the free candidate pool for a flat ₹3,999.'}
             </p>
 
@@ -50,7 +50,7 @@ export default function PremiumTierCard() {
                 <p className="text-sm text-gray-400">Loading…</p>
             ) : isPremium ? (
                 <div className="bg-green-50 border border-green-100 rounded-xl px-4 py-3 text-sm text-green-700 font-medium">
-                    ⭐ Premium — full candidate pool access, 8.33% placement fee per hire, no listing fee
+                    ⭐ Platinum — no per-job fee, 8.33% placement fee per hire
                 </div>
             ) : (
                 <>
@@ -63,8 +63,8 @@ export default function PremiumTierCard() {
                     <div className="border border-gray-200 rounded-xl px-4 py-3">
                         <p className="text-sm font-semibold text-gray-900 mb-1">Premium Tier</p>
                         <p className="text-xs text-gray-400 mb-2">
-                            Full candidate pool access, including Premium candidates. Replaces the listing fee —
-                            you pay no fee to post jobs, but every hire is charged an 8.33% placement fee at hire time.
+                            Replaces the per-job fee: you pay nothing to post jobs, but every hire is charged an
+                            8.33% placement fee at hire time.
                             Reviewed and approved by your account executive.
                         </p>
                         {requested || status?.premium_requested_at ? (

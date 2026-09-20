@@ -223,7 +223,8 @@ const summarizeJobMatches = (jobs) => {
 const summarizeCandidateMatches = (jobTitle, matches) => {
     const top = matches[0];
     const why = top.matched_skills?.length ? `, with ${listOf(top.matched_skills)}` : '';
-    return `Here are the best fits for **${jobTitle}**. ${top.name} leads with a ${top.match_score}% match${why}. You can open them in Talent Pool, or ask me to sharpen the job description to attract even more.`;
+    const premium = matches.some((m) => m.is_premium) ? ' Premium ⭐ candidates are listed first, then by skill match.' : '';
+    return `Here are the best fits for **${jobTitle}**.${premium} ${top.name} is at the top with a ${top.match_score}% match${why}. You can open them in Talent Pool, or ask me to sharpen the job description to attract even more.`;
 };
 
 const resolvePersona = (role) => (role === 'company' ? 'company' : role === 'candidate' ? 'candidate' : null);

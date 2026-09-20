@@ -655,7 +655,7 @@ exports.listRequests = async (req, res) => {
 exports.getTalentPool = async (req, res) => {
     try {
         const company = await getOrCreateCompany(req.user.id);
-        const { activated, isPremium } = await getCompanyAccess(company.id);
+        const { activated } = await getCompanyAccess(company.id);
 
         const { search = '', experience_min, experience_max, skill, page = 1, jobId } = req.query;
         const limit = 24;
@@ -702,12 +702,30 @@ exports.getTalentPool = async (req, res) => {
             params.push(`%${skill.trim()}%`);
         }
 
-        // Premium candidates are completely invisible to Standard-tier companies —
-        // this is the whole value prop of moving to Premium, not just a de-prioritization.
-        const premiumClause = isPremium ? '' : 'AND COALESCE(c.is_premium, 0) = 0';
+        // Premium candidates (⭐) are shown to EVERY company and always listed first;
+        // company tier never hides them. Within each group the order is best skill match
+        // for the selected JD (when one is chosen), then experience.
+        const fromWhere = `
+             FROM candidates c
+             JOIN users u ON u.id = c.user_id
+             JOIN candidate_profiles cp ON cp.candidate_id = c.id
+             WHERE c.deleted_at IS NULL
+               AND u.deleted_at IS NULL
+               AND u.status = 'active'
+               AND NOT EXISTS (
+                   SELECT 1 FROM applications a2
+                   WHERE a2.candidate_id = c.id AND a2.status = 'hired' AND a2.deleted_at IS NULL
+               )
+               AND NOT EXISTS (
+                   SELECT 1 FROM applications a3
+                   JOIN offers o ON o.application_id = a3.id AND o.deleted_at IS NULL
+                   WHERE a3.candidate_id = c.id AND o.status IN ('sent', 'accepted')
+               )
+               ${searchClause}
+               ${expClause}
+               ${skillClause}`;
 
-        const [rows] = await db.query(
-            `SELECT
+        const cols = `
                 c.id AS candidate_id,
                 c.is_premium,
                 u.name AS candidate_name,
@@ -721,61 +739,48 @@ exports.getTalentPool = async (req, res) => {
                  FROM candidate_skill_vectors csv
                  JOIN skill_tags st ON st.id = csv.skill_tag_id
                  WHERE csv.candidate_id = c.id
-                 LIMIT 12) AS skills
-             FROM candidates c
-             JOIN users u ON u.id = c.user_id
-             JOIN candidate_profiles cp ON cp.candidate_id = c.id
-             WHERE c.deleted_at IS NULL
-               AND u.deleted_at IS NULL
-               AND u.status = 'active'
-               AND NOT EXISTS (
-                   SELECT 1 FROM applications a2
-                   WHERE a2.candidate_id = c.id AND a2.status = 'hired' AND a2.deleted_at IS NULL
-               )
-               AND NOT EXISTS (
-                   SELECT 1 FROM applications a3
-                   JOIN offers o ON o.application_id = a3.id AND o.deleted_at IS NULL
-                   WHERE a3.candidate_id = c.id AND o.status IN ('sent', 'accepted')
-               )
-               ${premiumClause}
-               ${searchClause}
-               ${expClause}
-               ${skillClause}
-             ORDER BY c.is_premium DESC, cp.total_experience DESC, c.id DESC
-             LIMIT ? OFFSET ?`,
-            [...params, limit, offset]
-        );
+                 LIMIT 12) AS skills`;
 
-        // Count for pagination
-        const [countRows] = await db.query(
-            `SELECT COUNT(*) AS total
-             FROM candidates c
-             JOIN users u ON u.id = c.user_id
-             JOIN candidate_profiles cp ON cp.candidate_id = c.id
-             WHERE c.deleted_at IS NULL
-               AND u.deleted_at IS NULL
-               AND u.status = 'active'
-               AND NOT EXISTS (
-                   SELECT 1 FROM applications a2
-                   WHERE a2.candidate_id = c.id AND a2.status = 'hired' AND a2.deleted_at IS NULL
-               )
-               AND NOT EXISTS (
-                   SELECT 1 FROM applications a3
-                   JOIN offers o ON o.application_id = a3.id AND o.deleted_at IS NULL
-                   WHERE a3.candidate_id = c.id AND o.status IN ('sent', 'accepted')
-               )
-               ${premiumClause}
-               ${searchClause}
-               ${expClause}
-               ${skillClause}`,
-            params
-        );
-
-        // Live match % against the selected JD (masking never touches match_score).
+        let rows;
+        let total;
         let scoreMap = new Map();
+
         if (matchJobId) {
-            try { scoreMap = await scorePoolAgainstJob(matchJobId, rows.map(r => r.candidate_id)); }
+            // Score the whole filtered pool, rank it, THEN paginate — so "Premium first, then
+            // best match" holds across pages instead of only within the current one.
+            const [all] = await db.query(
+                `SELECT c.id AS candidate_id, c.is_premium, COALESCE(cp.total_experience, 0) AS exp ${fromWhere}`,
+                params
+            );
+            try { scoreMap = await scorePoolAgainstJob(matchJobId, all.map(r => r.candidate_id)); }
             catch (e) { console.error('[getTalentPool] scoring failed:', e.message); }
+
+            const scoreOf = (id) => scoreMap.get(id)?.score ?? -1;
+            all.sort((a, b) =>
+                (Number(b.is_premium) - Number(a.is_premium)) ||
+                (scoreOf(b.candidate_id) - scoreOf(a.candidate_id)) ||
+                (Number(b.exp) - Number(a.exp)) ||
+                (b.candidate_id - a.candidate_id)
+            );
+            total = all.length;
+
+            const pageIds = all.slice(offset, offset + limit).map(r => r.candidate_id);
+            if (pageIds.length) {
+                const [pageRows] = await db.query(`SELECT ${cols} ${fromWhere} AND c.id IN (?)`, [...params, pageIds]);
+                const byId = new Map(pageRows.map(r => [r.candidate_id, r]));
+                rows = pageIds.map(id => byId.get(id)).filter(Boolean);
+            } else {
+                rows = [];
+            }
+        } else {
+            [rows] = await db.query(
+                `SELECT ${cols} ${fromWhere}
+                 ORDER BY c.is_premium DESC, cp.total_experience DESC, c.id DESC
+                 LIMIT ? OFFSET ?`,
+                [...params, limit, offset]
+            );
+            const [countRows] = await db.query(`SELECT COUNT(*) AS total ${fromWhere}`, params);
+            total = countRows[0].total;
         }
 
         const candidates = rows.map(row => {
@@ -796,7 +801,7 @@ exports.getTalentPool = async (req, res) => {
         res.json({
             success: true,
             data: candidates,
-            total: countRows[0].total,
+            total,
             page: parseInt(page),
             limit,
             activated,
@@ -930,7 +935,7 @@ exports.requestPremiumTier = async (req, res) => {
             recipientUserId,
             'company_premium_request',
             `Premium Tier Request — ${company.company_name}`,
-            `${company.company_name} has requested to move to the Premium tier (8.33% placement fee per hire, access to Premium candidates).${req.body?.note ? ` Note: ${req.body.note}` : ''}`,
+            `${company.company_name} has requested to move to the Premium tier (no per-job fee, 8.33% placement fee per hire).${req.body?.note ? ` Note: ${req.body.note}` : ''}`,
             { company_id: company.id }
         );
 

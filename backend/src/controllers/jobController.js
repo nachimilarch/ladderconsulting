@@ -413,7 +413,7 @@ exports.getJobApplications = async (req, res) => {
 
         const [applications] = await db.query(
             `SELECT a.id, a.status, a.applied_at, a.cover_letter,
-                    a.candidate_id, a.source,
+                    a.candidate_id, a.source, c.is_premium,
                     u.name AS candidate_name, u.email AS candidate_email, u.phone AS candidate_phone,
                     cp.current_location AS location, cp.total_experience, cp.expected_salary,
                     cp.notice_period_days AS notice_period,
@@ -434,10 +434,11 @@ exports.getJobApplications = async (req, res) => {
              LEFT JOIN shortlists s ON s.application_id = a.id AND s.deleted_at IS NULL
              LEFT JOIN match_results mr ON mr.application_id = a.id
              WHERE ${filters.join(' AND ')}
-             ORDER BY COALESCE(mr.fit_score, 0) DESC, a.applied_at DESC`,
+             ORDER BY c.is_premium DESC, COALESCE(mr.fit_score, 0) DESC, a.applied_at DESC`,
             params
         );
 
+        // Premium candidates first (⭐), then best skill match for this JD.
         const result = applications.map(app => {
             const parsed = {
                 ...app,

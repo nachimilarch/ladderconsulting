@@ -286,11 +286,16 @@ function JDDetail({ job, jobDetail, loading }) {
 function PoolCard({ candidate, jobSelected, onAssign, assigning, onViewProfile, jobId }) {
     const exp = candidate.total_experience != null ? `${candidate.total_experience} yr${candidate.total_experience !== 1 ? 's' : ''}` : null;
     return (
-        <div className={`bg-white rounded-2xl border shadow-sm p-4 transition ${candidate.already_applied ? 'border-green-200 opacity-90' : 'border-gray-100'}`}>
+        <div className={`rounded-2xl border shadow-sm p-4 transition ${
+            candidate.already_applied ? 'bg-white border-green-200 opacity-90'
+            : Number(candidate.is_premium) === 1 ? 'bg-yellow-50/50 border-yellow-300 ring-1 ring-yellow-200'
+            : 'bg-white border-gray-100'
+        }`}>
             <div className="flex items-start justify-between gap-3">
                 <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <span className="font-semibold text-sm text-gray-900">{candidate.candidate_name}</span>
+                        {Number(candidate.is_premium) === 1 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300">⭐ Premium</span>}
                         {candidate.already_applied && <span className="badge-green text-[10px]">Assigned ✓</span>}
                         {!candidate.latest_resume_id && <span className="badge-yellow text-[10px]">No resume</span>}
                         {candidate.fit_score != null && (
@@ -349,7 +354,9 @@ function PoolCard({ candidate, jobSelected, onAssign, assigning, onViewProfile, 
 function FreePoolCard({ candidate, onDelete, deleting, onViewProfile }) {
     const exp = candidate.total_experience != null ? `${candidate.total_experience} yr${candidate.total_experience !== 1 ? 's' : ''}` : null;
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4">
+        <div className={`rounded-2xl border shadow-sm p-4 ${
+            Number(candidate.is_premium) === 1 ? 'bg-yellow-50/50 border-yellow-300 ring-1 ring-yellow-200' : 'bg-white border-gray-100'
+        }`}>
             <div className="flex items-start justify-between gap-3">
                 <button
                     type="button"
@@ -358,6 +365,7 @@ function FreePoolCard({ candidate, onDelete, deleting, onViewProfile }) {
                 >
                     <div className="flex items-center gap-2 flex-wrap mb-0.5">
                         <span className="font-semibold text-sm text-gray-900 hover:text-indigo-700 transition">{candidate.candidate_name}</span>
+                        {Number(candidate.is_premium) === 1 && <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-yellow-100 text-yellow-800 border border-yellow-300">⭐ Premium</span>}
                         {!candidate.latest_resume_id && <span className="badge-yellow text-[10px]">No resume</span>}
                         {candidate.total_applications > 0 && <span className="badge-blue text-[10px]">{candidate.total_applications} application(s)</span>}
                     </div>

@@ -28,7 +28,7 @@ const statusBadge = (s, neverLoggedIn = false) => {
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : null;
 
-// Standard = pays ₹3,999 per job; Platinum = no per-job fee, full pool, % placement fee.
+// Standard = pays ₹3,999 per job; Platinum = no per-job fee, % placement fee.
 const tierBadge = (tier) => tier === 'premium' ? (
     <span className="px-2 py-0.5 rounded text-xs font-semibold bg-yellow-100 text-yellow-700 whitespace-nowrap">⭐ Platinum</span>
 ) : (

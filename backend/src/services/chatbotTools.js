@@ -51,7 +51,7 @@ const insertPendingAction = async (conversationId, userId, actionType, payload, 
 // ── Company persona tools ──────────────────────────────────────────────────
 
 async function findMatchingCandidates({ user }, { job_id, limit = 5 }) {
-    const [[company]] = await db.query('SELECT id, company_tier FROM companies WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
+    const [[company]] = await db.query('SELECT id FROM companies WHERE user_id = ? AND deleted_at IS NULL', [user.id]);
     if (!company) return { error: 'Company account not found.' };
 
     const [[job]] = await db.query(
@@ -60,22 +60,23 @@ async function findMatchingCandidates({ user }, { job_id, limit = 5 }) {
     );
     if (!job) return { error: `Job #${job_id} not found, or does not belong to your company.` };
 
-    // Same tier-visibility rule as Talent Pool (Phase 1): Standard companies
-    // never see Premium candidates.
-    const isPremium = company.company_tier === 'premium';
+    // Every company sees Premium candidates (⭐), listed first; company tier doesn't matter.
+    // Ordering by is_premium first keeps them inside the 200-row window on a big pool.
     const [candidates] = await db.query(
-        `SELECT c.id FROM candidates c
+        `SELECT c.id, c.is_premium FROM candidates c
          JOIN users u ON u.id = c.user_id
          WHERE c.deleted_at IS NULL AND u.deleted_at IS NULL AND u.status = 'active'
-           ${isPremium ? '' : 'AND COALESCE(c.is_premium, 0) = 0'}
            AND NOT EXISTS (SELECT 1 FROM applications a WHERE a.candidate_id = c.id AND a.status = 'hired' AND a.deleted_at IS NULL)
+         ORDER BY c.is_premium DESC, c.id DESC
          LIMIT 200`
     );
+    const premiumIds = new Set(candidates.filter(c => c.is_premium).map(c => c.id));
 
     const scoreMap = await scorePoolAgainstJob(job_id, candidates.map(c => c.id));
     const ranked = [...scoreMap.entries()]
+        .filter(([, v]) => v) // candidates with no skills yet come back null
         .map(([candidateId, v]) => ({ candidateId, ...v }))
-        .sort((a, b) => b.score - a.score)
+        .sort((a, b) => (Number(premiumIds.has(b.candidateId)) - Number(premiumIds.has(a.candidateId))) || (b.score - a.score))
         .slice(0, limit);
 
     if (!ranked.length) return { job_title: job.title, matches: [], note: 'No scored candidates found in your visible pool yet.' };

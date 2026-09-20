@@ -31,7 +31,9 @@ function CandidateCard({ cand, activated, onInterest }) {
     const extra = skills.length - shown.length;
 
     return (
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow">
+        <div className={`rounded-2xl border shadow-sm p-5 flex flex-col gap-3 hover:shadow-md transition-shadow ${
+            cand.is_premium ? 'bg-yellow-50/50 border-yellow-300 ring-1 ring-yellow-200' : 'bg-white border-gray-100'
+        }`}>
             {/* Header */}
             <div className="flex items-start justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -265,7 +267,7 @@ export default function TalentPool() {
                 </p>
                 {activated && companyTier === 'premium' && (
                     <span className="inline-block mt-2 text-xs font-medium text-green-700 bg-green-50 border border-green-100 px-2.5 py-1 rounded-full">
-                        ⭐ Premium — full pool including Premium candidates
+                        ⭐ Platinum — no per-job fee
                     </span>
                 )}
                 {activated && companyTier !== 'premium' && (
@@ -273,14 +275,9 @@ export default function TalentPool() {
                         ✓ Account Activated
                     </span>
                 )}
-                {companyTier !== 'premium' && (
-                    <a
-                        href="/company/profile"
-                        className="inline-block mt-2 ml-2 text-xs font-medium text-yellow-700 bg-yellow-50 border border-yellow-100 px-2.5 py-1 rounded-full hover:bg-yellow-100 transition"
-                    >
-                        ⭐ Upgrade to Premium — see Premium candidates too
-                    </a>
-                )}
+                <p className="text-xs text-gray-400 mt-2">
+                    ⭐ Premium candidates are verified (₹6L+ CTC) and always listed first. Pick a job to rank everyone by skill match.
+                </p>
             </div>
 
             <AiAssistantPromo text="ask it to find candidates matching one of your job postings, ranked by AI match score." />

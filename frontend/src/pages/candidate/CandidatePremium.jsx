@@ -100,13 +100,13 @@ export default function CandidatePremium() {
             <div className="mb-6">
                 <h1 className="text-xl font-bold text-gray-900">Premium Profile</h1>
                 <p className="text-sm text-gray-500 mt-1">
-                    Verified candidates earning ₹6 LPA or more get boosted visibility to LadderStep's Premium hiring companies.
+                    Verified candidates earning ₹6 LPA or more get a ⭐ Premium badge and are listed first to every company, ahead of other applicants.
                 </p>
             </div>
 
             {status?.is_premium ? (
                 <div className="bg-green-50 border border-green-100 rounded-2xl px-6 py-5 text-sm text-green-700 font-medium">
-                    ⭐ Your profile is Premium — you're boosted to the top of Talent Pool results shown to Premium companies.
+                    ⭐ Your profile is Premium — you carry a star badge and are listed first to every company, then ranked by how well you match each job. You can apply to any job.
                 </div>
             ) : request?.status === 'pending' ? (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">

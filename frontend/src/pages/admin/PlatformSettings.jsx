@@ -101,8 +101,8 @@ const FEES_SETTINGS = {
 const FIXED_PRICING = [
     { label: 'Standard company — job posting', value: '₹3,999 per job posted (per JD, not one-time)' },
     { label: 'Standard company — placement fee', value: '1× monthly CTC per hire, unless a contracted % is set on the company' },
-    { label: 'Platinum company', value: 'No per-job fee · full pool incl. Premium candidates · 8.33% of annual CTC per hire' },
-    { label: 'Candidate Premium', value: '₹999 one-time · ₹6L+ CTC verified from payslips · boosted, Platinum-only visibility' },
+    { label: 'Platinum company', value: 'No per-job fee · 8.33% of annual CTC per hire' },
+    { label: 'Candidate Premium', value: '₹999 one-time · ₹6L+ CTC verified from payslips · ⭐ badge, listed first to every company' },
 ];
 
 // ── Environment / integration settings ───────────────────────────────────────

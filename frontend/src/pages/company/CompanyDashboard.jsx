@@ -145,7 +145,7 @@ export default function CompanyDashboard() {
                     tierStatus?.company_tier === 'premium' ? 'bg-green-50 border-green-100' : 'bg-white border-gray-100'
                 }`}>
                     {tierStatus?.company_tier === 'premium' ? (
-                        <span className="text-green-700 font-medium">⭐ Platinum — full pool, no listing fee, 8.33% per hire</span>
+                        <span className="text-green-700 font-medium">⭐ Platinum — no per-job fee, 8.33% per hire</span>
                     ) : tierStatus?.activated ? (
                         <span className="text-gray-700">Standard tier — <span className="text-indigo-600 font-medium">go Platinum →</span></span>
                     ) : (

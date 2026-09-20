@@ -68,7 +68,7 @@ function PlatinumBanner() {
                 )}
             </div>
             <p className="text-xs text-gray-500 mt-2">
-                Platinum: no listing or per-job fee, the full pool including Premium candidates, and an 8.33% placement fee per hire instead. Needs approval from your account executive.
+                Platinum: no listing or per-job fee, and an 8.33% placement fee per hire instead. Needs approval from your account executive.
             </p>
         </div>
     );

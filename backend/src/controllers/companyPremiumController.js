@@ -84,7 +84,7 @@ exports.approvePremiumRequest = async (req, res) => {
             company.user_id,
             'premium_tier_approved',
             'Premium Tier Approved',
-            `Your account has been moved to the Premium tier. You can now post jobs and browse the full candidate pool (including Premium candidates) with no listing fee — every hire is charged a ${PREMIUM_PLACEMENT_FEE_PERCENT}% placement fee at hire time.`,
+            `Your account has been moved to the Premium tier. You can now post jobs with no per-job fee — every hire is charged a ${PREMIUM_PLACEMENT_FEE_PERCENT}% placement fee at hire time.`,
             { company_id }
         );
 

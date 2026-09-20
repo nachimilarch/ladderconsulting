@@ -615,23 +615,6 @@ exports.listTalentPoolExec = async (req, res) => {
 
         const jobIdInt = jobId ? parseInt(jobId) : null;
 
-        // When browsing against a specific JD, scope visibility to that JD's company
-        // tier — Standard companies never see Premium candidates, even via an
-        // executive's suggestion. Browsing with no jobId (general pool view) is
-        // unrestricted since there's no target company to scope against yet.
-        let premiumClause = '';
-        if (jobIdInt) {
-            const [[targetJob]] = await db.query(
-                `SELECT co.company_tier FROM job_postings jp
-                 JOIN companies co ON co.id = jp.company_id
-                 WHERE jp.id = ? AND jp.deleted_at IS NULL`,
-                [jobIdInt]
-            );
-            if (targetJob && targetJob.company_tier !== 'premium') {
-                premiumClause = 'AND COALESCE(c.is_premium, 0) = 0';
-            }
-        }
-
         const [rows] = await db.query(
             `SELECT
                 c.id AS candidate_id,
@@ -670,11 +653,10 @@ exports.listTalentPoolExec = async (req, res) => {
                    SELECT 1 FROM applications a2
                    WHERE a2.candidate_id = c.id AND a2.status = 'hired' AND a2.deleted_at IS NULL
                )
-               ${premiumClause}
                ${searchClause}
                ${expClause}
                ${skillClause}
-             ORDER BY ${jobIdInt ? `COALESCE(
+             ORDER BY c.is_premium DESC, ${jobIdInt ? `COALESCE(
                  (SELECT mr.fit_score FROM applications a_ord
                   JOIN match_results mr ON mr.application_id = a_ord.id
                   WHERE a_ord.candidate_id = c.id AND a_ord.job_id = ? AND a_ord.deleted_at IS NULL
@@ -698,7 +680,6 @@ exports.listTalentPoolExec = async (req, res) => {
                    SELECT 1 FROM applications a2
                    WHERE a2.candidate_id = c.id AND a2.status = 'hired' AND a2.deleted_at IS NULL
                )
-               ${premiumClause}
                ${searchClause}
                ${expClause}
                ${skillClause}`,
@@ -751,7 +732,7 @@ exports.assignCandidateToJob = async (req, res) => {
     try {
         // Verify job exists and is active
         const [[job]] = await db.query(
-            `SELECT jp.id, jp.title, co.id AS company_id, co.company_name, co.assigned_executive_id, co.company_tier
+            `SELECT jp.id, jp.title, co.id AS company_id, co.company_name, co.assigned_executive_id
              FROM job_postings jp
              JOIN companies co ON co.id = jp.company_id AND co.deleted_at IS NULL
              WHERE jp.id = ? AND jp.status = 'active' AND jp.deleted_at IS NULL`,
@@ -761,21 +742,12 @@ exports.assignCandidateToJob = async (req, res) => {
 
         // Verify candidate exists and is not hired
         const [[cand]] = await db.query(
-            `SELECT c.id, c.is_premium, u.name AS candidate_name, u.id AS user_id
+            `SELECT c.id, u.name AS candidate_name, u.id AS user_id
              FROM candidates c JOIN users u ON u.id = c.user_id
              WHERE c.id = ? AND c.deleted_at IS NULL AND u.status = 'active'`,
             [candidateId]
         );
         if (!cand) return res.status(404).json({ success: false, message: 'Candidate not found.' });
-
-        // Defense-in-depth beyond the pool-listing filter: a Standard-tier company
-        // must never receive a Premium candidate, even via direct assignment.
-        if (cand.is_premium && job.company_tier !== 'premium') {
-            return res.status(403).json({
-                success: false,
-                message: 'This candidate is Premium-tier and can only be assigned to jobs posted by Premium-tier companies.',
-            });
-        }
 
         const isHired = await isCandidateHired(parseInt(candidateId));
         if (isHired) return res.status(409).json({ success: false, message: 'Candidate is already hired and unavailable.' });

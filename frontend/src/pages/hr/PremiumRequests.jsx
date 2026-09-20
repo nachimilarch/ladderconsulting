@@ -57,7 +57,7 @@ export default function PremiumRequests() {
                 <h1 className="text-xl font-bold text-gray-900">Company Premium Requests</h1>
                 <p className="text-sm text-gray-500 mt-1">
                     Companies assigned to you asking to move to the Premium tier (8.33% placement fee per hire,
-                    replaces the ₹3,999 listing fee, unlocks the Premium candidate pool).
+                    replaces the ₹3,999 per-job fee).
                 </p>
             </div>
 
