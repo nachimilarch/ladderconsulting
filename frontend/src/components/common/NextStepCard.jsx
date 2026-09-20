@@ -18,7 +18,7 @@ export default function NextStepCard({ next }) {
             <div className="flex items-start gap-3 mt-2">
                 <span className="text-3xl leading-none mt-0.5" aria-hidden="true">{next.icon}</span>
                 <div className="min-w-0">
-                    <h2 className="text-lg sm:text-xl font-bold leading-snug">{next.title}</h2>
+                    <h2 className="text-lg sm:text-xl font-bold leading-snug text-white">{next.title}</h2>
                     <p className="text-sm opacity-90 mt-1 leading-relaxed">{next.text}</p>
                 </div>
             </div>

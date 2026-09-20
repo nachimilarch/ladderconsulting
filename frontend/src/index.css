@@ -43,6 +43,11 @@
         @apply font-display font-semibold text-gray-900 leading-tight;
     }
 
+    /* Headings default to dark text; on a white-text surface (gradient cards) they inherit it. */
+    .text-white :where(h1, h2, h3, h4, h5, h6) {
+        color: inherit;
+    }
+
     input,
     select,
     textarea,
