@@ -164,41 +164,27 @@ async function findMatchingJobs({ user }, { limit = 5 } = {}) {
     const [[cand]] = await db.query('SELECT id FROM candidates WHERE user_id = ?', [user.id]);
     if (!cand) return { error: 'Candidate account not found.' };
 
-    // Scores are only stored per application, so a job the candidate hasn't applied
-    // to comes back as 0 — score those on the fly with the same skill-vector engine
-    // the Talent Pool uses, then rank.
-    const { jobs: active } = await jobController.getMatchedJobsForCandidate(cand.id, { page: 1, limit: 30 });
-    const scored = await Promise.all(active.map(async (j) => {
-        let score = j.match_computed ? Number(j.match_score) : null;
-        let matched = [];
-        if (score === null) {
-            const r = (await scorePoolAgainstJob(j.id, [cand.id])).get(cand.id);
-            if (r) { score = r.score; matched = r.matched_skills || []; }
-        } else if (j.matched_skills) {
-            try { matched = typeof j.matched_skills === 'string' ? JSON.parse(j.matched_skills) : j.matched_skills; } catch { /* leave [] */ }
-        }
-        return {
-            job_id: j.id,
-            title: j.title,
-            company: j.company_name,
-            location: j.location,
-            job_type: j.job_type,
-            work_mode: j.work_mode,
-            salary_min: j.salary_min,
-            salary_max: j.salary_max,
-            match_score: score === null ? null : Math.round(score),
-            matched_skills: (matched || []).slice(0, 4),
-            already_applied: !!j.already_applied,
-        };
-    }));
+    // Live-scored and ranked in one place, shared with the dashboard's Top Matches.
+    const { jobs: ranked } = await jobController.getMatchedJobsForCandidate(cand.id, { page: 1, limit });
+    const parse = (v) => { try { return typeof v === 'string' ? JSON.parse(v) : (v || []); } catch { return []; } };
 
-    const ranked = scored
-        .sort((a, b) => (b.match_score ?? -1) - (a.match_score ?? -1))
-        .slice(0, limit);
-    const anyScored = ranked.some(j => j.match_score !== null);
+    const jobs = ranked.map((j) => ({
+        job_id: j.id,
+        title: j.title,
+        company: j.company_name,
+        location: j.location,
+        job_type: j.job_type,
+        work_mode: j.work_mode,
+        salary_min: j.salary_min,
+        salary_max: j.salary_max,
+        match_score: j.match_computed ? Math.round(j.match_score) : null,
+        matched_skills: parse(j.matched_skills).slice(0, 4),
+        already_applied: !!j.already_applied,
+    }));
+    const anyScored = jobs.some(j => j.match_score !== null);
 
     return {
-        jobs: ranked,
+        jobs,
         note: CARD_NOTE + (anyScored ? '' : " None could be scored, which usually means the profile has no skills yet: suggest they add skills or upload a resume."),
     };
 }

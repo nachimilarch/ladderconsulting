@@ -43,11 +43,17 @@ const getCompanyId = async (userId) => {
 };
 
 // Shared by GET /api/jobs/matched (routes/jobs.js) and the chatbot's
-// find_matching_jobs tool (chatbotTools.js) — identical query either way.
+// find_matching_jobs tool (chatbotTools.js).
+//
+// match_results are stored per APPLICATION, so a job the candidate hasn't applied to
+// has no stored score. Those are scored live here (same skill-vector engine the
+// Talent Pool uses) and the whole set is ranked before paginating, so "best match
+// first" is real for a brand-new candidate too. Capped to the 100 newest active jobs.
+const MATCH_WINDOW = 100;
 exports.getMatchedJobsForCandidate = async (candidateId, { page = 1, limit = 10 } = {}) => {
     const offset = (page - 1) * limit;
 
-    const [jobs] = await db.query(
+    const [all] = await db.query(
         `SELECT
            jp.id, jp.title, jp.description, jp.location, jp.job_type,
            jp.salary_min, jp.salary_max, jp.experience_min, jp.experience_max,
@@ -65,16 +71,31 @@ exports.getMatchedJobsForCandidate = async (candidateId, { page = 1, limit = 10 
            ON app_link.job_id=jp.id AND app_link.candidate_id=? AND app_link.deleted_at IS NULL
          LEFT JOIN match_results mr ON mr.application_id = app_link.id
          WHERE jp.status='active' AND jp.deleted_at IS NULL
-         ORDER BY match_score DESC, jp.created_at DESC
-         LIMIT ? OFFSET ?`,
-        [candidateId, candidateId, limit, offset]
+         ORDER BY jp.created_at DESC
+         LIMIT ?`,
+        [candidateId, candidateId, MATCH_WINDOW]
     );
+
+    const scored = await Promise.all(all.map(async (j) => {
+        if (j.match_computed) return { ...j, match_score: Number(j.match_score) };
+        const live = (await matchingService.scorePoolAgainstJob(j.id, [candidateId])).get(candidateId);
+        if (!live) return { ...j, match_score: 0, match_computed: 0 }; // no skills on the profile, or none on the job
+        return {
+            ...j,
+            match_score: Math.round(live.score),
+            match_computed: 1,
+            matched_skills: JSON.stringify(live.matched_skills || []),
+            missing_skills: JSON.stringify(live.missing_skills || []),
+        };
+    }));
+
+    scored.sort((a, b) => (b.match_score - a.match_score) || (new Date(b.created_at) - new Date(a.created_at)));
 
     const [[{ total }]] = await db.query(
         `SELECT COUNT(*) AS total FROM job_postings WHERE status='active' AND deleted_at IS NULL`
     );
 
-    return { jobs, pagination: { page, limit, total } };
+    return { jobs: scored.slice(offset, offset + limit), pagination: { page, limit, total } };
 };
 
 // ── GET /api/jobs ─────────────────────────────────────────────────────────────

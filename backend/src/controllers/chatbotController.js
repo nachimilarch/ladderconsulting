@@ -3,7 +3,7 @@ const { streamChatCompletion, chatCompletion } = require('../services/localLlmSe
 const { SCHEMAS, IMPLEMENTATIONS } = require('../services/chatbotTools');
 const { hasActiveAiSubscription } = require('../utils/aiSubscription');
 const jobController = require('../controllers/jobController');
-const { saveCandidateProfile } = require('../utils/candidateProfile');
+const { updateCandidateProfileFields } = require('../utils/candidateProfile');
 const { applyToJob } = require('../utils/candidateApplications');
 
 const MAX_TOOL_ITERATIONS = 4;
@@ -603,7 +603,7 @@ exports.confirmAction = async (req, res) => {
             await jobController.updateJobRecord(company.id, job_id, { ...current, ...changes });
             resultRefId = job_id;
         } else if (action.action_type === 'update_profile') {
-            await saveCandidateProfile(req.user.id, payload);
+            await updateCandidateProfileFields(req.user.id, payload);
         } else if (action.action_type === 'apply_to_job') {
             resultRefId = await applyToJob(req.user.id, payload.job_id, payload.cover_letter);
         }

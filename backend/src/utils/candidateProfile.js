@@ -89,4 +89,26 @@ const saveCandidateProfile = async (userId, fields) => {
     return candidateId;
 };
 
-module.exports = { saveCandidateProfile, getCandidateId };
+// saveCandidateProfile REPLACES every profile column (an omitted field becomes NULL / 0),
+// which is right for the full profile form but wrong for a partial change such as the
+// assistant's "polish my headline". This overlays only the fields actually provided onto
+// the current row first, so everything else is left exactly as it was.
+const updateCandidateProfileFields = async (userId, changes) => {
+    const candidateId = await getCandidateId(userId);
+    const [[cur]] = await db.query(
+        `SELECT headline, summary, total_experience, current_location, preferred_locations,
+                expected_salary, current_salary, notice_period_days, linkedin_url, portfolio_url, education
+         FROM candidate_profiles WHERE candidate_id = ?`,
+        [candidateId]
+    );
+
+    let education = cur?.education ?? null;
+    if (typeof education === 'string') { try { education = JSON.parse(education); } catch { education = null; } }
+
+    const provided = Object.fromEntries(
+        Object.entries(changes).filter(([, v]) => v !== undefined && v !== null && v !== '')
+    );
+    return saveCandidateProfile(userId, { ...(cur || {}), education, ...provided });
+};
+
+module.exports = { saveCandidateProfile, updateCandidateProfileFields, getCandidateId };
