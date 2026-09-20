@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { resumeAPI } from '../../api/candidate';
 
 const POLL_MS = 6000;
-const GIVE_UP_MS = 6 * 60 * 1000;
+const GIVE_UP_MS = 12 * 60 * 1000;
 
 const blank = (v) => !String(v ?? '').trim();
 const has = (list, value) => list.some((x) => x.toLowerCase() === value.toLowerCase());
@@ -73,7 +73,7 @@ export default function AiEnrichmentCard({ form, setForm, education, setEducatio
                 <span className="inline-block w-4 h-4 rounded-full border-2 border-brand-300 border-t-brand-600 animate-spin shrink-0" aria-hidden="true" />
                 <div>
                     <p className="text-sm font-semibold text-gray-800">✨ The AI is taking a second look at your resume</p>
-                    <p className="text-xs text-gray-500 mt-0.5">It looks for details the first pass missed. This can take up to a minute; you can keep editing.</p>
+                    <p className="text-xs text-gray-500 mt-0.5">It looks for details the first pass missed. This can take a few minutes; you can keep editing.</p>
                 </div>
             </div>
         );

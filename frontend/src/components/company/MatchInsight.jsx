@@ -2,11 +2,11 @@ import { useEffect, useRef, useState } from 'react';
 import { matchInsightAPI } from '../../api/matchInsight';
 
 const POLL_MS = 5000;
-const GIVE_UP_MS = 4 * 60 * 1000;
+const GIVE_UP_MS = 6 * 60 * 1000;
 
 // "Why this fit?" for one candidate against one job. The score itself comes from the fixed
 // formula; this asks the AI model to explain it in a couple of sentences. It is shown only on
-// the top few candidates, is cached after the first ask, and can take up to a minute.
+// the top few candidates, is cached after the first ask, and can take a minute or two.
 export default function MatchInsight({ jobId, candidateId }) {
     // idle | loading | ready | failed | busy | hidden
     const [state, setState] = useState({ status: 'idle', note: '' });
@@ -76,7 +76,7 @@ export default function MatchInsight({ jobId, candidateId }) {
         return (
             <p className="mt-3 text-xs text-brand-700 bg-brand-50 border border-brand-100 rounded-xl px-3.5 py-2.5 flex items-center gap-2">
                 <span className="inline-block w-3 h-3 rounded-full border-2 border-brand-300 border-t-brand-600 animate-spin" aria-hidden="true" />
-                The AI is reading this match. It can take up to a minute; you can keep working.
+                The AI is reading this match. It can take a minute or two; you can keep working.
             </p>
         );
     }

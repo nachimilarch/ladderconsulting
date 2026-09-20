@@ -11,7 +11,7 @@ const { enqueue, isEnabled, parseJsonReply, cleanText } = require('./llmJobs');
 
 const FLAG = 'llm_match_insight';
 const REFRESH_DAYS = 14;
-const PENDING_TTL_MS = 5 * 60 * 1000;
+const PENDING_TTL_MS = 6 * 60 * 1000;
 const FAILED_TTL_MS = 60 * 1000;
 
 // jobId:candidateId -> { status: 'pending' | 'failed', at }  (in memory: a restart just clears it)
@@ -74,8 +74,8 @@ async function generate(jobId, candidateId) {
         ],
         json: true,
         temperature: 0.3,
-        maxTokens: 220,
-        timeoutMs: 180000,
+        maxTokens: 200,
+        timeoutMs: 240000,
     });
     const note = cleanText(parseJsonReply(reply.content)?.note, 500);
     if (!note) throw new Error('model returned no note');
@@ -102,7 +102,8 @@ const isFresh = (row) => row && Date.now() - new Date(row.created_at).getTime() 
 // Status for the UI: ready (with the note), pending, failed, or none.
 async function getInsight(jobId, candidateId) {
     const row = await cachedRow(jobId, candidateId);
-    if (row) return { status: 'ready', note: row.note, created_at: row.created_at };
+    // An old note is treated as missing, so the button comes back and a fresh one replaces it.
+    if (isFresh(row)) return { status: 'ready', note: row.note, created_at: row.created_at };
     const f = inFlight.get(keyOf(jobId, candidateId));
     if (f) {
         const ttl = f.status === 'pending' ? PENDING_TTL_MS : FAILED_TTL_MS;

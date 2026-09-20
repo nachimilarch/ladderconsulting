@@ -10,8 +10,8 @@ const { chatCompletion } = require('./localLlmService');
 const { extractSkills } = require('../utils/resumeParser');
 const { enqueue, isEnabled, parseJsonReply, cleanText } = require('./llmJobs');
 
-const MAX_RESUME_CHARS = 5000;
-const STALE_PENDING_MINUTES = 10; // a queue lost in a restart must not block a retry forever
+const MAX_RESUME_CHARS = 4000; // keeps the prompt short: the production box is CPU-only
+const STALE_PENDING_MINUTES = 12; // a queue lost in a restart must not block a retry forever
 const FLAG = 'llm_resume_enrichment';
 
 const SYSTEM = [
@@ -105,8 +105,8 @@ async function run(resumeId, text) {
             ],
             json: true,
             temperature: 0.1,
-            maxTokens: 700,
-            timeoutMs: 240000,
+            maxTokens: 500,
+            timeoutMs: 420000,
         });
         const extract = sanitize(parseJsonReply(reply.content), who?.name);
         if (!extract) throw new Error('model returned no usable JSON');
