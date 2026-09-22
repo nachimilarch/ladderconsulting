@@ -174,9 +174,18 @@ module.exports.reloadEnv = loadEnvOverrides;
 loadEnvOverrides().then(() => {
   app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);
-    startMailPoller();
-    startWAPoller();
-    startSubscriptionBiller();
-    startCampaignScheduler();
+    // These four loops assume exactly one running instance (mail/WhatsApp polling,
+    // invoice billing, campaign sends) — see deploy/ecosystem.production.config.cjs's
+    // instances: 1. Set DISABLE_BACKGROUND_JOBS=true to boot a second instance
+    // (e.g. a Docker container tested against the same database as a live instance)
+    // without it double-polling or double-sending. Unset, behavior is unchanged.
+    if (process.env.DISABLE_BACKGROUND_JOBS === 'true') {
+      console.log('DISABLE_BACKGROUND_JOBS=true — mail poller, WhatsApp poller, subscription biller and campaign scheduler are NOT running in this process.');
+    } else {
+      startMailPoller();
+      startWAPoller();
+      startSubscriptionBiller();
+      startCampaignScheduler();
+    }
   });
 });

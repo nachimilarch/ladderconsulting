@@ -1,0 +1,31 @@
+# Local test only. Builds and runs the backend in a container, side by side
+# with the existing dev setup (PM2/nodemon on :5001), on a different port so
+# nothing already running is touched. Production still runs on PM2 via
+# deploy/ecosystem.production.config.cjs, which this file does not affect.
+services:
+  backend-docker-test:
+    build:
+      context: ./backend
+    image: ladderstep-backend:local
+    env_file:
+      - ./backend/.env
+    environment:
+      # Overrides only the container's own view of DB_HOST. backend/.env on
+      # disk is untouched, so the existing dev backend keeps using 127.0.0.1.
+      DB_HOST: host.docker.internal
+      # This container shares the dev database with the already-running dev
+      # backend. Without this flag, both processes would poll mail/WhatsApp
+      # and tick the campaign scheduler at once — the same bug class as the
+      # auto-reply loop fixed earlier. This keeps the container's API fully
+      # testable while it stays a passive reader for anything background.
+      DISABLE_BACKGROUND_JOBS: "true"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "5055:5001"
+    volumes:
+      # The same uploads folder already on disk, bind-mounted — not copied.
+      # Existing resumes/documents/attachments are read as-is; nothing new
+      # is duplicated and nothing existing is erased.
+      - ./backend/uploads:/app/uploads
+    restart: "no"

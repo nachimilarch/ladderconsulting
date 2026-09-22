@@ -1,0 +1,27 @@
+# Production. Replaces deploy/ecosystem.production.config.cjs (PM2) as the
+# process supervisor for the backend.
+#
+# Run from the repo root on the server:
+#   docker compose -f deploy/docker-compose.production.yml up -d --build
+#
+# Host networking so backend/.env's DB_HOST=127.0.0.1 keeps working exactly
+# as it did under PM2 (same host, same port 5001) — nginx (proxy_pass
+# http://127.0.0.1:5001, in /etc/nginx/sites-available/ladderstep) needs no
+# changes at all.
+#
+# No DISABLE_BACKGROUND_JOBS here — this is meant to be the one and only
+# running instance, same invariant PM2's instances: 1 enforced. Never run
+# this at the same time as the PM2 process, and never scale it to more than
+# one container.
+services:
+  backend:
+    build:
+      context: ../backend
+    image: ladderstep-backend:prod
+    container_name: ladderstep-backend
+    network_mode: host
+    env_file:
+      - ../backend/.env
+    volumes:
+      - ../backend/uploads:/app/uploads
+    restart: unless-stopped
