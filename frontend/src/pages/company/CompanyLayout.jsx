@@ -19,10 +19,9 @@ const NAV = [
     ] },
     { title: 'Your hiring journey', items: [
         { label: 'Job Postings', to: '/company/jobs',       icon: '💼', step: 1, tour: 'job-postings', badge: 'jobs' },
-        { label: 'Talent Pool',  to: '/company/talent',     icon: '👥', step: 2, tour: 'talent-pool' },
-        { label: 'Shortlist',    to: '/company/shortlist',  icon: '⭐', step: 3, tour: 'shortlist', hint: 'applications', badge: 'shortlist' },
-        { label: 'Interviews',   to: '/company/interviews', icon: '🗓', step: 4, tour: 'interviews', badge: 'interviews' },
-        { label: 'Offers',       to: '/company/offers',     icon: '📨', step: 5, tour: 'offers' },
+        { label: 'Shortlist',    to: '/company/shortlist',  icon: '⭐', step: 2, tour: 'shortlist', hint: 'applications', badge: 'shortlist' },
+        { label: 'Interviews',   to: '/company/interviews', icon: '🗓', step: 3, tour: 'interviews', badge: 'interviews' },
+        { label: 'Offers',       to: '/company/offers',     icon: '📨', step: 4, tour: 'offers' },
     ] },
     { title: 'More', items: [
         { label: 'Payments',     to: '/company/payments',   icon: '💳', tour: 'payments', badge: 'payments' },

@@ -30,36 +30,6 @@ const SECTIONS = [
         ],
     },
     {
-        id: 'talent-pool',
-        icon: '👥',
-        title: 'Talent Pool',
-        color: 'violet',
-        steps: [
-            {
-                n: 1,
-                title: 'Browse All Candidates',
-                desc: 'The Talent Pool lists every active candidate on the platform. Filter by experience, skills, location, or notice period. Premium candidates (⭐) are verified high earners and are always listed first.',
-                link: '/company/talent',
-                linkLabel: 'Open Talent Pool →',
-            },
-            {
-                n: 2,
-                title: 'Match Against a Job',
-                desc: 'Select one of your active job postings from the dropdown. The platform instantly computes a fit score (0–100%) for every candidate based on skill match, experience level, and seniority. Candidates are re-sorted with best fits at the top.',
-            },
-            {
-                n: 3,
-                title: 'Express Interest',
-                desc: 'Click "Express Interest" on a candidate you like and pick the job. Your assigned LadderStep executive is notified and takes care of the introduction.',
-            },
-            {
-                n: 4,
-                title: 'Add to Your Pipeline',
-                desc: 'Once you have a live job posting, an "Add to Pipeline" button replaces Express Interest. The candidate is added to that job\'s applications so you can shortlist them.',
-            },
-        ],
-    },
-    {
         id: 'job-postings',
         icon: '💼',
         title: 'Job Postings',
@@ -260,7 +230,7 @@ export default function CompanyHelp() {
                     <h1 className="text-2xl font-bold text-indigo-900">Company Portal Guide</h1>
                 </div>
                 <p className="text-indigo-500 text-sm leading-relaxed max-w-2xl">
-                    Everything you need to post jobs, discover talent, schedule interviews, and make offers — all in one place. Follow the steps below or jump to any section.
+                    Everything you need to post jobs, review candidates our executives source for you, schedule interviews, and make offers — all in one place. Follow the steps below or jump to any section.
                 </p>
                 {/* Quick nav */}
                 <div className="flex flex-wrap gap-2 mt-6">
@@ -277,7 +247,7 @@ export default function CompanyHelp() {
             <div className="bg-white border border-gray-200 rounded-xl px-4 sm:px-6 py-5 mb-8 sm:mb-10">
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">End-to-End Hiring Flow</p>
                 <div className="flex flex-wrap items-center gap-1 text-sm">
-                    {['Post Job', 'Browse Talent', 'Express Interest', 'Shortlist', 'Request Interview', 'Exec Approves', 'Candidate Confirms', 'Submit Offer', 'Exec Approves', 'Offer Accepted ✓'].map((step, i, arr) => (
+                    {['Post Job', 'Exec Sources Candidates', 'Shortlist', 'Request Interview', 'Exec Approves', 'Candidate Confirms', 'Submit Offer', 'Exec Approves', 'Offer Accepted ✓'].map((step, i, arr) => (
                         <span key={i} className="flex items-center gap-1">
                             <span className="bg-indigo-50 text-indigo-700 rounded-md px-2 py-0.5 font-medium text-xs whitespace-nowrap">{step}</span>
                             {i < arr.length - 1 && <span className="text-gray-300 text-xs">→</span>}

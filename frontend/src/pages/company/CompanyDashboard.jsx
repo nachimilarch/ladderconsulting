@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link, useOutletContext } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { companyAPI, talentPoolAPI } from '../../api/company';
+import { companyAPI, companyAccessAPI } from '../../api/company';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import NextStepCard from '../../components/common/NextStepCard';
 import StepTracker from '../../components/common/StepTracker';
@@ -87,7 +87,7 @@ export default function CompanyDashboard() {
     const [aiStatus, setAiStatus] = useState(null);
 
     useEffect(() => {
-        talentPoolAPI.activationStatus().then(({ data }) => setTierStatus(data)).catch(() => {});
+        companyAccessAPI.activationStatus().then(({ data }) => setTierStatus(data)).catch(() => {});
         aiSubscriptionAPI.status().then(({ data }) => setAiStatus(data)).catch(() => {});
     }, []);
 

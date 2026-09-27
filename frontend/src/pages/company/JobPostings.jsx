@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { companyJobAPI, talentPoolAPI, premiumAPI } from '../../api/company';
+import { companyJobAPI, companyAccessAPI, premiumAPI } from '../../api/company';
 import toast from 'react-hot-toast';
 import AiAssistantPromo from '../../components/AiAssistantPromo';
 
@@ -27,7 +27,7 @@ function PlatinumBanner() {
     const [justRequested, setJustRequested] = useState(false);
 
     useEffect(() => {
-        talentPoolAPI.activationStatus()
+        companyAccessAPI.activationStatus()
             .then(r => setPremiumRequestedAt(r.data?.premium_requested_at || null))
             .catch(() => {});
     }, []);
@@ -111,7 +111,7 @@ export default function JobPostings() {
     useEffect(() => { load(); }, []);
 
     useEffect(() => {
-        talentPoolAPI.activationStatus()
+        companyAccessAPI.activationStatus()
             .then(r => setCompanyTier(r.data?.company_tier || 'standard'))
             .catch(() => {});
     }, []);

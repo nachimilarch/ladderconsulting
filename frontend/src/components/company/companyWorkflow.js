@@ -130,15 +130,15 @@ export const buildCompanyWorkflow = ({ dash, fees }) => {
         next = {
             tone: 'green', icon: '🎉',
             title: `You've hired ${plural(hired, 'person', 'people')}`,
-            text: 'Post another job to keep growing, or browse the talent pool.',
-            cta: 'Browse talent pool', to: '/company/talent', ai: 'Find candidates for my job',
+            text: 'Post another job to keep growing — our executives will source candidates for it.',
+            cta: 'Post a job', to: '/company/jobs',
         };
     } else {
         next = {
             tone: 'indigo', icon: '👥',
-            title: totalApps ? `${plural(totalApps, 'application', 'applications')} so far` : 'Find candidates for your jobs',
-            text: 'Browse the talent pool ranked by fit, and express interest in the people you like.',
-            cta: 'Open talent pool', to: '/company/talent', ai: 'Find candidates for my job',
+            title: totalApps ? `${plural(totalApps, 'application', 'applications')} so far` : 'Waiting on candidates',
+            text: 'Our executives are sourcing candidates for your open jobs. Shortlisted candidates will show up here.',
+            cta: 'View shortlist', to: '/company/shortlist',
         };
     }
 

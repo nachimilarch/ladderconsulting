@@ -28,7 +28,6 @@ import Reports from './pages/hr/Reports';
 // Company layout + pages
 import CompanyLayout from './pages/company/CompanyLayout';
 import CompanyDashboard from './pages/company/CompanyDashboard';
-import TalentPool from './pages/company/TalentPool';
 import JobPostings from './pages/company/JobPostings';
 import ShortlistView from './pages/company/ShortlistView';
 import InterviewScheduler from './pages/company/InterviewScheduler';
@@ -212,7 +211,6 @@ export default function App() {
           </ProtectedRoute>
         }>
           <Route index element={<CompanyDashboard />} />
-          <Route path="talent" element={<TalentPool />} />
           <Route path="jobs" element={<JobPostings />} />
           <Route path="shortlist" element={<ShortlistView />} />
           <Route path="interviews" element={<InterviewScheduler />} />

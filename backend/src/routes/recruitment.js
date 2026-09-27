@@ -36,10 +36,6 @@ router.get('/batches/:id', ...exec, ctrl.getBatchDetail);
 router.get('/talent',                               ...exec, ctrl.listTalentPoolExec);
 router.post('/jobs/:jobId/assign-candidate',        ...exec, ctrl.assignCandidateToJob);
 
-// Company interest inbox
-router.get('/talent-interests',                     ...exec, ctrl.listTalentInterests);
-router.post('/talent-interests/:notifId/assign',    ...exec, ctrl.actOnTalentInterest);
-
 // Full candidate profile for HR executives (PII included, no masking)
 // Optional ?jobId= returns fit_score + matched/missing skills for that JD
 router.get('/candidates/:candidateId/profile', ...exec, ctrl.getCandidateProfile);

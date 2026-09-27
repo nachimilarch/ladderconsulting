@@ -15,14 +15,9 @@ const STEPS = [
         body: 'Post your open roles here. Each job is ₹3,999 to go live (Platinum companies pay no per-job fee), and our executives source matching candidates for it.',
     },
     {
-        target: '[data-tour="talent-pool"]',
-        title: '👥 Talent Pool',
-        body: 'Browse our pre-screened candidates, ranked by how well they fit one of your jobs. Premium candidates (⭐) are listed first. Express interest and your executive takes it from there.',
-    },
-    {
         target: '[data-tour="shortlist"]',
         title: '⭐ Applications & Shortlist',
-        body: 'Everyone who applied or was sourced for your jobs appears here, best fit first with Premium ⭐ candidates on top. Shortlist and move them through your pipeline.',
+        body: 'Everyone who applied or was sourced by our executives for your jobs appears here, best fit first with Premium ⭐ candidates on top. Shortlist and move them through your pipeline.',
     },
     {
         target: '[data-tour="interviews"]',

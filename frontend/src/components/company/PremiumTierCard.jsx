@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { talentPoolAPI, premiumAPI } from '../../api/company';
+import { companyAccessAPI, premiumAPI } from '../../api/company';
 import toast from 'react-hot-toast';
 
 // Shows the company's current tier and, for Standard-tier companies, lets them
@@ -14,7 +14,7 @@ export default function PremiumTierCard() {
 
     const load = () => {
         setLoading(true);
-        talentPoolAPI.activationStatus()
+        companyAccessAPI.activationStatus()
             .then(({ data }) => setStatus(data))
             .catch(() => {})
             .finally(() => setLoading(false));

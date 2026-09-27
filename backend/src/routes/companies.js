@@ -25,12 +25,8 @@ router.get('/candidates/:candidateId/skills',  ctrl.getCandidateSkills);
 router.post('/requests',  ctrl.createRequest);
 router.get('/requests',   ctrl.listRequests);
 
-// Talent pool — browse candidates (full profiles if activated, masked if not)
-router.get('/talent',                        ctrl.getTalentPool);
-router.post('/talent/:candidateId/interest', ctrl.expressInterest);
-
-// Activation status — job posting is now priced per-JD (see /api/jobs),
-// this just reports whether the account has ever paid (Talent Pool access).
+// Activation status — job posting is priced per-JD (see /api/jobs); this
+// reports whether the account is activated (paid, or Platinum).
 router.get('/activation-status',  ctrl.getActivationStatus);
 
 // Premium tier — company-requested, executive/admin-approved, replaces the listing fee

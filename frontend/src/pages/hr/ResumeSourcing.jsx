@@ -397,86 +397,6 @@ function FreePoolCard({ candidate, onDelete, deleting, onViewProfile }) {
     );
 }
 
-// ── Interest Card ─────────────────────────────────────────────────────────────
-function InterestCard({ interest, jobs, onAssign, assigning, onViewProfile }) {
-    const [jobOverride, setJobOverride] = useState(interest.job_id || '');
-    const isHired = interest.is_hired;
-
-    return (
-        <div className={`bg-white rounded-2xl border shadow-sm p-4 transition ${
-            isHired ? 'border-red-200 opacity-80' :
-            !interest.is_read ? 'border-indigo-300 ring-1 ring-indigo-100' : 'border-gray-100'
-        }`}>
-            <div className="flex items-start gap-3">
-                {!interest.is_read && !isHired && <span className="w-2 h-2 rounded-full bg-indigo-500 mt-1.5 shrink-0" />}
-                {isHired && <span className="w-2 h-2 rounded-full bg-red-400 mt-1.5 shrink-0" />}
-                <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-semibold text-sm text-gray-900">{interest.company_name}</span>
-                            {isHired && (
-                                <span className="text-[10px] font-medium bg-red-50 text-red-700 border border-red-200 px-1.5 py-0.5 rounded-full">
-                                    Candidate Hired — Unavailable
-                                </span>
-                            )}
-                        </div>
-                        <span className="text-[10px] text-gray-400">{new Date(interest.created_at).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })}</span>
-                    </div>
-                    <div className="flex items-center gap-2 mb-1 flex-wrap">
-                        <p className="text-xs text-gray-600">
-                            Interested in: <span className={`font-medium ${isHired ? 'line-through text-gray-400' : 'text-gray-800'}`}>{interest.candidate_name}</span>
-                            {interest.headline && <span className="text-gray-400"> · {interest.headline}</span>}
-                        </p>
-                        <button
-                            onClick={() => onViewProfile(interest.candidate_id, null)}
-                            className="text-[11px] text-indigo-600 hover:underline shrink-0"
-                        >
-                            View Profile
-                        </button>
-                    </div>
-                    {interest.job_title && <p className="text-xs text-indigo-600 mb-1">For: {interest.job_title}</p>}
-                    <div className="flex flex-wrap gap-2 text-xs text-gray-400 mb-2">
-                        {interest.total_experience != null && <span>💼 {interest.total_experience} yrs</span>}
-                        {interest.current_location && <span>📍 {interest.current_location}</span>}
-                    </div>
-                    {interest.skills?.length > 0 && (
-                        <div className="flex flex-wrap gap-1 mb-2">
-                            {interest.skills.slice(0,5).map(s => <span key={s} className="badge-gray text-[10px] capitalize">{s}</span>)}
-                        </div>
-                    )}
-                    <p className="text-xs text-gray-500 italic mb-3 line-clamp-2">{interest.interest_notes}</p>
-
-                    {isHired ? (
-                        <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
-                            This candidate has been placed through LadderStep Human Consulting and is no longer available. Consider proposing an alternative candidate to {interest.company_name}.
-                        </p>
-                    ) : interest.already_assigned ? (
-                        <span className="badge-green text-xs">Already assigned to this job ✓</span>
-                    ) : (
-                        <div className="flex items-center gap-2 flex-wrap">
-                            <select
-                                value={jobOverride}
-                                onChange={e => setJobOverride(e.target.value)}
-                                className="form-input-sm flex-1 min-w-0 text-xs"
-                            >
-                                <option value="">— Select job to assign —</option>
-                                {jobs.map(j => <option key={j.id} value={j.id}>{j.company_name} · {j.title}</option>)}
-                            </select>
-                            <button
-                                onClick={() => onAssign(interest.notif_id, jobOverride || null)}
-                                disabled={!jobOverride || assigning === interest.notif_id}
-                                className="text-xs bg-indigo-600 text-white px-3 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-60 transition whitespace-nowrap"
-                            >
-                                {assigning === interest.notif_id ? 'Actioning…' : 'Assign & Notify'}
-                            </button>
-                        </div>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-}
-
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function ResumeSourcing() {
     const [tab, setTab] = useState('upload');
@@ -509,12 +429,6 @@ export default function ResumeSourcing() {
     const [poolTotal,  setPoolTotal]  = useState(0);
     const [poolLoading, setPoolLoading] = useState(false);
     const [assigning,  setAssigning]  = useState(null);
-
-    // Interests tab
-    const [interests,  setInterests]  = useState([]);
-    const [intLoading, setIntLoading] = useState(false);
-    const [unreadCount, setUnreadCount] = useState(0);
-    const [actioning,  setActioning]  = useState(null);
 
     // Free Pool tab
     const [fpSearch, setFpSearch] = useState('');
@@ -574,14 +488,6 @@ export default function ResumeSourcing() {
             .finally(() => setPoolLoading(false));
     }, [selectedJob, poolSearch, poolSkill, poolExpMin, poolExpMax, poolPage]);
 
-    const loadInterests = useCallback(() => {
-        setIntLoading(true);
-        recruitmentAPI.listTalentInterests()
-            .then(r => { setInterests(r.data?.data || []); setUnreadCount(r.data?.unread_count || 0); })
-            .catch(() => toast.error('Failed to load interest inbox.'))
-            .finally(() => setIntLoading(false));
-    }, []);
-
     const loadFreePool = useCallback(() => {
         setFpLoading(true);
         recruitmentAPI.listTalentPool({
@@ -594,7 +500,7 @@ export default function ResumeSourcing() {
             .finally(() => setFpLoading(false));
     }, [fpSearch, fpSkill, fpExpMin, fpExpMax, fpPage]);
 
-    useEffect(() => { loadJobs(); loadBatches(); loadInterests(); loadFreePool(); }, [loadJobs, loadBatches, loadInterests, loadFreePool]);
+    useEffect(() => { loadJobs(); loadBatches(); loadFreePool(); }, [loadJobs, loadBatches, loadFreePool]);
 
     useEffect(() => {
         if (tab === 'pool' && selectedJob) loadPool();
@@ -690,21 +596,6 @@ export default function ResumeSourcing() {
         } finally { setAssigning(null); }
     };
 
-    // ── Interest handlers ─────────────────────────────────────────────────────
-    const handleActOnInterest = async (notifId, jobId) => {
-        if (!jobId) return toast.error('Select a job posting to assign this candidate.');
-        setActioning(notifId);
-        try {
-            const r = await recruitmentAPI.actOnTalentInterest(notifId, jobId);
-            toast.success(r.data?.message || 'Candidate assigned and company notified.');
-            setInterests(prev => prev.map(i => i.notif_id === notifId ? { ...i, is_read: true, already_assigned: true } : i));
-            setUnreadCount(c => Math.max(0, c - 1));
-            loadJobs();
-        } catch (err) {
-            toast.error(err.response?.data?.message || 'Failed to action interest.');
-        } finally { setActioning(null); }
-    };
-
     // ── Free Pool handlers ────────────────────────────────────────────────────
     const handleDeleteFromPool = async (candidateId, name) => {
         if (!window.confirm(`Permanently delete ${name || 'this candidate'} and all of their resumes? This cannot be undone.`)) return;
@@ -737,7 +628,7 @@ export default function ResumeSourcing() {
             <div className="mb-5">
                 <h1 className="text-2xl font-bold text-gray-900">Resume Sourcing</h1>
                 <p className="text-sm text-gray-500 mt-0.5">
-                    Upload new resumes, manage the free pool, assign existing pool candidates to client JDs, or action company interest requests.
+                    Upload new resumes, manage the free pool, and assign existing pool candidates to client JDs.
                 </p>
             </div>
 
@@ -747,7 +638,6 @@ export default function ResumeSourcing() {
                     { key: 'upload',    label: 'Upload Resumes' },
                     { key: 'freepool',  label: `Free Pool${fpTotal > 0 ? ` (${fpTotal})` : ''}` },
                     { key: 'pool',      label: 'Assign from Pool' },
-                    { key: 'interests', label: `Company Interests${unreadCount > 0 ? ` (${unreadCount})` : ''}` },
                 ].map(t => (
                     <button key={t.key} onClick={() => setTab(t.key)}
                         className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${tab === t.key
@@ -1017,38 +907,6 @@ export default function ResumeSourcing() {
                                 )}
                             </>
                         )
-                    )}
-                </>
-            )}
-
-            {/* ── INTERESTS TAB ── */}
-            {tab === 'interests' && (
-                <>
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm text-gray-600">Companies who expressed interest in pool candidates. Assign the candidate to their open JD to notify them.</p>
-                        <button onClick={loadInterests} className="text-xs text-indigo-600 hover:underline">Refresh</button>
-                    </div>
-                    {intLoading ? (
-                        <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading…</div>
-                    ) : interests.length === 0 ? (
-                        <div className="card p-12 text-center shadow-sm">
-                            <div className="text-4xl mb-3">📩</div>
-                            <h3 className="font-semibold text-gray-700 mb-1">No interest requests yet</h3>
-                            <p className="text-sm text-gray-500">When a hiring company expresses interest in a talent pool candidate, it appears here for you to action.</p>
-                        </div>
-                    ) : (
-                        <div className="flex flex-col gap-3">
-                            {interests.map(interest => (
-                                <InterestCard
-                                    key={interest.notif_id}
-                                    interest={interest}
-                                    jobs={jobs}
-                                    onAssign={handleActOnInterest}
-                                    assigning={actioning}
-                                    onViewProfile={openProfile}
-                                />
-                            ))}
-                        </div>
                     )}
                 </>
             )}

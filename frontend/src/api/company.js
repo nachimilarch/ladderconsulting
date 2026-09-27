@@ -51,10 +51,8 @@ export const companyRequestAPI = {
     list:   ()     => api.get('/companies/requests'),
 };
 
-export const talentPoolAPI = {
-    list:             (params)            => api.get('/companies/talent', { params }),
-    expressInterest:  (candidateId, data) => api.post(`/companies/talent/${candidateId}/interest`, data),
-    activationStatus: ()                  => api.get('/companies/activation-status'),
+export const companyAccessAPI = {
+    activationStatus: () => api.get('/companies/activation-status'),
 };
 
 export const premiumAPI = {
