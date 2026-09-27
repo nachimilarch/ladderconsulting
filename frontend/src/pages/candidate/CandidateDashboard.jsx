@@ -6,22 +6,9 @@ import { candidateInterviewAPI } from '../../api/interview';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import JobDetailModal from '../../components/candidate/JobDetailModal';
 import NextStepCard from '../../components/common/NextStepCard';
-import StepTracker from '../../components/common/StepTracker';
 import AssistantPanel from '../../components/common/AssistantPanel';
-import FeatureShowcase from '../../components/common/FeatureShowcase';
 import { buildJourney, profileChecklist } from '../../components/candidate/journey';
 import { matchBadgeCls } from '../../utils/matchScore';
-
-const CANDIDATE_FEATURES = [
-    { icon: '📄', title: 'AI Resume Enrichment', desc: 'Upload your resume — AI suggests missing skills, education and a summary.', to: '/candidate/profile' },
-    { icon: '🎯', title: 'Live Job Matching', desc: 'See a real fit % for every job, ranked for you.', to: '/candidate/jobs' },
-    { icon: '✅', title: 'One-Tap Apply', desc: 'Apply to matched jobs in a single click.', to: '/candidate/jobs' },
-    { icon: '🗓', title: 'Interview Scheduling', desc: 'Confirm interview slots right from your dashboard.', to: '/candidate/interviews' },
-    { icon: '📨', title: 'Offer Responses', desc: 'Accept or decline offers directly in the portal.', to: '/candidate/interviews' },
-    { icon: '✨', title: 'AI Assistant', desc: 'Polish your profile, find matching jobs, or apply — just ask. ₹299/mo.', to: '/candidate/profile' },
-    { icon: '⭐', title: 'Premium Candidate', desc: 'Get verified and listed first to every hiring company. ₹999 one-time.', to: '/candidate/premium' },
-    { icon: '📁', title: 'Document Management', desc: 'Keep your certificates and documents organised in one place.', to: '/candidate/documents' },
-];
 
 const list = (res, ...keys) => {
     if (res?.status !== 'fulfilled') return [];
@@ -127,8 +114,6 @@ export default function CandidateDashboard() {
 
             <NextStepCard next={journey.next} />
 
-            <StepTracker title="Your journey" steps={journey.steps} />
-
             <AssistantPanel
                 subscribed={aiOn}
                 price={ai?.amount}
@@ -136,7 +121,31 @@ export default function CandidateDashboard() {
                 prompts={ASSISTANT_PROMPTS}
             />
 
-            <FeatureShowcase items={CANDIDATE_FEATURES} />
+            <Link to="/candidate/premium" className={`block rounded-2xl border p-5 transition hover:shadow-sm ${
+                premium?.is_premium ? 'bg-success-50 border-success-100' : 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-100'
+            }`}>
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-white text-sm flex items-center justify-center">⭐</span>
+                    {premium?.is_premium ? 'Premium active' : 'Go Premium'}
+                </h3>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+                    {premium?.is_premium
+                        ? "You're verified and listed first to every hiring company."
+                        : premium?.request?.status === 'pending'
+                            ? 'Verification pending — your executive is reviewing it.'
+                            : premium?.request?.status === 'approved'
+                                ? 'Approved — pay ₹999 to activate and be listed first →'
+                                : 'Earning ₹6 LPA+? Get verified and be listed first to every hiring company. ₹999 one-time →'}
+                </p>
+            </Link>
+
+            <div className="rounded-2xl bg-gray-50 border border-gray-100 px-5 py-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-1">How LadderStep works for you</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                    Build your profile and we match you to real openings from hiring companies.
+                    We coordinate your interviews and help you get to an offer — apply, or let the assistant do it for you.
+                </p>
+            </div>
 
             {/* At a glance */}
             <div>
@@ -237,24 +246,6 @@ export default function CandidateDashboard() {
                             : <><Link to="/candidate/profile" className="text-indigo-600 font-medium hover:underline">Upload your resume</Link> to see jobs matched to your skills.</>}
                     </div>
                 )}
-            </div>
-
-            {/* Boosters */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pb-2">
-                <Link to="/candidate/premium" className={`rounded-2xl border px-5 py-3.5 text-sm hover:shadow-sm transition ${premium?.is_premium ? 'bg-green-50 border-green-100' : 'bg-gradient-to-r from-yellow-50 to-indigo-50 border-yellow-100'}`}>
-                    {premium?.is_premium ? (
-                        <span className="font-semibold text-green-700">⭐ Premium active: you're listed first to every company</span>
-                    ) : premium?.request?.status === 'pending' ? (
-                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium verification pending</span>. Your executive is reviewing it.</span>
-                    ) : premium?.request?.status === 'approved' ? (
-                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Premium approved</span>. Pay ₹999 to activate →</span>
-                    ) : (
-                        <span className="text-gray-600"><span className="font-semibold text-yellow-700">⭐ Go Premium</span>: earning ₹6 LPA+? Get verified and be listed first.</span>
-                    )}
-                </Link>
-                <Link to="/candidate/documents" className="rounded-2xl border border-gray-100 bg-white px-5 py-3.5 text-sm hover:shadow-sm transition text-gray-600">
-                    📁 <span className="font-semibold text-gray-800">Documents</span>: upload IDs, payslips and certificates →
-                </Link>
             </div>
 
             {detailJobId && <JobDetailModal jobId={detailJobId} onClose={() => setDetailJobId(null)} />}

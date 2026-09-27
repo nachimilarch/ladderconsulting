@@ -4,20 +4,7 @@ import { useAuth } from '../../context/AuthContext';
 import { companyAPI, companyAccessAPI } from '../../api/company';
 import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import NextStepCard from '../../components/common/NextStepCard';
-import StepTracker from '../../components/common/StepTracker';
 import AssistantPanel from '../../components/common/AssistantPanel';
-import FeatureShowcase from '../../components/common/FeatureShowcase';
-
-const COMPANY_FEATURES = [
-    { icon: '💼', title: 'Post Jobs', desc: '₹3,999 per job on Standard, or free on Platinum.', to: '/company/jobs' },
-    { icon: '🧑‍💼', title: 'Executive-Sourced Candidates', desc: 'Our executives find and assign matching candidates to your JD.' },
-    { icon: '⭐', title: 'Smart Shortlisting', desc: 'Every applicant ranked by fit, Premium candidates always on top.', to: '/company/shortlist' },
-    { icon: '🗓', title: 'Managed Interviews', desc: 'Request a slot — we coordinate timing and confirm with the candidate.', to: '/company/interviews' },
-    { icon: '📨', title: 'Offer Management', desc: 'Raise offers in-app; we manage acceptance and documentation.', to: '/company/offers' },
-    { icon: '✨', title: 'AI Hiring Assistant', desc: 'Draft job posts, sharpen descriptions, and find matches. ₹299/mo.', to: '/company/profile' },
-    { icon: '🏆', title: 'Platinum Tier', desc: 'Post unlimited jobs for free, pay only 8.33% per hire.', to: '/company/profile' },
-    { icon: '💳', title: 'Payments & Invoices', desc: 'Pay job fees, placement fees and subscriptions online.', to: '/company/payments' },
-];
 
 // Phone-gate: on every dashboard load, if the company has no phone, show a
 // one-field modal before anything else.  Same component as in CompanyProfile.
@@ -136,8 +123,6 @@ export default function CompanyDashboard() {
 
             <NextStepCard next={workflow.next} />
 
-            <StepTracker title="Your hiring journey" steps={workflow.steps} />
-
             <AssistantPanel
                 subscribed={aiOn}
                 price={aiStatus?.amount}
@@ -145,7 +130,29 @@ export default function CompanyDashboard() {
                 prompts={ASSISTANT_PROMPTS}
             />
 
-            <FeatureShowcase items={COMPANY_FEATURES} />
+            <Link to="/company/profile" className={`block rounded-2xl border p-5 transition hover:shadow-sm ${
+                isPlatinum ? 'bg-success-50 border-success-100' : 'bg-gradient-to-br from-amber-50 to-yellow-50 border-amber-100'
+            }`}>
+                <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-yellow-500 text-white text-sm flex items-center justify-center">🏆</span>
+                    {isPlatinum ? 'Platinum' : 'Go Platinum'}
+                </h3>
+                <p className="text-sm text-gray-600 mt-2 leading-relaxed">
+                    {isPlatinum
+                        ? 'No per-job fee — you pay only 8.33% of CTC when you hire.'
+                        : tierStatus?.activated
+                            ? 'Post unlimited jobs for free and pay only 8.33% when you hire. Request Platinum from your profile →'
+                            : 'Post unlimited jobs for free and pay only 8.33% when you hire, instead of ₹3,999 per job. Request it from your profile →'}
+                </p>
+            </Link>
+
+            <div className="rounded-2xl bg-gray-50 border border-gray-100 px-5 py-4">
+                <h3 className="text-sm font-semibold text-gray-800 mb-1">How LadderStep works for you</h3>
+                <p className="text-xs text-gray-500 leading-relaxed">
+                    Post a job and our executives source, screen and shortlist matching candidates for you.
+                    We coordinate interviews and manage offers end-to-end — you just review and decide.
+                </p>
+            </div>
 
             {/* At a glance */}
             <div>
@@ -157,30 +164,6 @@ export default function CompanyDashboard() {
                     <Glance to="/company/shortlist" icon="⭐" label="Shortlisted" value={applications.shortlisted} />
                     <Glance to="/company/offers" icon="📨" label="Offers out" value={dash?.offers?.waiting ?? applications.offers_sent} />
                 </div>
-            </div>
-
-            {/* Account strip */}
-            <div className="flex flex-wrap gap-3">
-                <Link to="/company/profile" className={`flex-1 min-w-[220px] rounded-2xl border px-4 py-3 text-sm hover:shadow-sm transition ${
-                    isPlatinum ? 'bg-success-50 border-success-100' : 'bg-white border-gray-100'
-                }`}>
-                    {isPlatinum ? (
-                        <span className="text-success-700 font-medium">⭐ Platinum: no per-job fee, 8.33% per hire</span>
-                    ) : tierStatus?.activated ? (
-                        <span className="text-gray-700">Standard tier: <span className="text-indigo-600 font-medium">go Platinum →</span></span>
-                    ) : (
-                        <span className="text-gray-500">No live job yet: <span className="text-indigo-600 font-medium">post a job to see full profiles →</span></span>
-                    )}
-                </Link>
-                <Link to="/company/profile" className={`flex-1 min-w-[220px] rounded-2xl border px-4 py-3 text-sm hover:shadow-sm transition ${
-                    aiOn ? 'bg-indigo-50 border-indigo-100' : 'bg-white border-gray-100'
-                }`}>
-                    {aiOn ? (
-                        <span className="text-indigo-700 font-medium">✨ AI Assistant is on</span>
-                    ) : (
-                        <span className="text-gray-500">✨ AI Assistant: <span className="text-indigo-600 font-medium">subscribe for ₹{aiStatus?.amount || 299}/mo →</span></span>
-                    )}
-                </Link>
             </div>
 
             {/* Recent applications */}
