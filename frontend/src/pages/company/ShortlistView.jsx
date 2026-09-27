@@ -277,6 +277,11 @@ export default function ShortlistView() {
                                                     ⭐ Premium
                                                 </span>
                                             )}
+                                            {app.verified_trusted && (
+                                                <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-success-50 text-success-700 border border-success-200" title="A Premium candidate who applied directly — verified and trusted">
+                                                    ✅ Verified &amp; Trusted
+                                                </span>
+                                            )}
                                             <button
                                                 onClick={() => setProfileDrawer(app)}
                                                 className="text-[11px] text-indigo-600 hover:underline"

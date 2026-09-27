@@ -463,6 +463,9 @@ exports.getJobApplications = async (req, res) => {
         const result = applications.map(app => {
             const parsed = {
                 ...app,
+                // A Premium candidate applying on their own has already been verified by us —
+                // flag it distinctly from a Premium candidate an executive sourced/assigned.
+                verified_trusted: !!(app.is_premium && app.source === 'candidate'),
                 matched_skills: (() => {
                     try { return typeof app.matched_skills === 'string' ? JSON.parse(app.matched_skills) : (app.matched_skills ?? []); }
                     catch { return []; }
