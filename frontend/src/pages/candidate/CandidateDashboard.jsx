@@ -8,8 +8,20 @@ import JobDetailModal from '../../components/candidate/JobDetailModal';
 import NextStepCard from '../../components/common/NextStepCard';
 import StepTracker from '../../components/common/StepTracker';
 import AssistantPanel from '../../components/common/AssistantPanel';
+import FeatureShowcase from '../../components/common/FeatureShowcase';
 import { buildJourney, profileChecklist } from '../../components/candidate/journey';
 import { matchBadgeCls } from '../../utils/matchScore';
+
+const CANDIDATE_FEATURES = [
+    { icon: '📄', title: 'AI Resume Enrichment', desc: 'Upload your resume — AI suggests missing skills, education and a summary.', to: '/candidate/profile' },
+    { icon: '🎯', title: 'Live Job Matching', desc: 'See a real fit % for every job, ranked for you.', to: '/candidate/jobs' },
+    { icon: '✅', title: 'One-Tap Apply', desc: 'Apply to matched jobs in a single click.', to: '/candidate/jobs' },
+    { icon: '🗓', title: 'Interview Scheduling', desc: 'Confirm interview slots right from your dashboard.', to: '/candidate/interviews' },
+    { icon: '📨', title: 'Offer Responses', desc: 'Accept or decline offers directly in the portal.', to: '/candidate/interviews' },
+    { icon: '✨', title: 'AI Assistant', desc: 'Polish your profile, find matching jobs, or apply — just ask. ₹299/mo.', to: '/candidate/profile' },
+    { icon: '⭐', title: 'Premium Candidate', desc: 'Get verified and listed first to every hiring company. ₹999 one-time.', to: '/candidate/premium' },
+    { icon: '📁', title: 'Document Management', desc: 'Keep your certificates and documents organised in one place.', to: '/candidate/documents' },
+];
 
 const list = (res, ...keys) => {
     if (res?.status !== 'fulfilled') return [];
@@ -123,6 +135,8 @@ export default function CandidateDashboard() {
                 blurb="Your assistant can rewrite your profile, rank jobs by fit, and prepare applications for you."
                 prompts={ASSISTANT_PROMPTS}
             />
+
+            <FeatureShowcase items={CANDIDATE_FEATURES} />
 
             {/* At a glance */}
             <div>

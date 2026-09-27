@@ -6,6 +6,18 @@ import { aiSubscriptionAPI } from '../../api/aiSubscription';
 import NextStepCard from '../../components/common/NextStepCard';
 import StepTracker from '../../components/common/StepTracker';
 import AssistantPanel from '../../components/common/AssistantPanel';
+import FeatureShowcase from '../../components/common/FeatureShowcase';
+
+const COMPANY_FEATURES = [
+    { icon: '💼', title: 'Post Jobs', desc: '₹3,999 per job on Standard, or free on Platinum.', to: '/company/jobs' },
+    { icon: '🧑‍💼', title: 'Executive-Sourced Candidates', desc: 'Our executives find and assign matching candidates to your JD.' },
+    { icon: '⭐', title: 'Smart Shortlisting', desc: 'Every applicant ranked by fit, Premium candidates always on top.', to: '/company/shortlist' },
+    { icon: '🗓', title: 'Managed Interviews', desc: 'Request a slot — we coordinate timing and confirm with the candidate.', to: '/company/interviews' },
+    { icon: '📨', title: 'Offer Management', desc: 'Raise offers in-app; we manage acceptance and documentation.', to: '/company/offers' },
+    { icon: '✨', title: 'AI Hiring Assistant', desc: 'Draft job posts, sharpen descriptions, and find matches. ₹299/mo.', to: '/company/profile' },
+    { icon: '🏆', title: 'Platinum Tier', desc: 'Post unlimited jobs for free, pay only 8.33% per hire.', to: '/company/profile' },
+    { icon: '💳', title: 'Payments & Invoices', desc: 'Pay job fees, placement fees and subscriptions online.', to: '/company/payments' },
+];
 
 // Phone-gate: on every dashboard load, if the company has no phone, show a
 // one-field modal before anything else.  Same component as in CompanyProfile.
@@ -132,6 +144,8 @@ export default function CompanyDashboard() {
                 blurb="Your assistant can draft job posts, sharpen a job description, and rank candidates by fit for you."
                 prompts={ASSISTANT_PROMPTS}
             />
+
+            <FeatureShowcase items={COMPANY_FEATURES} />
 
             {/* At a glance */}
             <div>
