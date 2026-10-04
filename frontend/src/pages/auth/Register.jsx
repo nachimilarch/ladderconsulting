@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/AuthContext';
 
@@ -11,7 +11,9 @@ const ROLE_HOME = {
 export default function Register() {
     const { loginWithGoogle } = useAuth();
     const navigate = useNavigate();
-    const [role, setRole]     = useState('candidate');
+    const [searchParams] = useSearchParams();
+    // The website links here with ?role=company or ?role=candidate.
+    const [role, setRole]     = useState(searchParams.get('role') === 'company' ? 'company' : 'candidate');
     const [phone, setPhone]   = useState('');
     const [error, setError]   = useState('');
     const [pending, setPending] = useState('');

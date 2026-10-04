@@ -121,10 +121,15 @@ export default {
         rose: danger,
         purple: plum,
         fuchsia: plum,
+        // Public marketing website (pages/site): its own navy brand, kept apart from the portal violet.
+        site: { DEFAULT: '#164B78', dark: '#0F3554', light: '#1E5A9C' },
+        sitegray: { DEFAULT: '#8C9094', dark: '#4A4D51', light: '#F5F7FA' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+        sitehead: ['Montserrat', 'Inter', 'system-ui', 'sans-serif'],
+        sitebody: ['Inter', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
         card: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06)',

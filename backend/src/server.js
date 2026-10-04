@@ -110,6 +110,17 @@ const authLimiter = rateLimit({
 });
 app.use('/api/auth', authLimiter);
 
+// The public website's contact form sends email and notifies admins, so cap it hard per IP.
+const contactLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, message: 'Too many messages from this device. Please try again later.' },
+});
+app.use('/api/public/contact', contactLimiter);
+app.use('/api/public', require('./routes/public'));
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/employees', require('./routes/employees'));
 app.use('/api/calls', require('./routes/calls'));

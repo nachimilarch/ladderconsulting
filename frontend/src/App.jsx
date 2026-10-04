@@ -4,6 +4,13 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 
+// Public marketing website
+import SiteLayout from './components/site/SiteLayout';
+import SiteHome from './pages/site/Home';
+import SiteAbout from './pages/site/About';
+import SiteContact from './pages/site/Contact';
+import { Training as SiteTraining, HRServices as SiteHRServices, CorporateFinance as SiteCorporateFinance } from './pages/site/ServicePages';
+
 // Auth pages
 import Register from './pages/auth/Register';
 import Login from './pages/auth/Login';
@@ -141,8 +148,17 @@ export default function App() {
     <AuthProvider>
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Routes>
-        {/* Public */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        {/* Public website */}
+        <Route element={<SiteLayout />}>
+          <Route path="/" element={<SiteHome />} />
+          <Route path="/about" element={<SiteAbout />} />
+          <Route path="/training" element={<SiteTraining />} />
+          <Route path="/hr-services" element={<SiteHRServices />} />
+          <Route path="/corporate-finance" element={<SiteCorporateFinance />} />
+          <Route path="/contact" element={<SiteContact />} />
+        </Route>
+
+        {/* Public portal pages */}
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/login/trainer" element={<TrainerLogin />} />
