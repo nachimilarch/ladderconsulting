@@ -80,7 +80,25 @@ exports.submitContact = async (req, res) => {
         console.error('[public.contact] notify failed:', err.message);
     }
 
-    if (!emailed && !notified) {
+    // Also file it in the portal's Replies inbox (Outreach > Replies), next to the mail the poller
+    // brings in from crm@, so it can be read and answered there with the same mailbox. Plain text only:
+    // the inbox renders body_html as HTML, and this is public input.
+    let filed = false;
+    try {
+        const lines = [`Name: ${name}`, `Email: ${email}`];
+        if (phone) lines.push(`Phone: ${phone}`);
+        if (company) lines.push(`Company: ${company}`);
+        await db.query(
+            `INSERT INTO outreach_email_replies (channel, from_email, from_name, subject, body_text, received_at, reply_status)
+             VALUES ('email', ?, ?, ?, ?, ?, 'unread')`,
+            [email, name, `Website enquiry from ${name}`, `${lines.join('\n')}\n\n${message}`, new Date()]
+        );
+        filed = true;
+    } catch (err) {
+        console.error('[public.contact] inbox filing failed:', err.message);
+    }
+
+    if (!emailed && !notified && !filed) {
         return res.status(502).json({
             success: false,
             message: 'We could not send your message just now. Please try again in a few minutes.',
