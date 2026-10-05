@@ -30,7 +30,7 @@ exports.submitContact = async (req, res) => {
         return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
     }
 
-    const to = process.env.CONTACT_FORM_TO || process.env.SMTP_USER;
+    const to = process.env.CONTACT_FORM_TO || process.env.CONTACT_EMAIL || process.env.SMTP_USER;
     const from = process.env.EMAIL_FROM || `"LadderStep Human Consulting" <${process.env.SMTP_USER}>`;
 
     const html = `
