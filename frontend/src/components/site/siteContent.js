@@ -1,4 +1,12 @@
+import {
+    AcademicCapIcon, UserGroupIcon, BanknotesIcon,
+    LightBulbIcon, BookOpenIcon, RocketLaunchIcon, HandRaisedIcon,
+} from '@heroicons/react/24/outline';
+
 // All copy for the public marketing website lives here, so it can be edited in one place.
+// Everything below comes from the company's own information map or from what the portal really does.
+
+export const contactEmail = 'crm@theladderconsulting.com';
 
 export const navigationLinks = [
     { label: 'Home', href: '/' },
@@ -9,24 +17,6 @@ export const navigationLinks = [
     { label: 'Contact Us', href: '/contact' },
 ];
 
-export const mainServices = [
-    {
-        title: 'Training',
-        description: 'Comprehensive training programs for executives, sales teams, and leadership development.',
-        href: '/training',
-    },
-    {
-        title: 'HR Services',
-        description: 'Complete HR solutions from recruitment to performance management and ESG consultation.',
-        href: '/hr-services',
-    },
-    {
-        title: 'Corporate Finance',
-        description: 'Funding solutions, business loans, insurance, and expense optimization services.',
-        href: '/corporate-finance',
-    },
-];
-
 export const companyInfo = {
     name: 'LadderStep Human Consulting',
     tagline: 'Empowering Indian businesses with better talent and better profits',
@@ -34,22 +24,14 @@ export const companyInfo = {
     vision: 'To empower Indian businesses with better talent and better profits inspired by the initiative of Viksit Bharat 2047',
 };
 
-export const twoPillars = {
-    people: {
-        title: 'People',
-        description: 'Connect with us to attract, train and retain right talent in your organisation with our services which include training, talent acquisition and performance management.',
-    },
-    profits: {
-        title: 'Profits',
-        description: 'Enhance your profits by easy business loans, lesser operational risks and expenses optimisation.',
-    },
-};
+export const heroPillars = ['Executive Training', 'Selling Skills', 'Talent Development'];
 
-export const coreValues = [
-    { title: 'Quality Consciousness', description: 'We maintain the highest standards in all our services and deliverables.' },
-    { title: 'Knowledge Driven', description: 'Our solutions are backed by deep expertise and continuous learning.' },
-    { title: 'Proactive Approach', description: 'We anticipate challenges and provide solutions before they become problems.' },
-    { title: 'Collaboration', description: 'We work closely with our clients as partners in their growth journey.' },
+// The strip under the hero: plain facts about the firm, not made-up numbers.
+export const glance = [
+    { label: 'Built for', value: 'Small & Medium Businesses' },
+    { label: 'Two pillars', value: 'People & Profits' },
+    { label: 'Three service lines', value: 'Training, HR & Finance' },
+    { label: 'Our vision', value: 'Viksit Bharat 2047' },
 ];
 
 export const trainingServices = [
@@ -76,7 +58,80 @@ export const financeServices = [
     { title: 'Expense reduction consultation', description: 'Identify opportunities to optimize costs and improve profitability.' },
 ];
 
-// "Client Portal Access" on the Contact page — these hand visitors to the real portal.
+export const mainServices = [
+    {
+        key: 'training',
+        title: 'Training',
+        description: 'Comprehensive training programs for executives, sales teams, and leadership development.',
+        href: '/training',
+        icon: AcademicCapIcon,
+        items: trainingServices,
+    },
+    {
+        key: 'hr',
+        title: 'HR Services',
+        description: 'Complete HR solutions from recruitment to performance management and ESG consultation.',
+        href: '/hr-services',
+        icon: UserGroupIcon,
+        items: hrServices,
+    },
+    {
+        key: 'finance',
+        title: 'Corporate Finance',
+        description: 'Funding solutions, business loans, insurance, and expense optimization services.',
+        href: '/corporate-finance',
+        icon: BanknotesIcon,
+        items: financeServices,
+    },
+];
+
+export const twoPillars = {
+    people: {
+        title: 'People',
+        tagline: 'Attract. Train. Retain.',
+        description: 'Connect with us to attract, train and retain right talent in your organisation with our services which include training, talent acquisition and performance management.',
+        points: ['Talent acquisition', 'Training programs', 'Performance management'],
+    },
+    profits: {
+        title: 'Profits',
+        tagline: 'Fund. Protect. Optimise.',
+        description: 'Enhance your profits by easy business loans, lesser operational risks and expenses optimisation.',
+        points: ['Easy business loans', 'Lesser operational risks', 'Expense optimisation'],
+    },
+};
+
+export const coreValues = [
+    { title: 'Quality Consciousness', description: 'We maintain the highest standards in all our services and deliverables.', icon: BookOpenIcon },
+    { title: 'Knowledge Driven', description: 'Our solutions are backed by deep expertise and continuous learning.', icon: LightBulbIcon },
+    { title: 'Proactive Approach', description: 'We anticipate challenges and provide solutions before they become problems.', icon: RocketLaunchIcon },
+    { title: 'Collaboration', description: 'We work closely with our clients as partners in their growth journey.', icon: HandRaisedIcon },
+];
+
+// The LadderStep portal, described by what it really does today.
+export const platform = {
+    company: {
+        title: 'For Companies',
+        lead: 'Post a role and let our executives source candidates for it.',
+        points: [
+            'Candidates sourced and shortlisted for each job you post',
+            'Interviews and offers coordinated in one place',
+            'An AI assistant to draft job posts and rank candidates by fit',
+        ],
+        register: '/register?role=company',
+    },
+    seeker: {
+        title: 'For Job Seekers',
+        lead: 'Build one profile and get matched to real openings.',
+        points: [
+            'A live fit score for every job, ranked for you',
+            'Apply in a click, then confirm interviews and answer offers online',
+            'Premium profiles are verified and listed first to every company',
+        ],
+        register: '/register?role=candidate',
+    },
+};
+
+// Contact page "Client Portal Access" cards.
 export const portalAccess = [
     {
         title: 'Company',

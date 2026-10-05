@@ -122,14 +122,32 @@ export default {
         purple: plum,
         fuchsia: plum,
         // Public marketing website (pages/site): its own navy brand, kept apart from the portal violet.
-        site: { DEFAULT: '#164B78', dark: '#0F3554', light: '#1E5A9C' },
+        // `site` is the logo navy; deep/ink are the darker surfaces; mist is the pale wash. Gold is the one accent.
+        site: { DEFAULT: '#164B78', dark: '#0F3554', light: '#1E5A9C', deep: '#0A2A47', ink: '#061B2E', mist: '#EEF3F8' },
+        sitegold: { DEFAULT: '#C6A15B', light: '#E6D3A3', dark: '#9C7A36' },
         sitegray: { DEFAULT: '#8C9094', dark: '#4A4D51', light: '#F5F7FA' },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
-        sitehead: ['Montserrat', 'Inter', 'system-ui', 'sans-serif'],
+        sitehead: ['"Playfair Display"', 'Georgia', 'Cambria', 'serif'],
         sitebody: ['Inter', 'system-ui', 'sans-serif'],
+      },
+      keyframes: {
+        sitefloat: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        siteshine: {
+          '0%': { opacity: '0.55' },
+          '50%': { opacity: '1' },
+          '100%': { opacity: '0.55' },
+        },
+      },
+      animation: {
+        'site-float': 'sitefloat 7s ease-in-out infinite',
+        'site-float-slow': 'sitefloat 9s ease-in-out -3s infinite',
+        'site-shine': 'siteshine 5s ease-in-out infinite',
       },
       boxShadow: {
         card: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06)',
