@@ -353,8 +353,11 @@ exports.deleteCompany = async (req, res) => {
 // ── CANDIDATE MANAGEMENT ──────────────────────────────────────────────────────
 
 exports.listCandidates = async (req, res) => {
-    const { status, location, search, premium, origin, availability, page = 1, limit = 20 } = req.query;
-    const offset = (parseInt(page) - 1) * parseInt(limit);
+    const { status, location, search, premium, origin, availability } = req.query;
+    // Keep paging sane whatever the client sends: page >= 1, 1..100 rows a page.
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 20));
+    const offset = (page - 1) * limit;
 
     try {
         const where = ['u.deleted_at IS NULL', 'ro.name = ?'];
@@ -404,7 +407,7 @@ exports.listCandidates = async (req, res) => {
                       cp.current_location, cp.total_experience, cp.headline
              ORDER BY u.created_at DESC
              LIMIT ? OFFSET ?`,
-            [...params, parseInt(limit), offset]
+            [...params, limit, offset]
         );
 
         // Count must honour the same filters as the list, else the pager is wrong
@@ -430,7 +433,7 @@ exports.listCandidates = async (req, res) => {
         );
 
         res.json({
-            success: true, data: candidates, total: Number(total), page: parseInt(page), limit: parseInt(limit),
+            success: true, data: candidates, total: Number(total), page, limit,
             counts: { registered: Number(counts.registered), sourced: Number(counts.sourced), open_to_work: Number(counts.open_to_work) },
         });
     } catch (err) {

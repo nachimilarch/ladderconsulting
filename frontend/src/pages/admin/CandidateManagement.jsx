@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { adminCandidateAPI } from '../../api/admin';
 import toast from 'react-hot-toast';
@@ -25,6 +25,8 @@ const premiumBadge = (c) => {
     return <span className="text-gray-400 text-xs">Standard</span>;
 };
 
+const PAGE_SIZE = 25;
+
 const AI_LABEL = { active: 'Active', grace: 'Payment overdue', suspended: 'Suspended', cancelled: 'Cancelled' };
 
 export default function CandidateManagement() {
@@ -36,6 +38,9 @@ export default function CandidateManagement() {
     const [origin, setOrigin] = useState('');
     const [availability, setAvailability] = useState('');
     const [counts, setCounts] = useState(null);
+    const [page, setPage] = useState(1);
+    const [total, setTotal] = useState(0);
+    const listTop = useRef(null);
     const [selected, setSelected] = useState(null);
     const [actionModal, setActionModal] = useState(null);
     const [reason, setReason] = useState('');
@@ -49,20 +54,35 @@ export default function CandidateManagement() {
         if (premiumOnly) params.premium = '1';
         if (origin) params.origin = origin;
         if (availability) params.availability = availability;
+        params.page = page;
+        params.limit = PAGE_SIZE;
         adminCandidateAPI.list(params)
             .then((r) => {
                 const list = Array.isArray(r.data) ? r.data : r.data?.candidates ?? r.data?.data ?? [];
+                const count = Number(r.data?.total ?? list.length);
                 setCandidates(list);
+                setTotal(count);
                 setCounts(r.data?.counts || null);
+                // The list can shrink under you (filters, suspensions): never sit on a page that no longer exists.
+                const lastPage = Math.max(1, Math.ceil(count / PAGE_SIZE));
+                if (page > lastPage) setPage(lastPage);
             })
             .catch(() => { toast.error('Failed to load candidates'); setCandidates([]); })
             .finally(() => setLoading(false));
-    }, [search, statusFilter, premiumOnly, origin, availability]);
+    }, [search, statusFilter, premiumOnly, origin, availability, page]);
 
     useEffect(() => {
         const t = setTimeout(load, 350);
         return () => clearTimeout(t);
     }, [load]);
+
+    // Changing any filter starts again from the first page.
+    const withFirstPage = (setter) => (value) => { setter(value); setPage(1); };
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const goToPage = (p) => {
+        setPage(p);
+        listTop.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
 
     const openDetail = async (id) => {
         try {
@@ -101,7 +121,7 @@ export default function CandidateManagement() {
                 Candidates our executives sourced from resumes have never logged in.
             </p>
 
-            <OriginFilters origin={origin} onOrigin={setOrigin} availability={availability} onAvailability={setAvailability} counts={counts} />
+            <OriginFilters origin={origin} onOrigin={withFirstPage(setOrigin)} availability={availability} onAvailability={withFirstPage(setAvailability)} counts={counts} />
 
             {/* Filters */}
             <div className="flex gap-3 mb-6">
@@ -109,12 +129,12 @@ export default function CandidateManagement() {
                     type="text"
                     placeholder="Search name or email…"
                     value={search}
-                    onChange={(e) => setSearch(e.target.value)}
+                    onChange={(e) => withFirstPage(setSearch)(e.target.value)}
                     className="border border-gray-300 rounded px-3 py-2 text-sm w-64 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
                 <select
                     value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
+                    onChange={(e) => withFirstPage(setStatusFilter)(e.target.value)}
                     className="border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 >
                     <option value="">All statuses</option>
@@ -122,7 +142,7 @@ export default function CandidateManagement() {
                     <option value="suspended">Suspended</option>
                 </select>
                 <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                    <input type="checkbox" checked={premiumOnly} onChange={(e) => setPremiumOnly(e.target.checked)} />
+                    <input type="checkbox" checked={premiumOnly} onChange={(e) => withFirstPage(setPremiumOnly)(e.target.checked)} />
                     ⭐ Premium only
                 </label>
                 <Link to="/hr/premium-candidate-requests" className="ml-auto text-sm text-indigo-600 hover:underline self-center">
@@ -131,8 +151,9 @@ export default function CandidateManagement() {
             </div>
 
             <div className="flex gap-6">
-                {/* Table */}
-                <div className="flex-1 bg-white rounded-lg shadow-sm overflow-x-auto">
+                {/* Table + pager */}
+                <div className="flex-1 min-w-0" ref={listTop} style={{ scrollMarginTop: '1rem' }}>
+                <div className="bg-white rounded-lg shadow-sm overflow-x-auto">
                     {loading ? (
                         <p className="p-6 text-gray-400 text-sm">Loading…</p>
                     ) : candidates.length === 0 ? (
@@ -171,6 +192,36 @@ export default function CandidateManagement() {
                             </tbody>
                         </table>
                     )}
+                </div>
+
+                {total > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-3 text-sm text-gray-500">
+                        <span>
+                            Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total.toLocaleString('en-IN')}
+                        </span>
+                        {totalPages > 1 && (
+                            <div className="flex items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={() => goToPage(Math.max(1, page - 1))}
+                                    disabled={page === 1 || loading}
+                                    className="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    ← Previous
+                                </button>
+                                <span className="px-1 tabular-nums">Page {page} of {totalPages}</span>
+                                <button
+                                    type="button"
+                                    onClick={() => goToPage(Math.min(totalPages, page + 1))}
+                                    disabled={page >= totalPages || loading}
+                                    className="px-3 py-1.5 border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                                >
+                                    Next →
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                )}
                 </div>
 
                 {/* Slide-out detail */}
