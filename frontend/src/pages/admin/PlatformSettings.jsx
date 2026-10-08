@@ -40,6 +40,16 @@ const PLATFORM_SETTINGS = {
         description: 'When on, campaigns scheduled for a future time send by themselves at that time. Turn off to hold every scheduled campaign (nothing is lost; turn it back on and due campaigns send).',
         type: 'toggle',
     },
+    laila_use_claude: {
+        label: 'LAILA Answers With Claude',
+        description: 'When on (and an Anthropic API key is saved below), LAILA chats are answered by Claude instead of the local model. If Claude is ever unavailable, LAILA falls back to the local model by itself. Resume suggestions and match notes always use the local model.',
+        type: 'toggle',
+    },
+    laila_monthly_message_cap: {
+        label: 'LAILA Messages Per Person Per Month',
+        description: 'Only applies while Claude is on. Keeps the bill predictable: a person who reaches this is told their messages reset on the 1st. Default: 300.',
+        type: 'number',
+    },
     candidate_status_reminders_enabled: {
         label: 'Remind Candidates To Update Their Job Status',
         description: 'Emails (and notifies in the portal) candidates who have logged in before and have not said whether they are working or looking for a job, or whose answer is out of date. At most 3 reminders, 14 days apart, only 09:00 to 19:00 India time, 25 per half hour. Candidates sourced from resumes who never signed up are never contacted.',
@@ -211,6 +221,17 @@ const ENV_SECTIONS = [
         ],
     },
     {
+        id: 'claude',
+        title: 'LAILA (Claude by Anthropic)',
+        description: 'API key and model for Claude. Save, then use "Test connection". Switch it on with "LAILA Answers With Claude" above.',
+        icon: '🧠',
+        fields: [
+            { key: 'anthropic_api_key', label: 'Anthropic API Key',  type: 'password', placeholder: 'sk-ant-…' },
+            { key: 'claude_model',      label: 'Model',              type: 'select',   options: ['claude-haiku-5-5', 'claude-sonnet-5-5'] },
+            { key: 'claude_effort',     label: 'Effort',             type: 'select',   options: ['low', 'medium', 'high'] },
+        ],
+    },
+    {
         id: 'cashfree',
         title: 'Cashfree Payments',
         description: 'Cashfree payment gateway credentials for invoice collection.',
@@ -240,6 +261,53 @@ const Toggle = ({ value, onChange }) => (
         }`} />
     </button>
 );
+
+// Whether Claude is on, what it has cost this month, and a one-click connection test.
+function ClaudeStatus() {
+    const [info, setInfo] = useState(null);
+    const [testing, setTesting] = useState(false);
+    const [result, setResult] = useState(null);
+
+    const load = () => adminSettingsAPI.llmUsage().then((r) => setInfo(r.data?.data || null)).catch(() => {});
+    useEffect(() => { load(); }, []);
+
+    const test = async () => {
+        setTesting(true); setResult(null);
+        try {
+            const r = await adminSettingsAPI.llmTest();
+            setResult({ ok: true, text: `Connected. ${r.data.data.model} answered "${r.data.data.reply}" in ${(r.data.data.ms / 1000).toFixed(1)}s.` });
+        } catch (err) {
+            setResult({ ok: false, text: err.response?.data?.message || 'Could not reach Claude.' });
+        } finally { setTesting(false); load(); }
+    };
+
+    const m = info?.month;
+    const inr = m ? Math.round(m.cost_usd * 88 * 100) / 100 : 0;
+    return (
+        <div className="mt-2 rounded-lg bg-gray-50 border border-gray-100 p-4 text-sm">
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${info?.active ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}`}>
+                    {info?.active ? 'LAILA is answering with Claude' : info?.configured ? 'Key saved, Claude switched off' : 'No API key saved'}
+                </span>
+                {info && <span className="text-xs text-gray-500">{info.model} · effort {info.effort} · limit {info.monthly_message_cap} messages per person per month</span>}
+            </div>
+            {m && (
+                <p className="text-gray-600">
+                    This month: {m.calls.toLocaleString('en-IN')} replies for {m.people} {m.people === 1 ? 'person' : 'people'}, about ${m.cost_usd.toFixed(4)} (₹{inr.toLocaleString('en-IN')}).
+                    <span className="block text-xs text-gray-400 mt-0.5">An estimate from token counts at the published rates. Anthropic&apos;s invoice is the exact figure.</span>
+                </p>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-3">
+                <button type="button" onClick={test} disabled={testing}
+                    className="text-sm font-medium bg-indigo-600 text-white px-3.5 py-1.5 rounded-lg hover:bg-indigo-700 disabled:opacity-50">
+                    {testing ? 'Testing…' : 'Test connection'}
+                </button>
+                <span className="text-xs text-gray-400">Uses the saved key. Press Save first if you just changed it.</span>
+            </div>
+            {result && <p className={`mt-2 text-sm ${result.ok ? 'text-green-700' : 'text-red-600'}`}>{result.text}</p>}
+        </div>
+    );
+}
 
 const FieldInput = ({ field, value, onChange }) => {
     const [show, setShow] = useState(false);
@@ -693,6 +761,7 @@ export default function PlatformSettings() {
                                             />
                                         </div>
                                     ))}
+                                    {section.id === 'claude' && <ClaudeStatus />}
                                 </div>
                             )}
                         </div>

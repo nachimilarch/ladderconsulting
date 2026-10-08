@@ -90,6 +90,8 @@ router.get('/audit-logs',                  ...admin, ctrl.getAuditLogs);
 // Platform settings
 router.get('/settings',                    ...admin, ctrl.getSettings);
 router.patch('/settings',                  ...admin, ctrl.updateSettings);
+router.get('/llm-usage',                   ...admin, require('../controllers/llmAdminController').usage);
+router.post('/llm-test',                   ...admin, require('../controllers/llmAdminController').test);
 
 // Job Postings management
 router.get('/jobs',                        ...admin, ctrl.listAllJobs);

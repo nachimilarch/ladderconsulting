@@ -23,6 +23,7 @@ async function loadEnvOverrides() {
       'cashfree_app_id', 'cashfree_secret_key', 'cashfree_env', 'cashfree_webhook_secret',
       'openai_api_key', 'ai_match_threshold',
       'ollama_base_url', 'ollama_model', 'ollama_timeout_ms',
+      'anthropic_api_key', 'claude_model', 'claude_effort', 'laila_use_claude', 'laila_monthly_message_cap',
     ];
     if (!ENV_KEYS.length) return;
     const placeholders = ENV_KEYS.map(() => '?').join(',');

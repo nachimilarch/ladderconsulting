@@ -450,6 +450,13 @@ Stored in `whatsapp_auto_reply_flows`. After every inbound message, `fireAutoRep
 - **Media in:** Vaartabot currently delivers non-text messages as the placeholder `[unsupported]`. If a webhook ever carries a file URL, `services/whatsappMedia.extractInboundMedia` finds it (it checks many field names), `downloadInboundMedia` stores it under `uploads/whatsapp/` (10 MB, allow-listed types, refuses private/internal addresses), and the inbox shows it. Every webhook payload is kept 30 days in `whatsapp_webhook_events` so the real field names can be confirmed from a real media message.
 - **Media out:** Vaartabot has no media endpoint, so a file is stored and the message carries a private link `https://<site>/api/outreach/media/<token>` (public, random token, 30-day expiry). Staff view stored files at `GET /api/outreach/whatsapp/media/:in|out/:id`.
 
+### LAILA: Claude or Ollama (added 2026-10-09)
+LAILA's chat can be answered by **Claude (Anthropic)** or the local **Ollama** model. `services/lailaLlm.js` picks: Claude only when `laila_use_claude = true` AND an Anthropic API key is saved; otherwise Ollama. If a Claude call fails before any text has streamed, the same request is retried on Ollama. Only LAILA's chat uses this; resume suggestions, match notes and the outreach tools stay on Ollama (`services/localLlmService.js`).
+- **Files:** `services/claudeLlmService.js` (translates the OpenAI-style messages/tools the app uses into Claude's Messages API and back; drops unpaired tool calls because Claude rejects them), `services/lailaLlm.js` (router, fallback, monthly cap), `controllers/llmAdminController.js` (`GET /api/admin/llm-usage`, `POST /api/admin/llm-test`).
+- **Settings (Admin → Platform Settings):** `anthropic_api_key`, `claude_model` (default `claude-haiku-5-5`; `claude-sonnet-5-5` for better writing at ~20x the cost), `claude_effort` (`medium`), `laila_use_claude` (default off), `laila_monthly_message_cap` (300 per person per calendar month, only while Claude is on). Thinking is set per model in code: Haiku 5.5 `disabled`, Sonnet 5.5 `between_tools` (the API default would add cost and delay to a chat reply).
+- **Cost:** every call is logged in `llm_usage` with an estimated USD cost from the published rates (about ₹0.05 per message on Haiku 5.5, ₹1 on Sonnet 5.5). Anthropic's invoice is the exact figure.
+- **Privacy:** with Claude on, chat messages and the profile/job context go to Anthropic. The Privacy Policy says so.
+
 ### Credits
 `GET /credits/balance` → `{ data: { creditsBalance, totalMessagesSent } }`. Displayed on Outreach Dashboard, WhatsApp Campaigns, and Templates pages. Credits are purchased on vaartabot.com/billing.
 

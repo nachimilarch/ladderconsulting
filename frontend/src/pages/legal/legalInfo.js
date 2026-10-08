@@ -7,7 +7,7 @@ export const COMPANY = {
     state: 'Telangana, India',
 };
 
-export const LAST_UPDATED = '8 October 2026';
+export const LAST_UPDATED = '9 October 2026';
 
 export const LEGAL_PAGES = [
     { to: '/privacy-policy', label: 'Privacy Policy' },

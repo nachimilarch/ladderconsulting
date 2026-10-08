@@ -252,7 +252,9 @@ export default function ChatbotWidget({ mobileLauncher = true }) {
             flush();
             const msg = err.status === 402
                 ? "Your LAILA subscription isn't active right now. You can renew it from your profile page."
-                : UNAVAILABLE;
+                : err.status === 429 || err.status === 400
+                    ? err.message
+                    : UNAVAILABLE;
             add({ kind: 'message', role: 'assistant', content: msg });
             if (err.status === 402) setSubscribed(false);
         } finally {

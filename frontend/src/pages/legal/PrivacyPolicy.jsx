@@ -123,10 +123,14 @@ const sections = [
                     made by software alone.
                 </P>
                 <P>
-                    Some features use an AI language model: LAILA (our AI assistant), suggestions from your resume, and short notes explaining why a
-                    candidate fits a job. These run on a model hosted on our own servers, so your resume text and chat messages are not sent to an
-                    outside AI provider. The one exception is course recommendations for hired employees, which send only a job title, skill names and
-                    course titles, never names or contact details, to OpenAI.
+                    LAILA, our AI assistant, is powered by Claude, an AI model from Anthropic. When you chat with LAILA, your messages and the parts of
+                    your profile (or, for companies, your jobs) that LAILA needs in order to answer are sent to Anthropic, which produces the reply.
+                    We limit what is sent to what LAILA needs for that conversation.
+                </P>
+                <P>
+                    Other AI features, such as suggestions from your resume and short notes explaining why a candidate fits a job, run on a model hosted
+                    on our own servers, so that text is not sent to an outside AI provider. The one other exception is course recommendations for hired
+                    employees, which send only a job title, skill names and course titles, never names or contact details, to OpenAI.
                 </P>
                 <P>
                     AI can make mistakes. LAILA always shows you a preview and waits for your confirmation before it changes anything.
@@ -159,6 +163,7 @@ const sections = [
                     ['Google', 'Sign-in for candidates and companies. Also serves the typefaces our pages use (your browser contacts Google when a page loads).'],
                     ['Microsoft', 'Sign-in for our staff, and delivery of our emails (service emails and, for business contacts, outreach emails).'],
                     ['WhatsApp (via Vaartabot)', 'Delivers WhatsApp messages from us, and brings your replies back to us.'],
+                    ['Anthropic', 'Powers LAILA. Receives your chat messages and the profile or job details needed to answer them.'],
                     ['OpenAI', 'Course recommendations only, using job titles and skill names with no personal details.'],
                 ]} />
 
@@ -176,8 +181,8 @@ const sections = [
         title: 'Where your data is stored',
         body: (
             <P>
-                Our servers and file storage are in India (AWS Mumbai). Some of the providers above, such as Google, Microsoft, WhatsApp and
-                OpenAI, may process the limited data described there outside India. We only use providers that apply appropriate safeguards, and we
+                Our servers and file storage are in India (AWS Mumbai). Some of the providers above, such as Google, Microsoft, WhatsApp, Anthropic
+                and OpenAI, may process the limited data described there outside India. We only use providers that apply appropriate safeguards, and we
                 share no more than each one needs.
             </P>
         ),

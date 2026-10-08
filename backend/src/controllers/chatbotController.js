@@ -1,5 +1,6 @@
 const db = require('../config/db');
-const { streamChatCompletion, chatCompletion } = require('../services/localLlmService');
+// LAILA answers with Claude when an admin has switched it on, otherwise with the local Ollama model.
+const { streamChatCompletion, chatCompletion, capReached } = require('../services/lailaLlm');
 const { SCHEMAS, IMPLEMENTATIONS } = require('../services/chatbotTools');
 const { hasActiveAiSubscription } = require('../utils/aiSubscription');
 const jobController = require('../controllers/jobController');
@@ -52,13 +53,14 @@ const looksLikeFakeToolCall = (text, persona) => {
 const FIND_CANDIDATES = /\b(find|show|get|who|match|matching|suggest|recommend|rank|search)\b[^.?!]*\b(candidates?|people|profiles?|applicants?|talent)\b|\bwho (fits|matches|would fit|is right)\b/i;
 const IMPROVE_JOB = /\b(improve|polish|rewrite|re-?write|sharpen|refine|enhance|update|edit|fix)\b[^.?!]*\b(job|description|jd|posting|post)\b/i;
 
-const draftJobImprovement = async (job) => {
+const draftJobImprovement = async (job, userId) => {
     const facts = JSON.stringify({
         title: job.title, description: job.description, requirements: job.requirements || null,
         location: job.location || null, job_type: job.job_type, work_mode: job.work_mode,
     });
     const reply = await chatCompletion({
         json: true,
+        meta: { userId, feature: 'laila_chat' },
         messages: [
             { role: 'system', content: `You improve job postings. Use ONLY the facts in this posting: ${facts}\nDo not add facts: no benefits, tools, salary, team size, perks or requirements that are not already there. Improve clarity, structure and tone only. Reply with ONLY a JSON object: {"description": "...", "requirements": "..."} (use an empty string for requirements if the posting has none).` },
             { role: 'user', content: 'Improve this job posting.' },
@@ -95,6 +97,7 @@ const draftProfileRewrite = async (userId, userText) => {
     });
     const reply = await chatCompletion({
         json: true,
+        meta: { userId, feature: 'laila_chat' },
         messages: [
             { role: 'system', content: `You rewrite career profiles. Use ONLY the facts in this profile: ${facts}\nDo not add or change any fact: no new employers, degrees, tools, achievements or years of experience, and never inflate numbers. Improve the wording only: a specific, professional headline (max 100 characters) and a summary of 2-4 sentences in first person. If a field is empty, write it from the skills and experience given. Reply with ONLY a JSON object: {"headline": "...", "summary": "..."}` },
             { role: 'user', content: userText },
@@ -326,6 +329,11 @@ exports.sendMessage = async (req, res) => {
     if (!userText || typeof userText !== 'string') {
         return res.status(400).json({ message: 'message is required.' });
     }
+    if (userText.length > 4000) {
+        return res.status(400).json({ message: 'That message is too long. Please keep it under 4,000 characters.' });
+    }
+    const capMessage = await capReached(req.user.id);
+    if (capMessage) return res.status(429).json({ message: capMessage, code: 'LAILA_CAP' });
 
     res.setHeader('Content-Type', 'text/event-stream');
     // no-transform stops the compression() middleware from buffering the stream
@@ -351,7 +359,9 @@ exports.sendMessage = async (req, res) => {
         );
 
         const [history] = await db.query(
-            `SELECT role, content, tool_calls FROM chatbot_messages WHERE conversation_id = ? ORDER BY id ASC LIMIT 40`,
+            `SELECT role, content, tool_calls FROM (
+                 SELECT id, role, content, tool_calls FROM chatbot_messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 40
+             ) recent ORDER BY id ASC`,
             [conversationId]
         );
         const promptContext = await getPromptContext(req.user.id, persona);
@@ -443,7 +453,7 @@ exports.sendMessage = async (req, res) => {
                         }
                     } else {
                         const { job: current } = await IMPLEMENTATIONS.get_job_details({ user: req.user }, { job_id: job.id });
-                        const fields = current && await draftJobImprovement(current);
+                        const fields = current && await draftJobImprovement(current, req.user.id);
                         const made = fields && await IMPLEMENTATIONS.propose_job_update(
                             { user: req.user, conversationId }, { job_id: job.id, title: current.title, ...fields }
                         );
@@ -467,6 +477,7 @@ exports.sendMessage = async (req, res) => {
             const reply = await streamChatCompletion({
                 messages,
                 tools,
+                meta: { userId: req.user.id, feature: 'laila_chat' },
                 onToken: (text) => send({ type: 'token', text }),
             });
 

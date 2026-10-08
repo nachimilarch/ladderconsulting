@@ -60,6 +60,8 @@ export const adminAuditAPI = {
 export const adminSettingsAPI = {
     get: () => api.get('/admin/settings'),
     update: (data) => api.patch('/admin/settings', data),
+    llmUsage: () => api.get('/admin/llm-usage'),
+    llmTest: () => api.post('/admin/llm-test'),
 };
 
 export const adminAIAPI = {
