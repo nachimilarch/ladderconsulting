@@ -32,15 +32,15 @@ router.post('/resumes', ...exec, (req, res, next) => {
 router.get('/batches',     ...exec, ctrl.listBatches);
 router.get('/batches/:id', ...exec, ctrl.getBatchDetail);
 
-// Talent pool — exec view (unmasked) + direct assign to JD
+// Talent pool — exec view + direct assign to JD
 router.get('/talent',                               ...exec, ctrl.listTalentPoolExec);
 router.post('/jobs/:jobId/assign-candidate',        ...exec, ctrl.assignCandidateToJob);
 
-// Full candidate profile for HR executives (PII included, no masking)
+// Full candidate profile for HR executives
 // Optional ?jobId= returns fit_score + matched/missing skills for that JD
 router.get('/candidates/:candidateId/profile', ...exec, ctrl.getCandidateProfile);
 
-// Direct resume file download for HR/admin (original file, unmasked)
+// Direct resume file download for HR/admin (original file)
 router.get('/resumes/:resumeId/download', ...exec, ctrl.downloadResume);
 
 // DELETE a sourced candidate profile (soft-delete user + candidate + resumes, removes resume files)

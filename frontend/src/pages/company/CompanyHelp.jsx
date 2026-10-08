@@ -75,7 +75,7 @@ const SECTIONS = [
             {
                 n: 2,
                 title: 'Review Candidate Profiles',
-                desc: 'Once you have a live job posting you see full names, contact details, resumes and skills. Before that, personal details are masked. Premium candidates (⭐) are highlighted and listed first.',
+                desc: 'For every candidate who applies, or whom we put forward, you see the full name, email, phone number, resume and skills. Match scores and shortlisting open up once you have a live job posting. Premium candidates (⭐) are highlighted and listed first.',
             },
             {
                 n: 3,

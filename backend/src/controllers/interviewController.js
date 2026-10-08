@@ -1,6 +1,5 @@
 const db = require('../config/db');
 const { sendEmail } = require('../utils/email');
-const { maskName } = require('../utils/maskPII');
 const { generateOfferLetterPDF } = require('../utils/offerLetterPdf');
 const wa = require('../utils/whatsappNotify');
 
@@ -88,7 +87,7 @@ exports.listCompanySlots = async (req, res) => {
         const companyId = await getCompanyId(req.user.id);
 
         // Check once at the company level: Package A/B (non-Platinum with any paid order)
-        // → no placement fee for any candidate, show real names
+        // → no placement fee for any candidate
         const [[companyRow]] = await db.query(
             'SELECT placement_fee_percent FROM companies WHERE id = ? AND deleted_at IS NULL',
             [companyId]
@@ -127,15 +126,7 @@ exports.listCompanySlots = async (req, res) => {
             [companyId]
         );
 
-        const masked = slots.map(s => {
-            const { candidate_email, ...rest } = s;
-            return {
-                ...rest,
-                candidate_name: prepaidUnlock ? s.candidate_name : maskName(s.candidate_name),
-                prepaid_unlock: prepaidUnlock,
-            };
-        });
-        res.json({ slots: masked });
+        res.json({ slots: slots.map(s => ({ ...s, prepaid_unlock: prepaidUnlock })) });
     } catch (err) {
         console.error('listCompanySlots error:', err);
         res.status(500).json({ message: 'Failed to fetch interviews.' });

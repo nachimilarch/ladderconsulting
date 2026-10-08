@@ -117,7 +117,7 @@ async function run(resumeId, text) {
     }
 }
 
-// Queue enrichment for one resume. `text` is the PII-masked resume text. Returns the
+// Queue enrichment for one resume. `text` is the extracted resume text. Returns the
 // resulting status: 'pending' (queued), or 'skipped' (switched off / queue full).
 async function schedule(resumeId, text) {
     if (!String(text || '').trim()) return 'skipped';

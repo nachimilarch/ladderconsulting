@@ -181,7 +181,7 @@ const ENV_SECTIONS = [
     {
         id: 's3',
         title: 'AWS S3 Storage',
-        description: 'Used for resume uploads, masked PDFs, and outreach contact lists.',
+        description: 'Used for resume uploads and outreach contact lists.',
         icon: '☁️',
         fields: [
             { key: 'aws_access_key_id',     label: 'Access Key ID',       type: 'text',     placeholder: 'AKIA…' },

@@ -62,7 +62,6 @@ backend/src/
 │   ├── leadConverter.js       ← createLeadFromContact() — outreach → lead auto-creation
 │   ├── mailPoller.js          ← IMAP poller (setInterval 2min), started on server boot
 │   ├── matchingService.js     ← job matching (skill vectors via offline resumeParser)
-│   ├── maskedResumeGenerator.js ← PDF with PII redacted
 │   ├── skillExtractor.js      ← skill extraction (delegates to utils/resumeParser dictionary)
 │   ├── jobSkillExtractor.js   ← job skill extraction (keyword)
 │   └── trainingService.js     ← training module service (still uses OpenAI for course recommendations)
@@ -72,7 +71,6 @@ backend/src/
     ├── auditLog.js            ← logAction (fire-and-forget admin_logs insert)
     ├── email.js               ← sendEmail (transactional, GoDaddy SMTP)
     ├── outreachEmail.js       ← getTransporter, replaceMergeTags, buildReplyToAddress, parseReplyToTag
-    ├── maskPII.js             ← PII masking for candidate data shown to companies
     ├── candidateStatus.js     ← isCandidateHired(), hasPendingOffer() — lock helpers
     ├── paginate.js            ← pagination helper
     ├── resumeUnlock.js        ← consumePackCredit(), fulfillResumeUnlockOrder()
@@ -297,12 +295,12 @@ Profile CRUD, resume upload/download/parse/AI-extract, job browse, applications 
 - `GET /matched` — candidate: AI-matched jobs with fit_score
 - `GET|POST /` — company: list/create
 - `GET|PUT|PATCH|DELETE /:id` — company: CRUD
-- `GET /:jobId/applications` — company: list applications (PII masked unless unlocked)
+- `GET /:jobId/applications` — company: list applications (full names and contact details; match breakdown only once the company is activated)
 - `POST|DELETE /:jobId/applications/:appId/shortlist` — company: shortlist toggle
 - `PATCH /:jobId/applications/:appId/status` — company: move status
 
 ### Companies — `/api/companies` (company)
-Profile, dashboard, interviews, offers, candidate resume download (masked, gated by application).
+Profile, dashboard, interviews, offers, candidate resume download (original file, gated by application).
 
 **Resume Unlock:**
 - `GET /package-status` — `{ has_package, platinum }`
@@ -310,7 +308,7 @@ Profile, dashboard, interviews, offers, candidate resume download (masked, gated
 - `POST /talent/:candidateId/unlock` — purchase/grant unlock; returns payment link if needed
 - `GET /talent/:candidateId/profile` — full profile (gated by any unlock)
 - `GET /talent/:candidateId/preview` — preview profile (ungated teaser)
-- `GET /talent/:candidateId/resume` — original file (Single/Pack) or masked PDF (Platinum)
+- `GET /talent/:candidateId/resume` — original resume file
 - `POST /talent/:candidateId/apply` — add to pipeline (Single/Pack only)
 - `POST /talent/:candidateId/profile-unlock-request` — Platinum companies request full-profile access
 - `POST /talent/buy-pack` — standalone credit purchase (single or pack_4)
@@ -513,9 +511,9 @@ All controllers return `{ success: true, data: … }` or `{ success: false, mess
 ### Tiers
 | Tier | Price | What it grants |
 |------|-------|----------------|
-| Single | ₹999 | 1 credit — original unmasked resume file |
+| Single | ₹999 | 1 credit — original resume file |
 | 4-Pack | ₹3,999 | 4 credits — same as Single |
-| Platinum | Per-company % rate | Free unlimited — masked resume only, fee at hire |
+| Platinum | Per-company % rate | Free unlimited, fee at hire |
 
 ### Gate
 `GET /api/companies/package-status` checked by TalentPool.jsx before rendering. 403 `PACKAGE_REQUIRED` if no paid order exists. `getJobApplications` nulls `match_score` if no package.

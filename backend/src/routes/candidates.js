@@ -8,7 +8,6 @@ const { uploadResume, uploadDocument } = require('../middleware/upload');
 const { parseResumeText, parseFullProfile } = require('../utils/aiParser');
 const resumeEnrichment = require('../services/resumeEnrichment');
 const matchingService = require('../services/matchingService');
-const { maskResumeText } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
 const { upsertCandidateSkills } = require('../utils/skillTags');
 const premiumCtrl = require('../controllers/candidatePremiumController');
@@ -243,10 +242,6 @@ router.post('/resume', authenticateToken, authorizeRole('candidate'), (req, res,
         );
         const resumeId = result.insertId;
 
-        // Invalidate any cached masked resume so company gets a fresh redacted version
-        const maskedCachePath = path.join(process.cwd(), 'uploads', 'masked_resumes', `masked_${candidateId}.pdf`);
-        try { if (fs.existsSync(maskedCachePath)) fs.unlinkSync(maskedCachePath); } catch (_) {}
-
         // Respond immediately — the PDF is parsed ONCE in the background below
         // (skills land via triggerCandidateMatching). The client then calls
         // /resume/extract-profile, so it never needs skills in this response.
@@ -264,7 +259,7 @@ router.post('/resume', authenticateToken, authorizeRole('candidate'), (req, res,
             original_name: req.file.originalname,
         });
 
-        // Background: parse text ONCE → store masked text → extract skills + match
+        // Background: parse text ONCE → store it → extract skills + match
         setImmediate(async () => {
             try {
                 let parsedText = '';
@@ -278,16 +273,14 @@ router.post('/resume', authenticateToken, authorizeRole('candidate'), (req, res,
                     parsedText = (await mammoth.extractRawText({ buffer })).value;
                 }
                 if (parsedText.trim()) {
-                    const maskedText = maskResumeText(parsedText);
                     await db.query(
                         `UPDATE resumes SET parsed_text = ?, parse_status = 'done' WHERE id = ?`,
-                        [maskedText, resumeId]
+                        [parsedText, resumeId]
                     );
-                    // Use original unmasked text for matching accuracy; this also
-                    // extracts + batch-upserts the candidate's skill vectors.
+                    // Extracts + batch-upserts the candidate's skill vectors.
                     await matchingService.triggerCandidateMatching(candidateId, parsedText);
                     // Then let the local model suggest what the rules missed (queued, never blocks).
-                    await resumeEnrichment.schedule(resumeId, maskedText);
+                    await resumeEnrichment.schedule(resumeId, parsedText);
                 }
             } catch (err) {
                 console.error('[resume background]', err.message);
@@ -508,7 +501,7 @@ router.post('/resume/parse', authenticateToken, authorizeRole('candidate'), asyn
 
         await db.query(
             `UPDATE resumes SET parsed_text = ?, parse_status = 'done' WHERE id = ? AND deleted_at IS NULL`,
-            [maskResumeText(parsedText), resumeRow.id]
+            [parsedText, resumeRow.id]
         );
 
         if (aiResult.experience_years) {

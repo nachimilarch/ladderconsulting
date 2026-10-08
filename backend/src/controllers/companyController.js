@@ -1,7 +1,6 @@
 const db = require('../config/db');
 const path = require('path');
 const fs = require('fs');
-const { maskName, maskLocation } = require('../utils/maskPII');
 const { logAction } = require('../utils/auditLog');
 const { sendEmail } = require('../utils/email');
 const { getCompanyAccess } = require('../utils/companyAccess');
@@ -273,7 +272,6 @@ exports.getDashboard = async (req, res) => {
             [cid]
         );
 
-        const maskedRecent = recentApps.map(r => ({ ...r, candidate_name: maskName(r.candidate_name) }));
         res.json({
             company,
             jobs: jobStats,
@@ -282,10 +280,10 @@ exports.getDashboard = async (req, res) => {
             interviews: {
                 upcoming: Number(ivStats?.upcoming || 0),
                 awaiting_outcome: Number(ivStats?.awaiting_outcome || 0),
-                next: nextIv ? { ...nextIv, candidate_name: maskName(nextIv.candidate_name) } : null,
+                next: nextIv || null,
             },
             offers: { waiting: Number(offerStats?.waiting || 0) },
-            recent_applications: maskedRecent,
+            recent_applications: recentApps,
         });
     } catch (err) {
         console.error('getDashboard error:', err);
@@ -326,13 +324,7 @@ exports.listInterviews = async (req, res) => {
             [company.id]
         );
 
-        const activated = !!company.listing_fee_paid || company.company_tier === 'premium';
-
-        const masked = interviews.map(i => ({
-            ...i,
-            candidate_name: activated ? i.candidate_name : maskName(i.candidate_name),
-        }));
-        res.json({ interviews: masked });
+        res.json({ interviews });
     } catch (err) {
         console.error('listInterviews error:', err);
         res.status(500).json({ message: 'Failed to fetch interviews.' });
@@ -448,8 +440,7 @@ exports.listOffers = async (req, res) => {
             [company.id]
         );
 
-        const masked = offers.map(o => ({ ...o, candidate_name: maskName(o.candidate_name) }));
-        res.json({ offers: masked });
+        res.json({ offers });
     } catch (err) {
         console.error('listOffers error:', err);
         res.status(500).json({ message: 'Failed to fetch offers.' });
@@ -474,10 +465,8 @@ exports.downloadCandidateResume = async (req, res) => {
         if (!application) return res.status(403).json({ message: 'Access denied.' });
 
         const [[resume]] = await db.query(
-            `SELECT r.file_key, r.file_name, u.name AS candidate_name
+            `SELECT r.file_key, r.file_name
              FROM resumes r
-             JOIN candidates c ON c.id = r.candidate_id
-             JOIN users u ON u.id = c.user_id
              WHERE r.candidate_id = ? AND r.deleted_at IS NULL
              ORDER BY r.is_primary DESC, r.created_at DESC LIMIT 1`,
             [candidateId]
@@ -489,26 +478,11 @@ exports.downloadCandidateResume = async (req, res) => {
             return res.status(404).json({ message: 'Resume file not found on server.' });
         }
 
-        // Check if this company has a paid unlock for this candidate — if so, serve original.
-        const [[unlockRow]] = await db.query(
-            `SELECT granted_via FROM resume_unlocks
-             WHERE company_id = ? AND candidate_id = ? AND granted_via IN ('single','pack','platinum_approved')
-             LIMIT 1`,
-            [company.id, candidateId]
-        );
-
         logAction(req.user.id, 'company_resume_download', 'candidate', candidateId,
             { company_id: company.id, company_name: company.company_name,
-              application_id: application.application_id, masked: !unlockRow }, ip(req));
+              application_id: application.application_id }, ip(req));
 
-        if (unlockRow) {
-            return res.download(absolutePath, resume.file_name || 'candidate_resume.pdf');
-        }
-
-        const { getMaskedResumePath } = require('../services/maskedResumeGenerator');
-        const maskedPath = await getMaskedResumePath(absolutePath, resume.candidate_name, candidateId);
-        res.setHeader('X-Resume-Note', 'Contact information has been redacted by LadderStep Human Consulting');
-        res.download(maskedPath, 'candidate_resume_masked.pdf');
+        res.download(absolutePath, resume.file_name || 'candidate_resume.pdf');
     } catch (err) {
         console.error('downloadCandidateResume error:', err);
         res.status(500).json({ message: 'Failed to generate resume. Please contact LadderStep Human Consulting.' });

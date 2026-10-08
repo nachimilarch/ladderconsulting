@@ -5,7 +5,6 @@ const bcrypt = require('bcryptjs');
 const db = require('../config/db');
 const { parseFullProfile } = require('../utils/aiParser');
 const { parseRecruiterFilename, isNoiseName, chooseName } = require('../utils/resumeParser');
-const { maskResumeText } = require('../utils/maskPII');
 const matchingService = require('../services/matchingService');
 const { isCandidateHired } = require('../utils/candidateStatus');
 
@@ -209,7 +208,7 @@ const processResumeItem = async (item, job, uploadedBy) => {
         `INSERT INTO resumes (candidate_id, file_key, file_name, file_size, mime_type, is_primary, parse_status, parsed_text)
          VALUES (?, ?, ?, ?, ?, ?, 'done', ?)`,
         [candidateId, item.file_key, item.file_name, item.file_size || null,
-         item.mime_type || null, hasResume ? 0 : 1, maskResumeText(rawText)]
+         item.mime_type || null, hasResume ? 0 : 1, rawText]
     );
     const resumeId = resResult.insertId;
 
@@ -499,7 +498,7 @@ const logAction = (adminId, action, entityType, entityId, details, ipAddr) => {
 };
 
 // ── GET /api/recruitment/candidates/:candidateId/profile ─────────────────────
-// Full candidate profile for HR executives — PII exposed, no masking.
+// Full candidate profile for HR executives.
 // Optional ?jobId= returns fit_score + matched/missing skills for that JD.
 exports.getCandidateProfile = async (req, res) => {
     const { candidateId } = req.params;
@@ -578,7 +577,7 @@ exports.getCandidateProfile = async (req, res) => {
 };
 
 // ── GET /api/recruitment/talent ───────────────────────────────────────────────
-// Executive talent pool — real names, no masking. Supports search + skill + exp.
+// Executive talent pool. Supports search + skill + exp.
 // Optional ?jobId= to mark which candidates already have an application for that JD.
 exports.listTalentPoolExec = async (req, res) => {
     try {
@@ -928,7 +927,7 @@ exports.deleteCandidate = async (req, res) => {
 };
 
 // ── GET /api/recruitment/resumes/:resumeId/download ───────────────────────────
-// HR/admin direct download of a candidate's resume file (full PII, unmasked).
+// HR/admin direct download of a candidate's original resume file.
 exports.downloadResume = async (req, res) => {
     const { resumeId } = req.params;
     try {

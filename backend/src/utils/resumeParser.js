@@ -463,7 +463,8 @@ function firstSkillIndex(text, patterns) {
 function normalizeText(raw) {
     let t = String(raw || '');
 
-    // Remove PII placeholders inserted by masking layer — they confuse every extractor
+    // Resumes stored before masking was removed still carry placeholder tokens in parsed_text.
+    // Strip them so they don't confuse the extractors.
     t = t.replace(/\[Contact via[^\]]*\]/gi, '');
     t = t.replace(/\[Profile via[^\]]*\]/gi, '');
 

@@ -228,8 +228,8 @@ const FAQS = [
         a: 'Yes — you can apply to as many active jobs as you like. Each application is tracked independently. If you are hired for one role, your account is locked and you won\'t be able to apply to others.',
     },
     {
-        q: 'Will companies see my contact details before unlocking?',
-        a: 'Not until the company has activated its account by posting a paid job or joining Platinum. Until then companies only see a masked version of your profile with your name and contact details hidden. Your documents are only shared through your LadderStep executive.',
+        q: 'Will companies see my contact details?',
+        a: 'Yes. A company you apply to, or that a LadderStep executive puts you forward to, can see your name, email, phone number and resume so it can reach you. Your job status (whether you are looking or working) is only visible to the LadderStep team, never to companies. Your documents are only shared through your LadderStep executive.',
     },
     {
         q: 'What happens if I am sourced for a job I didn\'t apply to?',

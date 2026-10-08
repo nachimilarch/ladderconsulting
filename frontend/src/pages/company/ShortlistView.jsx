@@ -144,10 +144,13 @@ export default function ShortlistView() {
         setDownloadingResume(candidateId);
         try {
             const res = await candidateResumeAPI.download(candidateId);
-            const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+            // The original file is served as uploaded, so name the download after its real type.
+            const type = res.data?.type || 'application/pdf';
+            const ext = type.includes('wordprocessingml') ? 'docx' : type.includes('msword') ? 'doc' : 'pdf';
+            const url = window.URL.createObjectURL(new Blob([res.data], { type }));
             const link = document.createElement('a');
             link.href = url;
-            link.setAttribute('download', `${(candidateName || 'candidate').replace(/\s+/g, '_')}_resume.pdf`);
+            link.setAttribute('download', `${(candidateName || 'candidate').replace(/\s+/g, '_')}_resume.${ext}`);
             document.body.appendChild(link);
             link.click();
             link.remove();
@@ -198,7 +201,7 @@ export default function ShortlistView() {
                     <div>
                         <p className="text-sm font-semibold text-warning-800">Post a job to unlock shortlisting</p>
                         <p className="text-xs text-warning-700">
-                            Publish a job (₹3,999, or free on Platinum) to shortlist candidates and see their full profiles.{' '}
+                            Publish a job (₹3,999, or free on Platinum) to shortlist candidates and see their match scores.{' '}
                             <a href="/company/jobs" className="underline font-medium">Go to Job Postings →</a>
                         </p>
                     </div>

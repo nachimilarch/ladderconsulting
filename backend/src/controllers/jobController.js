@@ -1,7 +1,6 @@
 const db = require('../config/db');
 const matchingService = require('../services/matchingService');
 const { extractAndSaveJobSkills } = require('../services/jobSkillExtractor');
-const { maskCandidateForCompany } = require('../utils/maskPII');
 const { isCandidateHired } = require('../utils/candidateStatus');
 const { sendEmail } = require('../utils/email');
 const { getCompanyAccess } = require('../utils/companyAccess');
@@ -479,17 +478,15 @@ exports.getJobApplications = async (req, res) => {
                     catch { return []; }
                 })(),
             };
+            // Candidate names and contact details are always shown. Only the AI match
+            // breakdown waits for the company to be activated.
             if (!activated) {
                 parsed.match_score = null;
                 parsed.match_computed = false;
                 parsed.matched_skills = [];
                 parsed.missing_skills = [];
             }
-            if (activated) {
-                parsed.contact_unlocked = true;
-                return parsed;
-            }
-            return maskCandidateForCompany(parsed);
+            return parsed;
         });
         res.json({ applications: result, activation_required: !activated });
     } catch (err) {
