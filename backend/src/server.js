@@ -153,6 +153,8 @@ app.use('/api/admin', require('./routes/admin'));
 const whatsappCtrl = require('./controllers/whatsappController');
 app.get('/api/outreach/webhooks/whatsapp', whatsappCtrl.verifyWebhook);
 app.post('/api/outreach/webhooks/whatsapp', whatsappCtrl.handleWebhook);
+// Link a contact receives for a file we sent them on WhatsApp (no sign-in; long random token that expires).
+app.get('/api/outreach/media/:token', require('./controllers/whatsappInboxController').serveSharedMedia);
 app.use('/api/outreach', require('./routes/outreach'));
 
 // Admin outreach routes

@@ -2,6 +2,8 @@ const db     = require('../config/db');
 const axios  = require('axios');
 const crypto = require('crypto');
 const { createLeadFromContact } = require('../services/leadConverter');
+const inbox = require('../services/whatsappInbox');
+const waMedia = require('../services/whatsappMedia');
 
 const VB_BASE = 'https://vaartabot.com/api/v1';
 const vbHeaders = () => ({ 'X-API-Key': process.env.VAARTABOT_API_KEY, 'Content-Type': 'application/json' });
@@ -437,6 +439,9 @@ exports.handleWebhook = async (req, res) => {
     const body = req.body;
     if (!body) return;
 
+    // Keep a copy for 30 days: lets us see exactly what a new kind of message (media, for example) looks like.
+    recordWebhookEvent(body).catch((e) => console.error('[webhook:record]', e.message));
+
     try {
         // ── Vaartabot webhook format ──────────────────────────────────────────
         // { event, tenant_id, timestamp, data: { message_id, from, type, text, received_at } }
@@ -451,7 +456,7 @@ exports.handleWebhook = async (req, res) => {
                 const text      = data.text || data.message || data.body || '';
                 // received_at is ISO string; pass as-is — handleIncomingWAMessage accepts ISO or unix timestamp
                 const timestamp = data.received_at || body.timestamp || null;
-                if (from) await handleIncomingWAMessage(from, msgId, text, timestamp);
+                if (from) await handleIncomingWAMessage(from, msgId, text, timestamp, { data, body });
 
             } else if (event === 'message.delivered' || event === 'message.read') {
                 const msgId = data.message_id || data.messageId;
@@ -480,7 +485,19 @@ exports.handleWebhook = async (req, res) => {
     }
 };
 
-async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timestamp) {
+// Raw copy of every webhook event. Pruned as it is written so it never grows without limit.
+async function recordWebhookEvent(body) {
+    await db.query('INSERT INTO whatsapp_webhook_events (event, payload) VALUES (?, ?)',
+        [String(body.event || '').slice(0, 60) || null, JSON.stringify(body)]);
+    if (Math.random() < 0.05) {
+        await db.query('DELETE FROM whatsapp_webhook_events WHERE created_at < NOW() - INTERVAL 30 DAY LIMIT 500');
+    }
+}
+
+const MEDIA_LABEL = { image: 'Image', document: 'Document', audio: 'Voice or audio message', video: 'Video', sticker: 'Sticker',
+    location: 'Location', contacts: 'Shared contact', contact: 'Shared contact', reaction: 'Reaction', unsupported: 'Attachment' };
+
+async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timestamp, extra = {}) {
     // Accept ISO string (Vaartabot) or unix timestamp seconds (Meta)
     const receivedAt = timestamp
         ? (typeof timestamp === 'string' ? new Date(timestamp) : new Date(parseInt(timestamp) * 1000))
@@ -488,6 +505,25 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
     const e164Phone  = toE164(fromPhone);
     // Digits-only form for DB matching — contacts are stored without '+'
     const digitsPhone = fromPhone.replace(/\D/g, '');
+
+    // The same event can be delivered more than once; record each message only once.
+    if (waMessageId) {
+        const [[seen]] = await db.query(
+            'SELECT id FROM outreach_email_replies WHERE message_id = ? AND deleted_at IS NULL LIMIT 1', [waMessageId]);
+        if (seen) return;
+    }
+
+    // What kind of message is it, and does it carry a file?
+    const found = waMedia.extractInboundMedia(extra.data || {});
+    const msgType = found.msgType;
+    const isPlaceholder = !bodyText || bodyText === '[unsupported]';
+    // Put a caption in the message body; otherwise a readable label instead of Vaartabot's bare placeholder.
+    let storedText = found.caption || bodyText || '';
+    if (msgType && isPlaceholder && !found.caption) storedText = `[${MEDIA_LABEL[msgType] || 'Attachment'}]`;
+
+    // Who is it? The WhatsApp profile name, from the webhook or from Vaartabot's contact list.
+    const fromName = inbox.extractProfileName(extra.data, extra.body, fromPhone)
+        || await inbox.lookupProfileName(fromPhone);
 
     // Find campaign log by phone number — match against digits-only since contacts are stored without '+'
     const [[logRow]] = await db.query(
@@ -511,12 +547,28 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
     // Insert reply
     const [result] = await db.query(
         `INSERT INTO outreach_email_replies
-           (campaign_id, campaign_log_id, contact_id, assigned_to, channel,
-            from_phone, body_text, received_at, message_id, reply_status)
-         VALUES (?, ?, ?, ?, 'whatsapp', ?, ?, ?, ?, 'unread')`,
-        [campaignId, logId, contactId, assignedTo, fromPhone, bodyText, receivedAt, waMessageId]
+           (campaign_id, campaign_log_id, contact_id, assigned_to, channel, msg_type,
+            from_phone, from_name, body_text, received_at, message_id, reply_status)
+         VALUES (?, ?, ?, ?, 'whatsapp', ?, ?, ?, ?, ?, ?, 'unread')`,
+        [campaignId, logId, contactId, assignedTo, msgType, fromPhone, fromName, storedText, receivedAt, waMessageId]
     );
     const replyId = result.insertId;
+
+    if (fromName) {
+        // Give this person's earlier messages the name too.
+        inbox.saveNameForPhone(fromPhone, fromName).catch((e) => console.error('[wa:saveName]', e.message));
+    } else {
+        inbox.captureNameLater(fromPhone);
+    }
+
+    // Fetch the file in the background if the webhook pointed at one. A failure never loses the message.
+    if (found.url) {
+        waMedia.downloadInboundMedia({ url: found.url, mime: found.mime, filename: found.filename })
+            .then((m) => db.query(
+                'UPDATE outreach_email_replies SET media_key = ?, media_mime = ?, media_filename = ?, media_size = ? WHERE id = ?',
+                [m.key, m.mime, m.filename, m.size, replyId]))
+            .catch((e) => console.error(`[wa:media] reply ${replyId}: ${e.message}`));
+    }
 
     if (logId) {
         await db.query(
@@ -544,17 +596,18 @@ async function handleIncomingWAMessage(fromPhone, waMessageId, bodyText, timesta
         const [[campaign]] = await db.query(
             'SELECT campaign_name FROM outreach_campaigns WHERE id = ? LIMIT 1', [campaignId]
         ).catch(() => [[null]]);
+        const who = fromName ? `${fromName} (${fromPhone})` : fromPhone;
         await notify(
             assignedTo,
             'whatsapp_reply',
             'New WhatsApp Reply',
-            `New WhatsApp reply from ${fromPhone}${campaign?.campaign_name ? ` re: "${campaign.campaign_name}"` : ''}.`,
+            `New WhatsApp ${msgType ? 'message' : 'reply'} from ${who}${campaign?.campaign_name ? ` re: "${campaign.campaign_name}"` : ''}.`,
             { reply_id: replyId, campaign_id: campaignId }
         );
     }
 
     // Fire auto-reply flows in background (don't await — never block incoming handler)
-    fireAutoReply(e164Phone || fromPhone, bodyText, receivedAt).catch(e => console.error('[autoReply]', e.message));
+    fireAutoReply(e164Phone || fromPhone, storedText, receivedAt).catch(e => console.error('[autoReply]', e.message));
 }
 
 // ── GET /api/outreach/whatsapp/credits ────────────────────────────────────────

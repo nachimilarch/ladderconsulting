@@ -10,6 +10,7 @@ const replyCtrl     = require('../controllers/outreachReplyController');
 const callCtrl           = require('../controllers/outreachCallController');
 const emailAutoReplyCtrl = require('../controllers/emailAutoReplyController');
 const whatsappCtrl  = require('../controllers/whatsappController');
+const waInboxCtrl   = require('../controllers/whatsappInboxController');
 const analyticsCtrl = require('../controllers/outreachAnalyticsController');
 
 // Multer memory storage for Excel uploads (passed to S3)
@@ -59,7 +60,8 @@ router.delete('/email-campaigns/:id',          campaignCtrl.deleteEmailCampaign)
 // ── Replies ──────────────────────────────────────────────────────────────────
 router.get('/replies',                         replyCtrl.listReplies);
 router.get('/replies/:id',                     replyCtrl.getReply);
-router.post('/replies/:id/reply',              replyCtrl.sendReply);
+router.post('/replies/:id/reply',              waInboxCtrl.uploadMedia, replyCtrl.sendReply);
+router.get('/whatsapp/media/:direction/:id',    waInboxCtrl.serveStaffMedia);
 router.patch('/replies/:id/convert',           replyCtrl.convertToLead);
 router.patch('/replies/:id/ignore',            replyCtrl.ignoreReply);
 router.patch('/replies/:id/assign',            authorizeRole('admin'), replyCtrl.assignReply);

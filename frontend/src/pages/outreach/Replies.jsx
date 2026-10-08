@@ -89,12 +89,16 @@ export default function Replies() {
                                             <div className="flex items-center gap-2">
                                                 {r.reply_status === 'unread' && <span className="w-2 h-2 bg-yellow-400 rounded-full shrink-0"></span>}
                                                 <p className={`text-sm font-medium text-gray-800 ${r.reply_status === 'unread' ? 'font-semibold' : ''}`}>
-                                                    {r.from_name || r.from_email || r.from_phone || 'Unknown'}
+                                                    {r.from_name || r.contact_name || r.from_email || r.from_phone || 'Unknown'}
                                                 </p>
                                                 <span className="text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded capitalize">{r.channel}</span>
+                                                {r.channel === 'whatsapp' && (r.from_name || r.contact_name) && <span className="text-xs text-gray-400">{r.from_phone}</span>}
                                                 <IntentBadge triage={triage[r.id]} />
                                             </div>
-                                            <p className="text-xs text-gray-500 mt-0.5 truncate">{r.subject || r.body_text?.slice(0, 80) || '(no subject)'}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5 truncate">
+                                                {r.channel === 'whatsapp' && (r.has_media || (r.msg_type && r.msg_type !== 'text') || r.body_text === '[unsupported]') && <span aria-hidden="true">📎 </span>}
+                                                {r.subject || (r.body_text === '[unsupported]' ? 'Attachment' : r.body_text?.slice(0, 80)) || '(no subject)'}
+                                            </p>
                                             {r.campaign_name && <p className="text-xs text-gray-400 mt-0.5">Campaign: {r.campaign_name}</p>}
                                         </div>
                                         <div className="flex items-center gap-2 ml-4 shrink-0">

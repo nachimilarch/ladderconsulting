@@ -1,5 +1,9 @@
 import api from './axios';
 
+// Address of a file received on, or sent over, WhatsApp. direction is 'in' or 'out'.
+export const whatsappMediaUrl = (direction, id, { download = false } = {}) =>
+    `${api.defaults.baseURL}/outreach/whatsapp/media/${direction}/${id}${download ? '?download=1' : ''}`;
+
 export const contactListAPI = {
     upload:         (formData) => api.post('/outreach/contact-lists/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
     getAll:         (params)   => api.get('/outreach/contact-lists', { params }),
@@ -32,6 +36,8 @@ export const replyAPI = {
     getAll:   (params)        => api.get('/outreach/replies', { params }),
     getOne:   (id)            => api.get(`/outreach/replies/${id}`),
     reply:    (id, data)      => api.post(`/outreach/replies/${id}/reply`, data),
+    // WhatsApp: text and/or one file (multipart).
+    sendWhatsApp: (id, formData) => api.post(`/outreach/replies/${id}/reply`, formData, { headers: { 'Content-Type': 'multipart/form-data' } }),
     convert:  (id, data)      => api.patch(`/outreach/replies/${id}/convert`, data),
     ignore:   (id)            => api.patch(`/outreach/replies/${id}/ignore`),
     assign:   (id, userId)    => api.patch(`/outreach/replies/${id}/assign`, { assigned_to: userId }),

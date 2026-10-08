@@ -61,7 +61,9 @@ const sections = [
 
                 <H3>Messages and calls</H3>
                 <P>
-                    Emails and WhatsApp messages you send us or reply to, and notes our executives make about calls with you.
+                    Emails and WhatsApp messages you send us or reply to, including any photos, documents or voice messages, the name shown on your
+                    WhatsApp profile, and notes our executives make about calls with you. When we send you a file on WhatsApp, it is shared as a private link that
+                    stops working after 30 days.
                 </P>
 
                 <H3>Technical information</H3>

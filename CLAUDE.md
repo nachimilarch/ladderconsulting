@@ -444,6 +444,12 @@ Vaartabot POSTs to `POST /api/outreach/webhooks/whatsapp`:
 ### Auto-Reply Flows
 Stored in `whatsapp_auto_reply_flows`. After every inbound message, `fireAutoReply()` checks active flows in insertion order and fires the first match. Only `response_type = 'template'` is supported (free-text silently skipped with a warning log).
 
+### Inbox: replying, names and media (added 2026-10-09)
+- **Replying:** the reply page shows the WhatsApp conversation (inbound rows from `outreach_email_replies` + our sends in `whatsapp_outbound_messages`) and a composer. Free-form replies are only allowed within 24 hours of the person's **last inbound message** (`services/whatsappInbox.getWindow`); after that, only an approved template (campaign) works. Vaartabot's `POST /messages/reply` takes `{ to, message }` text only.
+- **Names:** `from_name` comes from the webhook payload if it carries one, otherwise from `GET /contacts?search=<digits>` on Vaartabot (it stores the WhatsApp profile name). If neither has it yet it is retried after 15s and 2 min. One-off backfill: `node src/scripts/backfillWhatsAppNames.js [--apply]`.
+- **Media in:** Vaartabot currently delivers non-text messages as the placeholder `[unsupported]`. If a webhook ever carries a file URL, `services/whatsappMedia.extractInboundMedia` finds it (it checks many field names), `downloadInboundMedia` stores it under `uploads/whatsapp/` (10 MB, allow-listed types, refuses private/internal addresses), and the inbox shows it. Every webhook payload is kept 30 days in `whatsapp_webhook_events` so the real field names can be confirmed from a real media message.
+- **Media out:** Vaartabot has no media endpoint, so a file is stored and the message carries a private link `https://<site>/api/outreach/media/<token>` (public, random token, 30-day expiry). Staff view stored files at `GET /api/outreach/whatsapp/media/:in|out/:id`.
+
 ### Credits
 `GET /credits/balance` → `{ data: { creditsBalance, totalMessagesSent } }`. Displayed on Outreach Dashboard, WhatsApp Campaigns, and Templates pages. Credits are purchased on vaartabot.com/billing.
 
