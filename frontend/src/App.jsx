@@ -9,7 +9,7 @@ import SiteLayout from './components/site/SiteLayout';
 import SiteHome from './pages/site/Home';
 import SiteAbout from './pages/site/About';
 import SiteContact from './pages/site/Contact';
-import { Training as SiteTraining, HRServices as SiteHRServices, CorporateFinance as SiteCorporateFinance } from './pages/site/ServicePages';
+import { Services as SiteServices, PillarPage as SitePillarPage } from './pages/site/ServicePages';
 
 // Auth pages
 import Register from './pages/auth/Register';
@@ -152,9 +152,12 @@ export default function App() {
         <Route element={<SiteLayout />}>
           <Route path="/" element={<SiteHome />} />
           <Route path="/about" element={<SiteAbout />} />
-          <Route path="/training" element={<SiteTraining />} />
-          <Route path="/hr-services" element={<SiteHRServices />} />
-          <Route path="/corporate-finance" element={<SiteCorporateFinance />} />
+          <Route path="/services" element={<SiteServices />} />
+          <Route path="/services/:slug" element={<SitePillarPage />} />
+          {/* Old service-line URLs, now grouped under the four pillars */}
+          <Route path="/training" element={<Navigate to="/services/enable" replace />} />
+          <Route path="/hr-services" element={<Navigate to="/services/enable" replace />} />
+          <Route path="/corporate-finance" element={<Navigate to="/services/secure" replace />} />
           <Route path="/contact" element={<SiteContact />} />
         </Route>
 

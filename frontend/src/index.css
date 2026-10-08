@@ -43,6 +43,11 @@
         @apply font-display font-semibold text-gray-900 leading-tight;
     }
 
+    /* Public website (Ladderstep brand): headings are Inter, like the body. */
+    .ls-site :is(h1, h2, h3, h4, h5, h6) {
+        @apply font-sans;
+    }
+
     /* Headings default to dark text; on a white-text surface (gradient cards) they inherit it. */
     .text-white :where(h1, h2, h3, h4, h5, h6) {
         color: inherit;

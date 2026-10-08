@@ -1,81 +1,97 @@
-import { CheckIcon } from '@heroicons/react/24/outline';
 import usePageMeta from '../../components/site/usePageMeta';
-import { Button, CtaBand, DarkBackdrop, Eyebrow, PageHero, Reveal, SectionHeading } from '../../components/site/ui';
-import { companyInfo, coreValues, twoPillars } from '../../components/site/siteContent';
+import PillarSteps from '../../components/site/PillarSteps';
+import { Mark } from '../../components/site/Brand';
+import { Button, CtaBand, Eyebrow, PageHero, Reveal, SectionHeading } from '../../components/site/ui';
+import { brandStory, companyInfo, coreValues } from '../../components/site/siteContent';
 
 export default function About() {
-    usePageMeta('About Us', companyInfo.description);
+    usePageMeta('About', companyInfo.description);
 
     return (
         <div>
             <PageHero
-                eyebrow="About LadderStep"
+                eyebrow="About Ladderstep"
                 title="A consulting partner for the businesses that power India"
                 subtitle={companyInfo.description}
-                crumb="About Us"
+                crumbs={[{ label: 'About' }]}
             />
 
-            {/* Pillars */}
-            <section className="py-20 lg:py-28">
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <SectionHeading
-                        eyebrow="Our two pillars"
-                        title="People and Profits"
-                        subtitle="We focus on the two essential elements that drive business growth."
-                    />
-                    <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-                        {[twoPillars.people, twoPillars.profits].map((p, i) => (
-                            <Reveal key={p.title} delay={i * 120} className="h-full">
-                                <div className="h-full rounded-2xl bg-white p-8 sm:p-10 ring-1 ring-slate-900/10 shadow-sm border-t-4 border-sitegold">
-                                    <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sitegold-dark">{p.tagline}</p>
-                                    <h3 className="mt-3 font-sitehead text-3xl font-bold text-site-deep">{p.title}</h3>
-                                    <p className="mt-4 leading-relaxed text-slate-600">{p.description}</p>
-                                    <ul className="mt-6 space-y-3">
-                                        {p.points.map((pt) => (
-                                            <li key={pt} className="flex items-center gap-3 text-slate-700">
-                                                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-site-mist text-site">
-                                                    <CheckIcon className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" />
-                                                </span>
-                                                {pt}
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </div>
-                            </Reveal>
-                        ))}
+            {/* Who we are + vision */}
+            <section className="bg-white py-20 lg:py-28">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-12 lg:grid-cols-12 lg:items-center">
+                    <Reveal className="lg:col-span-6">
+                        <Eyebrow className="mb-4">Who we are</Eyebrow>
+                        <h2 className="text-3xl sm:text-4xl lg:text-[2.75rem] font-bold tracking-tight leading-[1.1] text-balance text-ls-navy">
+                            SMBs are the backbone of our economy.
+                        </h2>
+                        <p className="mt-6 text-lg leading-relaxed text-ls-muted">
+                            Growing a business takes more than ambition. It takes a clear plan, the right people, secure finances and
+                            systems that hold as you grow. Ladderstep brings all four together, so you can focus on the climb.
+                        </p>
+                    </Reveal>
+                    <Reveal delay={120} className="lg:col-span-6">
+                        <figure className="border-l-4 border-ls-blue bg-ls-paper p-8 sm:p-10">
+                            <figcaption className="text-xs font-semibold uppercase tracking-[0.22em] text-ls-blue">Our vision</figcaption>
+                            <blockquote className="mt-4 text-2xl sm:text-[1.75rem] font-semibold leading-snug text-ls-navy">
+                                {companyInfo.vision}.
+                            </blockquote>
+                        </figure>
+                    </Reveal>
+                </div>
+            </section>
+
+            {/* The idea behind the mark */}
+            <section className="bg-ls-paper py-20 lg:py-28">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid gap-12 lg:grid-cols-12 lg:items-center">
+                    <Reveal className="lg:col-span-5">
+                        <div className="flex aspect-square max-w-sm items-center justify-center border border-ls-line bg-white p-12 sm:p-16 mx-auto lg:mx-0">
+                            <Mark animate className="h-full w-full" title="The Ladderstep take-off mark" />
+                        </div>
+                    </Reveal>
+                    <div className="lg:col-span-7">
+                        <SectionHeading
+                            className="!mb-10"
+                            eyebrow="Our mark"
+                            title="A disciplined climb that ends in a take-off"
+                        />
+                        <dl className="grid gap-8 sm:grid-cols-2">
+                            {brandStory.map((b, i) => (
+                                <Reveal key={b.title} delay={i * 120}>
+                                    <dt className="flex items-center gap-3 text-lg font-bold text-ls-navy">
+                                        <span className={`h-3 w-6 ${i === 0 ? 'bg-ls-navy' : 'bg-ls-red'}`} aria-hidden="true" />
+                                        {b.title}
+                                    </dt>
+                                    <dd className="mt-3 leading-relaxed text-ls-muted">{b.text}</dd>
+                                </Reveal>
+                            ))}
+                        </dl>
                     </div>
                 </div>
             </section>
 
-            {/* Vision */}
-            <section className="relative isolate overflow-hidden text-white">
-                <DarkBackdrop />
-                <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32 text-center">
-                    <Eyebrow tone="dark" className="mb-6">Our vision</Eyebrow>
-                    <p className="font-sitehead text-2xl sm:text-3xl lg:text-4xl font-semibold leading-snug text-white">
-                        <span className="text-sitegold-light">&ldquo;</span>{companyInfo.vision}<span className="text-sitegold-light">&rdquo;</span>
-                    </p>
+            {/* Pillars */}
+            <section className="bg-white py-20 lg:py-28">
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+                    <SectionHeading
+                        eyebrow="Our four pillars"
+                        title="Strategize. Enable. Secure. Scale."
+                        subtitle="Four steps every growing business takes. We help with each one, in the order you need them."
+                    />
+                    <PillarSteps />
                 </div>
             </section>
 
             {/* Values */}
-            <section className="py-20 lg:py-28">
+            <section className="bg-ls-paper py-20 lg:py-28">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                    <SectionHeading
-                        eyebrow="Our core values"
-                        title="The principles that guide everything we do"
-                    />
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                    <SectionHeading eyebrow="What we stand for" title="The principles behind our work" />
+                    <div className="grid grid-cols-1 gap-x-8 gap-y-12 sm:grid-cols-2 lg:grid-cols-4">
                         {coreValues.map((v, i) => (
-                            <Reveal key={v.title} delay={(i % 2) * 100} className="h-full">
-                                <div className="flex h-full gap-5 rounded-2xl bg-sitegray-light p-7 ring-1 ring-slate-900/5">
-                                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-white text-site shadow-sm ring-1 ring-slate-900/5">
-                                        <v.icon className="h-6 w-6" aria-hidden="true" />
-                                    </span>
-                                    <div>
-                                        <h3 className="font-sitehead text-xl font-bold text-site-deep">{v.title}</h3>
-                                        <p className="mt-2 leading-relaxed text-slate-600">{v.description}</p>
-                                    </div>
+                            <Reveal key={v.title} delay={i * 90}>
+                                <div className="border-t-2 border-ls-navy pt-6">
+                                    <v.icon className="h-7 w-7 text-ls-blue" strokeWidth={1.5} aria-hidden="true" />
+                                    <h3 className="mt-5 text-xl font-bold text-ls-navy">{v.title}</h3>
+                                    <p className="mt-2 leading-relaxed text-ls-muted">{v.description}</p>
                                 </div>
                             </Reveal>
                         ))}
@@ -84,11 +100,11 @@ export default function About() {
             </section>
 
             <CtaBand
-                title="Let's build your next stage of growth"
-                text="Whether it is your people, your funding or both, we would like to hear about your business."
+                title="Let's plan your next step"
+                text="Whether it is strategy, people, capital or systems, we would like to hear about your business."
             >
-                <Button to="/contact" variant="gold" size="lg" arrow>Contact us</Button>
-                <Button to="/" variant="light" size="lg">Back to home</Button>
+                <Button to="/contact" size="lg" arrow>Book a strategy call</Button>
+                <Button to="/services" variant="light" size="lg">See our services</Button>
             </CtaBand>
         </div>
     );

@@ -1,10 +1,13 @@
 import { useState } from 'react';
-import { ArrowRightIcon, CheckCircleIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
+import { ArrowRightIcon, ExclamationCircleIcon } from '@heroicons/react/24/outline';
 import { publicAPI } from '../../api/public';
+import { Plane } from './Brand';
 
 const EMPTY = { name: '', email: '', phone: '', company: '', message: '', website: '' };
-const field = 'block w-full rounded-lg border border-slate-300 bg-white px-4 py-3 text-base text-site-deep placeholder:text-slate-400 shadow-sm transition focus:border-site focus:outline-none focus:ring-4 focus:ring-site/10';
-const label = 'mb-2 block text-sm font-semibold text-site-deep';
+// Brand forms: white fields, navy labels, blue focus ring; red only for errors and the submit button.
+const field = 'block w-full rounded-md border border-[#C9CED8] bg-white px-4 py-3 text-base text-ls-navy placeholder:text-[#8A92A3] transition focus:border-ls-blue focus:outline-none focus:ring-2 focus:ring-ls-blue/30';
+const label = 'mb-2 block text-sm font-semibold text-ls-navy';
+const req = <span className="text-ls-blue" aria-hidden="true">*</span>;
 
 export default function ContactForm() {
     const [form, setForm] = useState(EMPTY);
@@ -39,11 +42,11 @@ export default function ContactForm() {
         <form onSubmit={submit} className="space-y-5">
             <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                 <div>
-                    <label htmlFor="name" className={label}>Name <span className="text-sitegold-dark">*</span></label>
+                    <label htmlFor="name" className={label}>Name {req}</label>
                     <input id="name" name="name" type="text" required maxLength={100} autoComplete="name" placeholder="Your full name" value={form.name} onChange={change} className={field} />
                 </div>
                 <div>
-                    <label htmlFor="email" className={label}>Email <span className="text-sitegold-dark">*</span></label>
+                    <label htmlFor="email" className={label}>Email {req}</label>
                     <input id="email" name="email" type="email" required maxLength={150} autoComplete="email" placeholder="you@company.com" value={form.email} onChange={change} className={field} />
                 </div>
             </div>
@@ -60,7 +63,7 @@ export default function ContactForm() {
             </div>
 
             <div>
-                <label htmlFor="message" className={label}>How can we help? <span className="text-sitegold-dark">*</span></label>
+                <label htmlFor="message" className={label}>How can we help? {req}</label>
                 <textarea id="message" name="message" required rows={5} maxLength={3000} placeholder="Tell us about your business and what you would like to achieve." value={form.message} onChange={change} className={`${field} resize-y`} />
             </div>
 
@@ -73,12 +76,12 @@ export default function ContactForm() {
             {status && (
                 <div
                     role="status"
-                    className={`flex items-start gap-3 rounded-lg border p-4 text-sm ${status.type === 'success'
-                        ? 'border-success-200 bg-success-50 text-success-800'
-                        : 'border-danger-200 bg-danger-50 text-danger-800'}`}
+                    className={`flex items-start gap-3 rounded-md border p-4 text-sm ${status.type === 'success'
+                        ? 'border-ls-line border-l-4 border-l-ls-blue bg-ls-paper text-ls-navy'
+                        : 'border-ls-red/40 border-l-4 border-l-ls-red-shade bg-[#FDF2F3] text-ls-red-shade'}`}
                 >
                     {status.type === 'success'
-                        ? <CheckCircleIcon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                        ? <Plane className="h-5 w-auto shrink-0 motion-safe:animate-ls-takeoff [animation-delay:0s]" />
                         : <ExclamationCircleIcon className="h-5 w-5 shrink-0" aria-hidden="true" />}
                     <span>{status.message}</span>
                 </div>
@@ -87,12 +90,12 @@ export default function ContactForm() {
             <button
                 type="submit"
                 disabled={sending}
-                className="group inline-flex w-full items-center justify-center gap-2 rounded-lg bg-site px-8 py-4 text-base font-semibold tracking-wide text-white shadow-lg shadow-site/20 transition-all hover:bg-site-deep focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sitegold focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-md bg-ls-red px-7 py-3.5 text-lg font-bold text-white transition-colors hover:bg-ls-red-shade focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ls-blue disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
             >
                 {sending ? 'Sending…' : 'Send message'}
-                {!sending && <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />}
+                {!sending && <ArrowRightIcon className="h-4 w-4 transition-transform group-hover:translate-x-0.5" strokeWidth={2.25} aria-hidden="true" />}
             </button>
-            <p className="text-xs text-slate-500">We will get back to you as soon as possible. Your details are used only to respond to your enquiry.</p>
+            <p className="text-xs text-ls-muted">We will get back to you as soon as possible. Your details are used only to respond to your enquiry.</p>
         </form>
     );
 }

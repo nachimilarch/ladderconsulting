@@ -1,28 +1,25 @@
 import { Link } from 'react-router-dom';
 import { EnvelopeIcon } from '@heroicons/react/24/outline';
-import { navigationLinks, companyInfo, contactEmail, mainServices } from './siteContent';
+import { Lockup } from './Brand';
+import { navigationLinks, companyInfo, contactEmail, pillars, pillarHref } from './siteContent';
 
-const link = 'text-sm text-slate-400 hover:text-white transition-colors';
-const heading = 'text-xs font-semibold uppercase tracking-[0.2em] text-sitegold-light mb-5';
+const link = 'text-sm text-white/70 hover:text-white transition-colors';
+const heading = 'text-xs font-semibold uppercase tracking-[0.22em] text-ls-blue-soft mb-5';
 
 export default function SiteFooter() {
     return (
-        <footer className="relative bg-site-ink text-slate-300">
-            <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-sitegold/60 to-transparent" aria-hidden="true" />
+        <footer className="bg-ls-navy text-white">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-10">
-                <div className="grid grid-cols-1 gap-12 md:grid-cols-2 lg:grid-cols-12">
-                    <div className="lg:col-span-5">
-                        {/* The logo files have a white background, so they sit on a white tile */}
-                        <Link to="/" className="inline-flex items-center gap-3 rounded-xl bg-white px-4 py-3 shadow-lg shadow-black/20" aria-label="LadderStep Human Consulting, home">
-                            <img src="/site/logo_notext.jpeg" alt="" className="h-10 w-auto" />
-                            <img src="/site/logo_text.jpeg" alt="LadderStep Human Consulting" className="h-8 w-auto" />
+                <div className="grid grid-cols-1 gap-12 sm:grid-cols-2 lg:grid-cols-12">
+                    <div className="sm:col-span-2 lg:col-span-5">
+                        <Link to="/" aria-label="Ladderstep Consulting, home" className="inline-block focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-white">
+                            <Lockup tone="dark" tagline className="h-16 w-auto" />
                         </Link>
-                        <p className="mt-6 text-sm leading-relaxed text-slate-400 max-w-md">{companyInfo.description}</p>
-                        <p className="mt-4 font-sitehead text-lg italic text-sitegold-light max-w-md leading-snug">&ldquo;{companyInfo.tagline}&rdquo;</p>
+                        <p className="mt-7 text-sm leading-relaxed text-white/70 max-w-md">{companyInfo.description}</p>
                     </div>
 
                     <div className="lg:col-span-2">
-                        <h4 className={heading}>Explore</h4>
+                        <h2 className={heading}>Explore</h2>
                         <ul className="space-y-3">
                             {navigationLinks.map((l) => (
                                 <li key={l.href}><Link to={l.href} className={link}>{l.label}</Link></li>
@@ -31,30 +28,29 @@ export default function SiteFooter() {
                     </div>
 
                     <div className="lg:col-span-2">
-                        <h4 className={heading}>Services</h4>
+                        <h2 className={heading}>Services</h2>
                         <ul className="space-y-3">
-                            {mainServices.map((s) => (
-                                <li key={s.key}><Link to={s.href} className={link}>{s.title}</Link></li>
+                            {pillars.map((p) => (
+                                <li key={p.slug}><Link to={pillarHref(p)} className={link}>{p.word}</Link></li>
                             ))}
                         </ul>
                     </div>
 
                     <div className="lg:col-span-3">
-                        <h4 className={heading}>Get in touch</h4>
-                        <a href={`mailto:${contactEmail}`} className="inline-flex items-center gap-2 text-sm text-slate-300 hover:text-white transition-colors break-all">
-                            <EnvelopeIcon className="h-5 w-5 shrink-0 text-sitegold-light" aria-hidden="true" />
+                        <h2 className={heading}>Get in touch</h2>
+                        <a href={`mailto:${contactEmail}`} className="inline-flex items-center gap-2 text-sm text-white hover:text-ls-blue-soft underline underline-offset-4 decoration-ls-blue-bright break-all">
+                            <EnvelopeIcon className="h-5 w-5 shrink-0 text-ls-blue-soft" aria-hidden="true" />
                             {contactEmail}
                         </a>
                         <div className="mt-6 flex flex-wrap gap-3">
-                            <Link to="/login" className="rounded-lg border border-white/20 px-4 py-2 text-sm font-semibold text-white hover:bg-white/10 transition-colors">Login</Link>
-                            <Link to="/register" className="rounded-lg bg-sitegold px-4 py-2 text-sm font-semibold text-site-ink hover:bg-sitegold-light transition-colors">Get Started</Link>
+                            <Link to="/login" className="rounded-md border-2 border-white/60 px-4 py-2 text-sm font-semibold text-white hover:bg-white hover:text-ls-navy transition-colors">Client portal</Link>
                         </div>
                     </div>
                 </div>
 
-                <div className="mt-14 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-slate-500">
+                <div className="mt-14 pt-8 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-white/55">
                     <p>© {new Date().getFullYear()} {companyInfo.name}. All rights reserved.</p>
-                    <p className="tracking-wide">Inspired by <span className="text-slate-400">Viksit Bharat 2047</span></p>
+                    <p className="tracking-wide">Inspired by Viksit Bharat 2047</p>
                 </div>
             </div>
         </footer>

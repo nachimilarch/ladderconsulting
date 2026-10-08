@@ -121,33 +121,50 @@ export default {
         rose: danger,
         purple: plum,
         fuchsia: plum,
-        // Public marketing website (pages/site): its own navy brand, kept apart from the portal violet.
-        // `site` is the logo navy; deep/ink are the darker surfaces; mist is the pale wash. Gold is the one accent.
-        site: { DEFAULT: '#164B78', dark: '#0F3554', light: '#1E5A9C', deep: '#0A2A47', ink: '#061B2E', mist: '#EEF3F8' },
-        sitegold: { DEFAULT: '#C6A15B', light: '#E6D3A3', dark: '#9C7A36' },
-        sitegray: { DEFAULT: '#8C9094', dark: '#4A4D51', light: '#F5F7FA' },
+        // Public marketing website (pages/site): the Ladderstep Consulting "Take-off" brand
+        // (ladderstep-brand/ladderstep-brand-context.md, 8 Oct 2026), kept apart from the portal violet.
+        // White is the canvas, navy leads, blue supports, red is the single accent per screen.
+        // The bright tones are for navy backgrounds only.
+        ls: {
+          navy: '#14213D',
+          'navy-700': '#1B2B4D',
+          blue: '#1D3A8A',
+          red: '#E63946',
+          'red-shade': '#B52434',
+          'blue-bright': '#4C7BFF',
+          'red-bright': '#FF3B5C',
+          'blue-soft': '#9DB6FF',
+          muted: '#5B6478',
+          paper: '#F6F7FA',
+          line: '#E2E5EC',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
-        sitehead: ['"Playfair Display"', 'Georgia', 'Cambria', 'serif'],
-        sitebody: ['Inter', 'system-ui', 'sans-serif'],
+        // Stand-in for the logo wordmark until the final face is outlined.
+        wordmark: ['"Helvetica Neue"', 'Helvetica', 'Arial', 'sans-serif'],
       },
       keyframes: {
-        sitefloat: {
-          '0%, 100%': { transform: 'translateY(0)' },
-          '50%': { transform: 'translateY(-10px)' },
+        // Logo build: the steps grow left to right, then the plane lifts off up and to the right.
+        'ls-step': {
+          '0%': { transform: 'scaleX(0)' },
+          '100%': { transform: 'scaleX(1)' },
         },
-        siteshine: {
-          '0%': { opacity: '0.55' },
-          '50%': { opacity: '1' },
-          '100%': { opacity: '0.55' },
+        'ls-takeoff': {
+          '0%': { opacity: '0', transform: 'translate(-28px, 28px)' },
+          '100%': { opacity: '1', transform: 'translate(0, 0)' },
+        },
+        'ls-path': {
+          '0%': { strokeDashoffset: '400' },
+          '100%': { strokeDashoffset: '0' },
         },
       },
       animation: {
-        'site-float': 'sitefloat 7s ease-in-out infinite',
-        'site-float-slow': 'sitefloat 9s ease-in-out -3s infinite',
-        'site-shine': 'siteshine 5s ease-in-out infinite',
+        'ls-step-1': 'ls-step 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s both',
+        'ls-step-2': 'ls-step 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.45s both',
+        'ls-takeoff': 'ls-takeoff 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.9s both',
+        'ls-path': 'ls-path 1.4s ease-out 1.2s both',
       },
       boxShadow: {
         card: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06)',

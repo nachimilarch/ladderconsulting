@@ -1,11 +1,11 @@
 import { useEffect } from 'react';
 
-const BRAND = 'LadderStep Human Consulting';
+const BRAND = 'Ladderstep Consulting';
 
 // Sets the browser tab title and meta description for a public page, and restores them on leave.
 export default function usePageMeta(title, description) {
     useEffect(() => {
-        document.title = title ? `${title} | ${BRAND}` : `${BRAND} - Business Consulting for SMBs`;
+        document.title = title ? `${title} | ${BRAND}` : `${BRAND} | Strategize. Enable. Secure. Scale.`;
         let tag = document.querySelector('meta[name="description"]');
         const created = !tag;
         if (!tag) {
@@ -16,7 +16,7 @@ export default function usePageMeta(title, description) {
         const previous = tag.getAttribute('content');
         if (description) tag.setAttribute('content', description);
         return () => {
-            document.title = BRAND;
+            document.title = 'LadderStep Human Consulting';
             if (created) tag.remove();
             else if (previous !== null) tag.setAttribute('content', previous);
         };
