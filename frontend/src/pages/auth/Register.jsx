@@ -100,6 +100,14 @@ export default function Register() {
                     Already have an account?{' '}
                     <Link to="/login" className="text-blue-600 font-medium hover:underline">Login</Link>
                 </p>
+
+                <p className="text-xs text-center text-gray-400 mt-4 leading-5">
+                    By creating an account you agree to our{' '}
+                    <Link to="/terms-of-service" className="underline hover:text-gray-600">Terms of Service</Link> and{' '}
+                    <Link to="/privacy-policy" className="underline hover:text-gray-600">Privacy Policy</Link>.
+                    {' '}See also our{' '}
+                    <Link to="/refund-and-cancellation" className="underline hover:text-gray-600">Refund &amp; Cancellation Policy</Link>.
+                </p>
             </div>
         </div>
     );

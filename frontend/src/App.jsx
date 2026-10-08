@@ -4,12 +4,10 @@ import { GoogleOAuthProvider } from '@react-oauth/google';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import ProtectedRoute from './routes/ProtectedRoute';
 
-// Public marketing website
-import SiteLayout from './components/site/SiteLayout';
-import SiteHome from './pages/site/Home';
-import SiteAbout from './pages/site/About';
-import SiteContact from './pages/site/Contact';
-import { Services as SiteServices, PillarPage as SitePillarPage } from './pages/site/ServicePages';
+// Public legal pages
+import PrivacyPolicy from './pages/legal/PrivacyPolicy';
+import TermsOfService from './pages/legal/TermsOfService';
+import RefundPolicy from './pages/legal/RefundPolicy';
 
 // Auth pages
 import Register from './pages/auth/Register';
@@ -148,18 +146,13 @@ export default function App() {
     <AuthProvider>
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Routes>
-        {/* Public website */}
-        <Route element={<SiteLayout />}>
-          <Route path="/" element={<SiteHome />} />
-          <Route path="/about" element={<SiteAbout />} />
-          <Route path="/services" element={<SiteServices />} />
-          <Route path="/services/:slug" element={<SitePillarPage />} />
-          {/* Old service-line URLs, now grouped under the four pillars */}
-          <Route path="/training" element={<Navigate to="/services/enable" replace />} />
-          <Route path="/hr-services" element={<Navigate to="/services/enable" replace />} />
-          <Route path="/corporate-finance" element={<Navigate to="/services/secure" replace />} />
-          <Route path="/contact" element={<SiteContact />} />
-        </Route>
+        {/* The main page is the sign-in page (the marketing website is not served). */}
+        <Route path="/" element={<Navigate to="/login" replace />} />
+
+        {/* Public legal pages (linked from sign-in and sign-up, and needed by the payment gateway) */}
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+        <Route path="/terms-of-service" element={<TermsOfService />} />
+        <Route path="/refund-and-cancellation" element={<RefundPolicy />} />
 
         {/* Public portal pages */}
         <Route path="/register" element={<Register />} />
