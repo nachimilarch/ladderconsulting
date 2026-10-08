@@ -13,7 +13,7 @@ export default function AiAssistantPromo({ text, prompt }) {
             className="w-full flex items-center justify-between gap-3 bg-indigo-50 border border-indigo-100 rounded-2xl px-5 py-3 mb-6 text-sm text-left hover:bg-indigo-100 transition"
         >
             <span className="text-indigo-800">
-                <strong>✨ AI Assistant</strong> — {text}
+                <strong>✨ LAILA</strong> — {text}
             </span>
             <span className="text-indigo-600 font-semibold text-xs shrink-0 whitespace-nowrap">Try it →</span>
         </button>

@@ -32,7 +32,7 @@ const STEPS = [
     {
         target: '[data-tour="payments"]',
         title: '💳 Payments',
-        body: 'Job posting fees, placement fees and your AI assistant subscription (₹299/month) all live here. Pay securely online and download every invoice.',
+        body: 'Job posting fees, placement fees and your LAILA subscription (₹299/month) all live here. Pay securely online and download every invoice.',
     },
     {
         target: '[data-tour="help"]',

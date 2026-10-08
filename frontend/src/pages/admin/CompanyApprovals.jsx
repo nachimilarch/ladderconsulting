@@ -233,7 +233,7 @@ export default function CompanyApprovals() {
                                                         <span className="text-[10px] text-yellow-700">Platinum requested</span>
                                                     )}
                                                     {(c.ai_status === 'active' || c.ai_status === 'grace') && (
-                                                        <span className="text-[10px] text-indigo-600">✨ AI Assistant</span>
+                                                        <span className="text-[10px] text-indigo-600">✨ LAILA</span>
                                                     )}
                                                 </div>
                                             ) : '—'}
@@ -278,7 +278,7 @@ export default function CompanyApprovals() {
                                 ['Plan', detail.company_tier ? tierBadge(detail.company_tier) : null],
                                 ['Platinum since', detail.company_tier === 'premium' ? fmtDate(detail.premium_approved_at) : null],
                                 ['Platinum requested', detail.company_tier !== 'premium' ? fmtDate(detail.premium_requested_at) : null],
-                                ['AI Assistant', detail.company_tier ? aiLabel(detail.ai_status) : null],
+                                ['LAILA', detail.company_tier ? aiLabel(detail.ai_status) : null],
                                 ['AI renews', ['active', 'grace'].includes(detail.ai_status) ? fmtDate(detail.ai_period_end) : null],
                                 ['Job Postings', detail.job_count],
                                 ['Applications', detail.application_count],

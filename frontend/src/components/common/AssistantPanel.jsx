@@ -9,7 +9,7 @@ export default function AssistantPanel({ subscribed, price, blurb, prompts }) {
                 <div>
                     <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                         <span className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-500 text-white text-sm flex items-center justify-center">✨</span>
-                        Let AI do the heavy lifting
+                        Let LAILA do the heavy lifting
                     </h3>
                     <p className="text-xs text-gray-500 mt-1 leading-relaxed">{blurb}</p>
                 </div>
@@ -34,7 +34,7 @@ export default function AssistantPanel({ subscribed, price, blurb, prompts }) {
             <p className="text-[11px] text-gray-400 mt-3 leading-snug">
                 {subscribed
                     ? 'You always see a preview and confirm before anything changes.'
-                    : 'Tap any option to see how to turn the assistant on. You always confirm before anything changes.'}
+                    : 'Tap any option to see how to turn LAILA on. You always confirm before anything changes.'}
             </p>
         </div>
     );

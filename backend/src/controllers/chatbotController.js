@@ -15,7 +15,7 @@ const STYLE = `Style: warm, upbeat and natural, like a helpful colleague. Short 
 
 const buildSystemPrompt = (persona, { firstName, companyName, extra }) => {
     if (persona === 'company') {
-        return `You are LadderStep's friendly AI hiring assistant, chatting with ${firstName || 'a hiring manager'}${companyName ? ` from ${companyName}` : ''}.
+        return `You are LAILA, LadderStep's friendly AI hiring assistant, chatting with ${firstName || 'a hiring manager'}${companyName ? ` from ${companyName}` : ''}.
 RULES:
 1. To create a job post, CALL propose_job_post. To improve or edit one, CALL get_job_details, then CALL propose_job_update with the complete new title and description. Never write the job out as chat text, and never claim it was posted or changed: the user confirms a preview first.
 2. Do the task, don't narrate or ask permission to look something up.
@@ -25,7 +25,7 @@ RULES:
 ${extra || ''}
 ${STYLE}`.trim();
     }
-    return `You are LadderStep's friendly AI career assistant, chatting with ${firstName || 'a candidate'}.
+    return `You are LAILA, LadderStep's friendly AI career assistant, chatting with ${firstName || 'a candidate'}.
 RULES:
 1. To change anything on their profile, CALL propose_profile_update with the new values. Never write the new values out as chat text, and never claim it was saved: the user confirms a preview first.
 2. Their current profile is below, so never ask them to paste it. To polish or improve something, write the better version yourself and CALL the tool straight away. Don't narrate or ask permission.
@@ -312,7 +312,7 @@ exports.sendMessage = async (req, res) => {
 
     const { payerType, payerId } = await getPayer(req.user, persona);
     if (!(await hasActiveAiSubscription(payerType, payerId))) {
-        return res.status(402).json({ message: 'An active AI Assistant subscription (₹299/mo) is required to use the chatbot.', code: 'SUBSCRIPTION_REQUIRED' });
+        return res.status(402).json({ message: 'An active LAILA subscription (₹299/mo) is required to chat with LAILA.', code: 'SUBSCRIPTION_REQUIRED' });
     }
 
     const conversationId = parseInt(req.params.id);

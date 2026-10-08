@@ -103,7 +103,7 @@ const TYPE_LABELS = {
     partial_payment: 'Partial Payment',
     other_fee:       'Other Fee',
     job_posting_fee: 'Job Posting Fee',
-    ai_subscription: 'AI Subscription',
+    ai_subscription: 'LAILA Subscription',
     training_fee:    'Training',
     service_fee:     'Service Fee',
     listing_fee:     'Listing Fee (legacy)',

@@ -36,7 +36,7 @@ const NAV = [
 const TABS = [
     { label: 'Home',      to: '/company',           icon: '🏠', exact: true },
     { label: 'Jobs',      to: '/company/jobs',      icon: '💼', badge: 'jobs' },
-    { label: 'Ask AI',    ai: true,                 icon: '✨' },
+    { label: 'Ask LAILA',   ai: true,                 icon: '✨' },
     { label: 'Shortlist', to: '/company/shortlist', icon: '⭐', badge: 'shortlist' },
     { label: 'More',      menu: true,                icon: '☰' },
 ];
@@ -125,7 +125,7 @@ export default function CompanyLayout() {
                         onClick={() => askAssistant()}
                         className="hidden md:inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-gradient-to-r from-indigo-600 to-violet-600 px-3.5 py-1.5 rounded-full shadow-sm hover:shadow transition"
                     >
-                        ✨ Ask AI
+                        ✨ Ask LAILA
                     </button>
                     <NotificationBell />
                     <span className="navbar-user hidden md:inline">{user?.name}</span>
@@ -199,10 +199,10 @@ export default function CompanyLayout() {
                                 key="ai"
                                 onClick={() => askAssistant()}
                                 className="flex flex-col items-center justify-center gap-0.5 py-1.5 -mt-4"
-                                aria-label="Ask the AI assistant"
+                                aria-label="Ask LAILA"
                             >
                                 <span className="w-12 h-12 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white text-xl flex items-center justify-center shadow-lg ring-4 ring-white">✨</span>
-                                <span className="text-[10px] font-semibold text-indigo-700">Ask AI</span>
+                                <span className="text-[10px] font-semibold text-indigo-700">Ask LAILA</span>
                             </button>
                         );
                     }

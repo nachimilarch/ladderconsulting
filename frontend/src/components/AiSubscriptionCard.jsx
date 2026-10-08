@@ -34,7 +34,7 @@ export default function AiSubscriptionCard() {
         setLoading(true);
         aiSubscriptionAPI.status()
             .then(({ data }) => setStatus(data))
-            .catch(() => toast.error('Failed to load AI subscription status.'))
+            .catch(() => toast.error('Failed to load LAILA subscription status.'))
             .finally(() => setLoading(false));
     };
 
@@ -56,7 +56,7 @@ export default function AiSubscriptionCard() {
     };
 
     const handleCancel = async () => {
-        if (!window.confirm('Cancel your AI Assistant subscription?')) return;
+        if (!window.confirm('Cancel your LAILA subscription?')) return;
         setBusy(true);
         try {
             await aiSubscriptionAPI.cancel();
@@ -83,9 +83,9 @@ export default function AiSubscriptionCard() {
 
     return (
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h2 className="text-base font-semibold text-gray-900 mb-1">AI Assistant Subscription</h2>
+            <h2 className="text-base font-semibold text-gray-900 mb-1">LAILA Subscription</h2>
             <p className="text-xs text-gray-500 mb-4">
-                ₹{status?.amount || 299}/month — unlocks the AI chatbot for drafting, matching, and profile help. Opt-in, cancel anytime.
+                ₹{status?.amount || 299}/month — unlocks LAILA, your AI assistant, for drafting, matching, and profile help. Opt-in, cancel anytime.
             </p>
 
             {!sub ? (

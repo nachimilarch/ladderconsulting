@@ -10,8 +10,8 @@ import ChatHelp from './chat/ChatHelp';
 import { OPEN_CHATBOT_EVENT } from '../utils/assistant';
 
 const GREETING = {
-    candidate: (name) => `Hi${name ? ` ${name}` : ''}! 👋 I'm your LadderStep assistant. I can polish your profile, find jobs that suit you, and even apply for you. What would you like to start with?`,
-    company: (name) => `Hi${name ? ` ${name}` : ''}! 👋 I'm your LadderStep assistant. I can draft job posts, improve existing ones, and find candidates who fit your roles. What shall we work on?`,
+    candidate: (name) => `Hi${name ? ` ${name}` : ''}! 👋 I'm LAILA, your LadderStep assistant. I can polish your profile, find jobs that suit you, and even apply for you. What would you like to start with?`,
+    company: (name) => `Hi${name ? ` ${name}` : ''}! 👋 I'm LAILA, your LadderStep assistant. I can draft job posts, improve existing ones, and find candidates who fit your roles. What shall we work on?`,
 };
 
 const STARTERS = {
@@ -251,7 +251,7 @@ export default function ChatbotWidget({ mobileLauncher = true }) {
         } catch (err) {
             flush();
             const msg = err.status === 402
-                ? "Your AI Assistant subscription isn't active right now. You can renew it from your profile page."
+                ? "Your LAILA subscription isn't active right now. You can renew it from your profile page."
                 : UNAVAILABLE;
             add({ kind: 'message', role: 'assistant', content: msg });
             if (err.status === 402) setSubscribed(false);
@@ -294,7 +294,7 @@ export default function ChatbotWidget({ mobileLauncher = true }) {
                 className={`fixed bottom-5 right-4 sm:right-5 z-40 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-lg hover:shadow-xl hover:scale-105 transition items-center justify-center text-2xl ${
                     mobileLauncher ? (open ? 'hidden sm:flex' : 'flex') : 'hidden md:flex'
                 }`}
-                aria-label="AI Assistant"
+                aria-label="LAILA"
             >
                 {open ? '×' : '✨'}
             </button>
@@ -307,7 +307,7 @@ export default function ChatbotWidget({ mobileLauncher = true }) {
                     >
                         <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg">✨</div>
                         <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm leading-tight">LadderStep Assistant</p>
+                            <p className="font-semibold text-sm leading-tight">LAILA</p>
                             <p className="text-[11px] text-white/80 flex items-center gap-1.5">
                                 <span className="w-1.5 h-1.5 rounded-full bg-green-300" />
                                 {sending ? 'Typing…' : 'Here to help'}
@@ -340,7 +340,7 @@ export default function ChatbotWidget({ mobileLauncher = true }) {
                     ) : !subscribed ? (
                         <div className="flex-1 overflow-y-auto p-4">
                             <p className="text-sm text-gray-600 mb-3">
-                                Hi{firstName ? ` ${firstName}` : ''}! 👋 Turn on the AI Assistant and I'll help with your day-to-day work right here in the chat.
+                                Hi{firstName ? ` ${firstName}` : ''}! 👋 I'm LAILA. Turn me on and I'll help with your day-to-day work right here in the chat.
                             </p>
                             <div className="mb-3"><ChatHelp persona={persona} preview /></div>
                             <AiSubscriptionCard />

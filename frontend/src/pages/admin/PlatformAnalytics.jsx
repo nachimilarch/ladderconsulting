@@ -12,7 +12,7 @@ const pct    = (n, d) => d > 0 ? `${Math.round((n / d) * 100)}%` : '—';
 const STREAM_LABEL = {
     job_posting_fee: 'Job Posting Fees',
     premium_profile_fee: 'Candidate Premium',
-    ai_subscription: 'AI Subscriptions',
+    ai_subscription: 'LAILA Subscriptions',
     placement_fee: 'Placement Fee Invoices',
     training_fee: 'Training',
     service_fee: 'Service Fees',
@@ -528,7 +528,7 @@ export default function PlatformAnalytics() {
 
                 {/* Memberships, Premium & AI Assistant */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-5 mb-5">
-                    <Panel title="Tiers, Premium & AI Assistant" subtitle="Who is on which plan, and what is waiting on the team">
+                    <Panel title="Tiers, Premium & LAILA" subtitle="Who is on which plan, and what is waiting on the team">
                         <div className="grid grid-cols-2 gap-3">
                             <SumTile label="Platinum Companies" desc="No per-job fee · 8.33% per hire" value={summary?.premium_companies} accent="border-yellow-400" />
                             <SumTile label="Premium Candidates" desc="₹6L+ verified · fee paid" value={summary?.premium_candidates} accent="border-green-400" />

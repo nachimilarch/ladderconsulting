@@ -160,7 +160,7 @@ export default function CandidateManagement() {
                                             <div className="flex flex-col gap-1 items-start">
                                                 {premiumBadge(c)}
                                                 {(c.ai_status === 'active' || c.ai_status === 'grace') && (
-                                                    <span className="text-[10px] text-indigo-600">✨ AI Assistant</span>
+                                                    <span className="text-[10px] text-indigo-600">✨ LAILA</span>
                                                 )}
                                             </div>
                                         </td>
@@ -192,7 +192,7 @@ export default function CandidateManagement() {
                                 ['Plan', premiumBadge({ ...selected, premium_request_status: selected.premium_request?.status })],
                                 ['Premium since', selected.is_premium ? fmtDate(selected.premium_activated_at) : null],
                                 ['Declared CTC', selected.premium_request ? fmtINR(selected.premium_request.declared_annual_ctc) : null],
-                                ['AI Assistant', selected.ai_subscription ? (AI_LABEL[selected.ai_subscription.status] || selected.ai_subscription.status) : 'Not subscribed'],
+                                ['LAILA', selected.ai_subscription ? (AI_LABEL[selected.ai_subscription.status] || selected.ai_subscription.status) : 'Not subscribed'],
                                 ['AI renews', ['active', 'grace'].includes(selected.ai_subscription?.status) ? fmtDate(selected.ai_subscription.current_period_end) : null],
                                 ['Location', selected.location],
                                 ['Experience', selected.experience_years != null ? `${selected.experience_years} yrs` : null],

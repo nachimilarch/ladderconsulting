@@ -66,14 +66,14 @@ const generateRenewalInvoices = async (amount) => {
             const invoiceNumber = await nextInvoiceNumber(db);
             const [invResult] = await db.query(
                 `INSERT INTO invoices (invoice_number, company_id, candidate_id, raised_by, invoice_type, amount, status, description, due_date)
-                 VALUES (?, ?, ?, NULL, 'ai_subscription', ?, 'pending', 'AI Assistant Subscription — LadderStep Human Consulting', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+                 VALUES (?, ?, ?, NULL, 'ai_subscription', ?, 'pending', 'LAILA Subscription — LadderStep Human Consulting', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
                 [invoiceNumber, sub.company_id, sub.candidate_id, amount]
             );
             await db.query(`UPDATE ai_subscriptions SET last_invoice_id = ? WHERE id = ?`, [invResult.insertId, sub.id]);
 
             const userId = await payerUserId(sub);
-            await notify(userId, 'ai_subscription_renewal', 'AI Subscription Renewal Due',
-                `Your ₹${amount} monthly AI Assistant subscription is due for renewal (Invoice ${invoiceNumber}). Pay within 7 days to keep access uninterrupted.`,
+            await notify(userId, 'ai_subscription_renewal', 'LAILA Subscription Renewal Due',
+                `Your ₹${amount} monthly LAILA subscription is due for renewal (Invoice ${invoiceNumber}). Pay within 7 days to keep access uninterrupted.`,
                 { subscription_id: sub.id, invoice_id: invResult.insertId });
         } catch (e) {
             console.error('[subscriptionBiller] renewal invoice failed for sub', sub.id, e.message);
@@ -102,8 +102,8 @@ const moveOverdueToGrace = async (graceDays) => {
                 [sub.due_date, graceDays, sub.id]
             );
             const userId = await payerUserId(sub);
-            await notify(userId, 'ai_subscription_grace', 'AI Subscription Payment Overdue',
-                `Your AI Assistant subscription payment is overdue. You have ${graceDays} more day(s) of access before it's suspended — pay to keep it active.`,
+            await notify(userId, 'ai_subscription_grace', 'LAILA Subscription Payment Overdue',
+                `Your LAILA subscription payment is overdue. You have ${graceDays} more day(s) of access before it's suspended — pay to keep it active.`,
                 { subscription_id: sub.id });
         } catch (e) {
             console.error('[subscriptionBiller] grace transition failed for sub', sub.id, e.message);
@@ -124,8 +124,8 @@ const suspendExpiredGrace = async () => {
         try {
             await db.query(`UPDATE ai_subscriptions SET status = 'suspended' WHERE id = ?`, [sub.id]);
             const userId = await payerUserId(sub);
-            await notify(userId, 'ai_subscription_suspended', 'AI Subscription Suspended',
-                'Your AI Assistant subscription has been suspended due to non-payment. Pay your outstanding invoice to reactivate.',
+            await notify(userId, 'ai_subscription_suspended', 'LAILA Subscription Suspended',
+                'Your LAILA subscription has been suspended due to non-payment. Pay your outstanding invoice to reactivate.',
                 { subscription_id: sub.id });
         } catch (e) {
             console.error('[subscriptionBiller] suspend failed for sub', sub.id, e.message);

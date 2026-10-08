@@ -167,22 +167,22 @@ const SECTIONS = [
     {
         id: 'ai-assistant',
         icon: '✨',
-        title: 'AI Assistant',
+        title: 'LAILA, your AI assistant',
         color: 'indigo',
         steps: [
             {
                 n: 1,
-                title: 'Tap "Ask AI" and say what you need',
+                title: 'Tap "Ask LAILA" and say what you need',
                 desc: 'Use the ✨ button (the middle button on your phone) and ask in plain words: "Polish my profile", "Find jobs that match me", "Help me apply to a job", or "What should I improve?". Tap the ? in the chat to see everything it can do.',
             },
             {
                 n: 2,
                 title: 'You stay in control',
-                desc: 'The assistant never changes anything by itself. It shows you a preview card first, and nothing is saved or sent until you tap "Looks good, confirm". Tap "Not now" to cancel.',
+                desc: 'LAILA never changes anything by itself. It shows you a preview card first, and nothing is saved or sent until you tap "Looks good, confirm". Tap "Not now" to cancel.',
             },
             {
                 n: 3,
-                title: 'Applying with AI',
+                title: 'Applying with LAILA',
                 desc: 'Ask it to find matching jobs, then tap "Apply with my profile" on a job card. It prepares the application for you to confirm. You can also apply yourself from Browse Jobs at any time.',
                 link: '/candidate/jobs',
                 linkLabel: 'Browse jobs →',
@@ -190,7 +190,7 @@ const SECTIONS = [
             {
                 n: 4,
                 title: 'Turning it on',
-                desc: 'The AI Assistant is a ₹299/month add-on that you can cancel any time. Open the assistant and tap Subscribe, or manage it from the bottom of your profile page. It can\'t upload resumes or schedule interviews yet — use the menu for those.',
+                desc: 'LAILA is a ₹299/month add-on that you can cancel any time. Open LAILA and tap Subscribe, or manage it from the bottom of your profile page. It can\'t upload resumes or schedule interviews yet — use the menu for those.',
                 link: '/candidate/profile',
                 linkLabel: 'Go to My Profile →',
             },

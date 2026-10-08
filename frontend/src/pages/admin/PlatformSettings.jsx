@@ -115,12 +115,12 @@ const FEES_SETTINGS = {
         type: 'number',
     },
     ai_subscription_amount: {
-        label: 'AI Assistant Subscription (₹ / month)',
-        description: 'Monthly price of the AI Assistant for companies and candidates. Applies to invoices raised from now on.',
+        label: 'LAILA Subscription (₹ / month)',
+        description: 'Monthly price of LAILA, the AI assistant, for companies and candidates. Applies to invoices raised from now on.',
         type: 'number',
     },
     ai_subscription_grace_days: {
-        label: 'AI Subscription Grace Period (days)',
+        label: 'LAILA Subscription Grace Period (days)',
         description: 'How long a subscriber keeps access after an unpaid renewal falls due, before the subscription is suspended.',
         type: 'number',
     },
@@ -201,8 +201,8 @@ const ENV_SECTIONS = [
     },
     {
         id: 'ollama',
-        title: 'AI Assistant (Local LLM)',
-        description: 'Ollama server behind the AI chatbot. It must be reachable from the backend server and run a tool-calling model (e.g. qwen2.5:7b). Leave blank to use the server defaults.',
+        title: 'LAILA (Local LLM)',
+        description: 'Ollama server behind LAILA. It must be reachable from the backend server and run a tool-calling model (e.g. qwen2.5:7b). Leave blank to use the server defaults.',
         icon: '✨',
         fields: [
             { key: 'ollama_base_url',   label: 'Ollama URL',      type: 'text',   placeholder: 'http://10.0.1.25:11434' },

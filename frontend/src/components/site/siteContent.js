@@ -115,7 +115,7 @@ export const platform = {
         points: [
             'Candidates sourced and shortlisted for each job you post',
             'Interviews and offers coordinated in one place',
-            'An AI assistant to draft job posts and rank candidates by fit',
+            'LAILA, our AI assistant, drafts job posts and ranks candidates by fit',
         ],
         register: '/register?role=company',
     },

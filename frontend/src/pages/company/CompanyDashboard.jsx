@@ -126,7 +126,7 @@ export default function CompanyDashboard() {
             <AssistantPanel
                 subscribed={aiOn}
                 price={aiStatus?.amount}
-                blurb="Your assistant can draft job posts, sharpen a job description, and rank candidates by fit for you."
+                blurb="LAILA can draft job posts, sharpen a job description, and rank candidates by fit for you."
                 prompts={ASSISTANT_PROMPTS}
             />
 

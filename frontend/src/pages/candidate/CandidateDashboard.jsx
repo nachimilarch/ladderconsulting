@@ -117,7 +117,7 @@ export default function CandidateDashboard() {
             <AssistantPanel
                 subscribed={aiOn}
                 price={ai?.amount}
-                blurb="Your assistant can rewrite your profile, rank jobs by fit, and prepare applications for you."
+                blurb="LAILA can rewrite your profile, rank jobs by fit, and prepare applications for you."
                 prompts={ASSISTANT_PROMPTS}
             />
 
@@ -143,7 +143,7 @@ export default function CandidateDashboard() {
                 <h3 className="text-sm font-semibold text-gray-800 mb-1">How LadderStep works for you</h3>
                 <p className="text-xs text-gray-500 leading-relaxed">
                     Build your profile and we match you to real openings from hiring companies.
-                    We coordinate your interviews and help you get to an offer — apply, or let the assistant do it for you.
+                    We coordinate your interviews and help you get to an offer — apply, or let LAILA do it for you.
                 </p>
             </div>
 

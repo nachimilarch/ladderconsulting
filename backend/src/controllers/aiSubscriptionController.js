@@ -87,7 +87,7 @@ exports.subscribe = async (req, res) => {
             [payer.payerId]
         );
         if (existing && ['active', 'grace'].includes(existing.status)) {
-            return res.status(409).json({ message: 'You already have an active AI subscription.' });
+            return res.status(409).json({ message: 'You already have an active LAILA subscription.' });
         }
 
         const [[userRow]] = await db.query('SELECT name, email, phone FROM users WHERE id = ?', [req.user.id]);
@@ -100,7 +100,7 @@ exports.subscribe = async (req, res) => {
             invoiceNumber = await nextInvoiceNumber(conn);
             const [invResult] = await conn.query(
                 `INSERT INTO invoices (invoice_number, ${column}, raised_by, invoice_type, amount, status, description, due_date)
-                 VALUES (?, ?, ?, 'ai_subscription', ?, 'pending', 'AI Assistant Subscription — LadderStep Human Consulting', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
+                 VALUES (?, ?, ?, 'ai_subscription', ?, 'pending', 'LAILA Subscription — LadderStep Human Consulting', DATE_ADD(NOW(), INTERVAL 7 DAY))`,
                 [invoiceNumber, payer.payerId, req.user.id, amount]
             );
             invoiceId = invResult.insertId;
@@ -128,7 +128,7 @@ exports.subscribe = async (req, res) => {
             customerName: userRow.name || payer.displayName,
             customerEmail: userRow.email,
             customerPhone: userRow.phone || '9999999999',
-            orderNote: 'AI Assistant Subscription — LadderStep Human Consulting',
+            orderNote: 'LAILA Subscription — LadderStep Human Consulting',
             returnUrl,
         }).catch(async (cfErr) => {
             await db.query(`UPDATE payment_transactions SET status = 'failed' WHERE cashfree_order_id = ?`, [orderId]);
@@ -169,7 +169,7 @@ exports.payInvoice = async (req, res) => {
              ORDER BY created_at DESC LIMIT 1`,
             [payer.payerId]
         );
-        if (!inv) return res.status(404).json({ message: 'No outstanding AI subscription invoice found.' });
+        if (!inv) return res.status(404).json({ message: 'No outstanding LAILA subscription invoice found.' });
 
         const [[userRow]] = await db.query('SELECT name, email, phone FROM users WHERE id = ?', [req.user.id]);
         const outstanding = parseFloat(inv.amount) - parseFloat(inv.amount_paid);
@@ -190,7 +190,7 @@ exports.payInvoice = async (req, res) => {
             customerName: userRow.name || payer.displayName,
             customerEmail: userRow.email,
             customerPhone: userRow.phone || '9999999999',
-            orderNote: `AI Assistant Subscription — Invoice ${inv.invoice_number}`,
+            orderNote: `LAILA Subscription — Invoice ${inv.invoice_number}`,
             returnUrl,
         }).catch(async (cfErr) => {
             await db.query(`UPDATE payment_transactions SET status = 'failed' WHERE cashfree_order_id = ?`, [orderId]);
@@ -236,7 +236,7 @@ exports.cancel = async (req, res) => {
 
         logAction(req.user.id, 'cancel_ai_subscription', payer.payerType, payer.payerId, {}, ip(req));
 
-        res.json({ success: true, message: 'AI subscription cancelled.' });
+        res.json({ success: true, message: 'LAILA subscription cancelled.' });
     } catch (err) {
         console.error('[aiSubscription.cancel]', err.message);
         res.status(500).json({ message: 'Failed to cancel subscription.' });
@@ -305,6 +305,6 @@ exports.adminList = async (req, res) => {
         });
     } catch (err) {
         console.error('[aiSubscription.adminList]', err);
-        res.status(500).json({ success: false, message: 'Failed to fetch AI subscriptions.' });
+        res.status(500).json({ success: false, message: 'Failed to fetch LAILA subscriptions.' });
     }
 };

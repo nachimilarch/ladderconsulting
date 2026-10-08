@@ -95,7 +95,7 @@ export default function AdminDashboard() {
         { icon: '👥', label: 'HR Staff',            value: summary?.total_hr_staff },
         { icon: '⭐', label: 'Platinum Companies',  value: summary?.premium_companies,  sub: '8.33% placement fee tier' },
         { icon: '🌟', label: 'Premium Candidates',  value: summary?.premium_candidates, sub: '₹6L+ verified, listed first' },
-        { icon: '🤖', label: 'AI Subscriptions',    value: summary?.active_ai_subscriptions, sub: 'active, ₹299/mo' },
+        { icon: '🤖', label: 'LAILA Subscriptions',    value: summary?.active_ai_subscriptions, sub: 'active, ₹299/mo' },
         { icon: '🎓', label: 'Certificates Issued', value: summary?.certificates_issued },
     ];
 

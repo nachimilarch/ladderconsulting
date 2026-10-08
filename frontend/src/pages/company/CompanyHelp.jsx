@@ -198,8 +198,8 @@ const FAQS = [
         a: 'The application moves back to "Interviewed" status. You can submit a new offer request at a revised CTC, or close the application and move to the next candidate.',
     },
     {
-        q: 'What does the AI assistant do?',
-        a: 'The assistant (₹299 per month) can draft a job post, improve the wording of a job you have already posted, and find the best-matching candidates for a job. It always shows you a preview and waits for your OK before anything changes. Open it with the chat button at the bottom right.',
+        q: 'What does LAILA do?',
+        a: 'LAILA, our AI assistant (₹299 per month), can draft a job post, improve the wording of a job you have already posted, and find the best-matching candidates for a job. It always shows you a preview and waits for your OK before anything changes. Open it with the chat button at the bottom right.',
     },
     {
         q: 'How is the AI fit score calculated?',

@@ -21,7 +21,7 @@ const STATUS_CLS = {
 const TYPE_META = {
     job_posting_fee:     { label: 'Job Posting Fee',   cls: 'bg-indigo-100 text-indigo-700', effect: 'publish the job posting' },
     premium_profile_fee: { label: 'Candidate Premium', cls: 'bg-amber-100 text-amber-700',   effect: 'activate Premium for this candidate' },
-    ai_subscription:     { label: 'AI Subscription',   cls: 'bg-violet-100 text-violet-700', effect: 'activate or extend the AI Assistant subscription' },
+    ai_subscription:     { label: 'LAILA Subscription', cls: 'bg-violet-100 text-violet-700', effect: 'activate or extend the LAILA subscription' },
     placement_fee:       { label: 'Placement Fee',     cls: 'bg-emerald-100 text-emerald-700' },
     training_fee:        { label: 'Training',          cls: 'bg-sky-100 text-sky-700' },
     service_fee:         { label: 'Service Fee',       cls: 'bg-gray-100 text-gray-600' },
@@ -213,7 +213,7 @@ export default function AdminPayments() {
                     accent="border-yellow-500"
                 />
                 <Kpi
-                    label="AI Subscription MRR"
+                    label="LAILA Subscription MRR"
                     value={fmtINR(subSummary?.monthly_recurring)}
                     sub={`${subSummary?.active || 0} active · ${subSummary?.grace || 0} overdue`}
                     accent="border-violet-500"
@@ -225,7 +225,7 @@ export default function AdminPayments() {
                 {[
                     { id: 'invoices', label: 'Invoices' },
                     { id: 'fees',     label: 'Placement Fees' },
-                    { id: 'ai',       label: 'AI Subscriptions' },
+                    { id: 'ai',       label: 'LAILA Subscriptions' },
                 ].map(t => (
                     <button
                         key={t.id}
@@ -496,7 +496,7 @@ export default function AdminPayments() {
                                 <tbody className="divide-y divide-gray-100">
                                     {subs.length === 0 ? (
                                         <tr>
-                                            <td colSpan={6} className="text-center py-12 text-gray-400">No AI subscriptions found.</td>
+                                            <td colSpan={6} className="text-center py-12 text-gray-400">No LAILA subscriptions found.</td>
                                         </tr>
                                     ) : subs.map(s => {
                                         const st = SUB_STATUS[s.status] || { label: s.status, cls: 'bg-gray-100 text-gray-500' };
