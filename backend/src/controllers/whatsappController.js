@@ -440,7 +440,7 @@ exports.handleWebhook = async (req, res) => {
     if (!body) return;
 
     // Keep a copy for 30 days: lets us see exactly what a new kind of message (media, for example) looks like.
-    recordWebhookEvent(body).catch((e) => console.error('[webhook:record]', e.message));
+    recordWebhookEvent(body, !!sigHeader).catch((e) => console.error('[webhook:record]', e.message));
 
     try {
         // ── Vaartabot webhook format ──────────────────────────────────────────
@@ -486,9 +486,11 @@ exports.handleWebhook = async (req, res) => {
 };
 
 // Raw copy of every webhook event. Pruned as it is written so it never grows without limit.
-async function recordWebhookEvent(body) {
+async function recordWebhookEvent(body, signaturePresent) {
+    // `_signature_present` records whether the sender signed the request, so we can tell
+    // whether it is safe to start rejecting unsigned requests.
     await db.query('INSERT INTO whatsapp_webhook_events (event, payload) VALUES (?, ?)',
-        [String(body.event || '').slice(0, 60) || null, JSON.stringify(body)]);
+        [String(body.event || '').slice(0, 60) || null, JSON.stringify({ ...body, _signature_present: signaturePresent })]);
     if (Math.random() < 0.05) {
         await db.query('DELETE FROM whatsapp_webhook_events WHERE created_at < NOW() - INTERVAL 30 DAY LIMIT 500');
     }
