@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { adminCandidateAPI } from '../../api/admin';
 import toast from 'react-hot-toast';
+import { CandidateOriginLine, OriginFilters } from '../../components/hr/CandidateOrigin';
 
 const statusBadge = (s) => {
     const map = { active: 'bg-green-100 text-green-700', suspended: 'bg-red-100 text-red-700' };
@@ -32,6 +33,9 @@ export default function CandidateManagement() {
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [premiumOnly, setPremiumOnly] = useState(false);
+    const [origin, setOrigin] = useState('');
+    const [availability, setAvailability] = useState('');
+    const [counts, setCounts] = useState(null);
     const [selected, setSelected] = useState(null);
     const [actionModal, setActionModal] = useState(null);
     const [reason, setReason] = useState('');
@@ -43,14 +47,17 @@ export default function CandidateManagement() {
         if (search) params.search = search;
         if (statusFilter) params.status = statusFilter;
         if (premiumOnly) params.premium = '1';
+        if (origin) params.origin = origin;
+        if (availability) params.availability = availability;
         adminCandidateAPI.list(params)
             .then((r) => {
                 const list = Array.isArray(r.data) ? r.data : r.data?.candidates ?? r.data?.data ?? [];
                 setCandidates(list);
+                setCounts(r.data?.counts || null);
             })
             .catch(() => { toast.error('Failed to load candidates'); setCandidates([]); })
             .finally(() => setLoading(false));
-    }, [search, statusFilter, premiumOnly]);
+    }, [search, statusFilter, premiumOnly, origin, availability]);
 
     useEffect(() => {
         const t = setTimeout(load, 350);
@@ -88,7 +95,13 @@ export default function CandidateManagement() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-6">Candidate Management</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-1">Candidate Management</h2>
+            <p className="text-sm text-gray-500 mb-5">
+                Candidates who registered and log in themselves can tell us whether they are looking for a job.
+                Candidates our executives sourced from resumes have never logged in.
+            </p>
+
+            <OriginFilters origin={origin} onOrigin={setOrigin} availability={availability} onAvailability={setAvailability} counts={counts} />
 
             {/* Filters */}
             <div className="flex gap-3 mb-6">
@@ -128,7 +141,7 @@ export default function CandidateManagement() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
-                                    {['Name', 'Email', 'Location', 'Applications', 'Plan', 'Status', ''].map((h) => (
+                                    {['Name', 'Origin · job status · last login', 'Location', 'Applications', 'Plan', 'Status', ''].map((h) => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                                     ))}
                                 </tr>
@@ -136,8 +149,11 @@ export default function CandidateManagement() {
                             <tbody className="divide-y divide-gray-100">
                                 {(Array.isArray(candidates) ? candidates : []).map((c) => (
                                     <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(c.id)}>
-                                        <td className="px-4 py-3 font-medium text-gray-800">{c.full_name || '—'}</td>
-                                        <td className="px-4 py-3 text-gray-500">{c.email}</td>
+                                        <td className="px-4 py-3">
+                                            <p className="font-medium text-gray-800">{c.full_name || '—'}</p>
+                                            <p className="text-xs text-gray-400">{c.email}</p>
+                                        </td>
+                                        <td className="px-4 py-3 min-w-[16rem]"><CandidateOriginLine candidate={c} /></td>
                                         <td className="px-4 py-3 text-gray-500">{c.location || '—'}</td>
                                         <td className="px-4 py-3 text-gray-500">{c.application_count ?? 0}</td>
                                         <td className="px-4 py-3">
@@ -167,6 +183,8 @@ export default function CandidateManagement() {
                             </div>
                             <button onClick={() => setSelected(null)} className="text-gray-400 hover:text-gray-600">✕</button>
                         </div>
+
+                        <CandidateOriginLine candidate={selected} className="mb-4" />
 
                         <dl className="space-y-2 text-sm mb-4">
                             {[

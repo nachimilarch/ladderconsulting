@@ -1,9 +1,16 @@
-import { useState } from 'react';
-import { Link, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState } from 'react';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import ChatbotWidget from '../../components/ChatbotWidget';
 import NotificationBell from '../../components/NotificationBell';
 import { askAssistant } from '../../utils/assistant';
+import { employmentStatusAPI } from '../../api/candidate';
+import EmploymentStatusModal from '../../components/candidate/EmploymentStatusModal';
+
+// "Remind me later" only lasts for the current browser session.
+const SNOOZE_KEY = 'employment-status-snoozed';
+const readSnoozed = () => { try { return sessionStorage.getItem(SNOOZE_KEY) === '1'; } catch { return false; } };
+const writeSnoozed = () => { try { sessionStorage.setItem(SNOOZE_KEY, '1'); } catch { /* private mode */ } };
 
 // The sidebar mirrors the candidate journey, in order: build a profile, find jobs,
 // apply, then interviews and offers. Numbering it makes the workflow obvious.
@@ -37,7 +44,41 @@ const TABS = [
 export default function CandidateLayout() {
     const { user, logout } = useAuth();
     const location = useLocation();
+    const navigate = useNavigate();
     const [menuOpen, setMenuOpen] = useState(false);
+
+    // Job status ("working or looking?"): asked at login when missing or stale, and from reminders.
+    const [jobStatus, setJobStatus] = useState(null);
+    const [snoozed, setSnoozed] = useState(readSnoozed);
+    const [askedByHand, setAskedByHand] = useState(false);
+    const forcedByLink = new URLSearchParams(location.search).has('update-status');
+
+    useEffect(() => {
+        let alive = true;
+        employmentStatusAPI.get().then((r) => { if (alive) setJobStatus(r.data?.data || null); }).catch(() => {});
+        return () => { alive = false; };
+    }, []);
+
+    const showStatusModal = !!jobStatus && (askedByHand || forcedByLink || (jobStatus.needs_update && !snoozed));
+
+    const stripStatusParam = () => {
+        if (!forcedByLink) return;
+        const params = new URLSearchParams(location.search);
+        params.delete('update-status');
+        const qs = params.toString();
+        navigate({ pathname: location.pathname, search: qs ? `?${qs}` : '' }, { replace: true });
+    };
+    const closeStatusModal = () => {
+        writeSnoozed();
+        setSnoozed(true);
+        setAskedByHand(false);
+        stripStatusParam();
+    };
+    const savedStatus = () => {
+        setAskedByHand(false);
+        stripStatusParam();
+        employmentStatusAPI.get().then((r) => setJobStatus(r.data?.data || null)).catch(() => {});
+    };
 
     const isActive = (item) => (item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to));
     const initial = (user?.name || 'C').trim()[0]?.toUpperCase();
@@ -114,7 +155,7 @@ export default function CandidateLayout() {
 
                 {/* Main content: extra bottom padding on phones so the tab bar never covers it */}
                 <main className="flex-1 min-w-0 p-4 sm:p-6 pb-28 md:pb-6 overflow-x-hidden overflow-y-auto">
-                    <Outlet />
+                    <Outlet context={{ jobStatus, askJobStatus: () => setAskedByHand(true) }} />
                 </main>
             </div>
 
@@ -184,6 +225,10 @@ export default function CandidateLayout() {
                         </div>
                     </aside>
                 </div>
+            )}
+
+            {showStatusModal && (
+                <EmploymentStatusModal current={jobStatus.status} onSaved={savedStatus} onClose={closeStatusModal} />
             )}
 
             <ChatbotWidget mobileLauncher={false} />

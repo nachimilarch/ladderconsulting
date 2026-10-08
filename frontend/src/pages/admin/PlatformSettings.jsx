@@ -40,6 +40,16 @@ const PLATFORM_SETTINGS = {
         description: 'When on, campaigns scheduled for a future time send by themselves at that time. Turn off to hold every scheduled campaign (nothing is lost; turn it back on and due campaigns send).',
         type: 'toggle',
     },
+    candidate_status_reminders_enabled: {
+        label: 'Remind Candidates To Update Their Job Status',
+        description: 'Emails (and notifies in the portal) candidates who have logged in before and have not said whether they are working or looking for a job, or whose answer is out of date. At most 3 reminders, 14 days apart, only 09:00 to 19:00 India time, 25 per half hour. Candidates sourced from resumes who never signed up are never contacted.',
+        type: 'toggle',
+    },
+    candidate_status_refresh_days: {
+        label: 'Job Status Refresh Period (days)',
+        description: 'How long a "looking" or "open to offers" answer stays fresh before the candidate is asked again. "Working, not looking" lasts three times as long. Default: 30.',
+        type: 'number',
+    },
     llm_resume_enrichment: {
         label: 'AI Resume Second Look',
         description: 'After a candidate uploads a resume, the AI model suggests extra profile details (headline, summary, skills, education) for the candidate to accept. Turn off if the AI server is overloaded.',

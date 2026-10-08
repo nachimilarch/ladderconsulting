@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { recruitmentAPI } from '../../api/recruitment';
 import toast from 'react-hot-toast';
 import { matchTextCls, matchBoxCls } from '../../utils/matchScore';
+import { CandidateOriginLine, OriginFilters } from '../../components/hr/CandidateOrigin';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
 const fmtExp  = (min, max) => { const lo = min != null ? parseFloat(min) : null; const hi = max != null ? parseFloat(max) : null; if (lo != null && hi != null) return `${lo}–${hi} yrs`; if (lo != null) return `${lo}+ yrs`; if (hi != null) return `up to ${hi} yrs`; return ''; };
@@ -90,6 +91,7 @@ function CandidateProfileDrawer({ candidateId, jobId, onClose }) {
                                     {data.headline && <p className="text-xs text-gray-500">{data.headline}</p>}
                                 </div>
                             </div>
+                            <CandidateOriginLine candidate={data} className="mt-3" />
                             <div className="flex flex-col gap-0.5 mt-2 text-xs text-gray-500">
                                 {data.candidate_email && <span>✉ {data.candidate_email}</span>}
                                 {data.candidate_phone && <span>📞 {data.candidate_phone}</span>}
@@ -313,6 +315,7 @@ function PoolCard({ candidate, jobSelected, onAssign, assigning, onViewProfile, 
                         {candidate.notice_period_days != null && <span>🕐 {candidate.notice_period_days}d notice</span>}
                         {candidate.expected_salary && <span>💰 {fmtSal(candidate.expected_salary)}</span>}
                     </div>
+                    <CandidateOriginLine candidate={candidate} className="mt-2" />
                     {candidate.skills?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                             {candidate.skills.slice(0, 6).map(s => <span key={s} className="badge-gray text-[10px] capitalize">{s}</span>)}
@@ -375,6 +378,7 @@ function FreePoolCard({ candidate, onDelete, deleting, onViewProfile }) {
                         {candidate.current_location && <span>📍 {candidate.current_location}</span>}
                         {candidate.notice_period_days != null && <span>🕐 {candidate.notice_period_days}d notice</span>}
                     </div>
+                    <CandidateOriginLine candidate={candidate} className="mt-2" />
                     {candidate.skills?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-2">
                             {candidate.skills.slice(0, 6).map(s => <span key={s} className="badge-gray text-[10px] capitalize">{s}</span>)}
@@ -420,6 +424,9 @@ export default function ResumeSourcing() {
     const pollRef      = useRef(null);
 
     // Pool tab
+    const [poolOrigin, setPoolOrigin] = useState('');
+    const [poolAvail, setPoolAvail] = useState('');
+    const [poolCounts, setPoolCounts] = useState(null);
     const [poolSearch, setPoolSearch] = useState('');
     const [poolSkill,  setPoolSkill]  = useState('');
     const [poolExpMin, setPoolExpMin] = useState('');
@@ -431,6 +438,9 @@ export default function ResumeSourcing() {
     const [assigning,  setAssigning]  = useState(null);
 
     // Free Pool tab
+    const [fpOrigin, setFpOrigin] = useState('');
+    const [fpAvail, setFpAvail] = useState('');
+    const [fpCounts, setFpCounts] = useState(null);
     const [fpSearch, setFpSearch] = useState('');
     const [fpSkill,  setFpSkill]  = useState('');
     const [fpExpMin, setFpExpMin] = useState('');
@@ -482,11 +492,12 @@ export default function ResumeSourcing() {
             search: poolSearch, skill: poolSkill,
             experience_min: poolExpMin, experience_max: poolExpMax,
             page: poolPage, jobId: selectedJob.id,
+            origin: poolOrigin, availability: poolAvail,
         })
-            .then(r => { setPool(r.data?.data || []); setPoolTotal(r.data?.total || 0); })
+            .then(r => { setPool(r.data?.data || []); setPoolTotal(r.data?.total || 0); setPoolCounts(r.data?.counts || null); })
             .catch(() => toast.error('Failed to load talent pool.'))
             .finally(() => setPoolLoading(false));
-    }, [selectedJob, poolSearch, poolSkill, poolExpMin, poolExpMax, poolPage]);
+    }, [selectedJob, poolSearch, poolSkill, poolExpMin, poolExpMax, poolPage, poolOrigin, poolAvail]);
 
     const loadFreePool = useCallback(() => {
         setFpLoading(true);
@@ -494,21 +505,22 @@ export default function ResumeSourcing() {
             search: fpSearch, skill: fpSkill,
             experience_min: fpExpMin, experience_max: fpExpMax,
             page: fpPage,
+            origin: fpOrigin, availability: fpAvail,
         })
-            .then(r => { setFreePool(r.data?.data || []); setFpTotal(r.data?.total || 0); })
+            .then(r => { setFreePool(r.data?.data || []); setFpTotal(r.data?.total || 0); setFpCounts(r.data?.counts || null); })
             .catch(() => toast.error('Failed to load free pool.'))
             .finally(() => setFpLoading(false));
-    }, [fpSearch, fpSkill, fpExpMin, fpExpMax, fpPage]);
+    }, [fpSearch, fpSkill, fpExpMin, fpExpMax, fpPage, fpOrigin, fpAvail]);
 
     useEffect(() => { loadJobs(); loadBatches(); loadFreePool(); }, [loadJobs, loadBatches, loadFreePool]);
 
     useEffect(() => {
         if (tab === 'pool' && selectedJob) loadPool();
-    }, [tab, selectedJob, poolSearch, poolSkill, poolExpMin, poolExpMax, poolPage, loadPool]);
+    }, [tab, selectedJob, poolSearch, poolSkill, poolExpMin, poolExpMax, poolPage, poolOrigin, poolAvail, loadPool]);
 
     useEffect(() => {
         if (tab === 'freepool') loadFreePool();
-    }, [tab, fpSearch, fpSkill, fpExpMin, fpExpMax, fpPage, loadFreePool]);
+    }, [tab, fpSearch, fpSkill, fpExpMin, fpExpMax, fpPage, fpOrigin, fpAvail, loadFreePool]);
 
     // Poll while any batch is processing
     useEffect(() => {
@@ -807,8 +819,13 @@ export default function ResumeSourcing() {
                 <>
                     <div className="mb-4">
                         <h2 className="text-lg font-display font-bold text-gray-900">{fpTotal} candidate{fpTotal !== 1 ? 's' : ''} in the free pool</h2>
-                        <p className="text-sm text-gray-500 mt-0.5">All sourced and self-registered candidates, available for placement. Click any name to view their full profile. Hired candidates are excluded.</p>
+                        <p className="text-sm text-gray-500 mt-0.5">Candidates our executives sourced, and candidates who registered and log in themselves (they tell us whether they are looking). Use the switch to separate them. Click any name to view their full profile. Hired candidates are excluded.</p>
                     </div>
+                    <OriginFilters
+                        origin={fpOrigin} onOrigin={(v) => { setFpOrigin(v); setFpPage(1); }}
+                        availability={fpAvail} onAvailability={(v) => { setFpAvail(v); setFpPage(1); }}
+                        counts={fpCounts}
+                    />
                     <div className="card-p mb-4">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
                             <input value={fpSearch} onChange={e=>{setFpSearch(e.target.value);setFpPage(1);}} placeholder="Search name / headline…" className="form-input-sm col-span-2" />
@@ -857,6 +874,11 @@ export default function ResumeSourcing() {
                             ) : (
                                 <div className="card-p">
                                     <h2 className="section-title mb-3">Filter Candidates</h2>
+                                    <OriginFilters
+                                        origin={poolOrigin} onOrigin={(v) => { setPoolOrigin(v); setPoolPage(1); }}
+                                        availability={poolAvail} onAvailability={(v) => { setPoolAvail(v); setPoolPage(1); }}
+                                        counts={poolCounts}
+                                    />
                                     <div className="grid grid-cols-2 gap-2 mb-2">
                                         <input value={poolSearch} onChange={e=>{setPoolSearch(e.target.value);setPoolPage(1);}} placeholder="Search name / headline…" className="form-input-sm col-span-2" />
                                         <input value={poolSkill}  onChange={e=>{setPoolSkill(e.target.value);setPoolPage(1);}}  placeholder="Skill (e.g. React)" className="form-input-sm" />

@@ -253,6 +253,7 @@ export default function App() {
         }>
           <Route index element={<AdminHome />} />
           <Route path="companies" element={<CompanyApprovals />} />
+          <Route path="candidates" element={<CandidateManagement />} />
           <Route path="jobs" element={<AdminJobPostings />} />
           <Route path="premium" element={<AdminPremiumRequests />} />
           <Route path="staff" element={<HRStaffManagement />} />

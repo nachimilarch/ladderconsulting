@@ -59,3 +59,9 @@ export const candidatePremiumAPI = {
     request: (declaredAnnualCtc) => api.post('/candidates/premium/request', { declared_annual_ctc: declaredAnnualCtc }),
     pay:     ()                 => api.post('/candidates/premium/pay'),
 };
+
+// "Are you working or looking for a job?" Only our own staff see the answer, never companies.
+export const employmentStatusAPI = {
+    get: () => api.get('/candidates/employment-status'),
+    set: (status) => api.put('/candidates/employment-status', { status }),
+};

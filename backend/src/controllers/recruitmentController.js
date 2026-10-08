@@ -510,6 +510,8 @@ exports.getCandidateProfile = async (req, res) => {
             `SELECT c.id AS candidate_id, u.id AS user_id,
                     u.name AS candidate_name, u.email AS candidate_email,
                     u.phone AS candidate_phone, u.status, u.created_at AS registered_at,
+                    c.employment_status, c.employment_status_updated_at,
+                    u.last_login_at, (u.last_login_at IS NOT NULL) AS self_registered,
                     cp.headline, cp.summary, cp.total_experience,
                     cp.current_location, cp.preferred_locations,
                     cp.expected_salary, cp.current_salary,
@@ -580,11 +582,22 @@ exports.getCandidateProfile = async (req, res) => {
 // Optional ?jobId= to mark which candidates already have an application for that JD.
 exports.listTalentPoolExec = async (req, res) => {
     try {
-        const { search = '', skill, experience_min, experience_max, page = 1, jobId } = req.query;
+        const { search = '', skill, experience_min, experience_max, page = 1, jobId, origin, availability } = req.query;
         const limit = 20;
         const offset = (Math.max(1, parseInt(page)) - 1) * limit;
 
         const params = [];
+
+        // Who made the account: someone who has logged in themselves ("registered"), or a record
+        // our executives sourced and uploaded that has never logged in ("sourced").
+        const originClause = origin === 'registered' ? 'AND u.last_login_at IS NOT NULL'
+            : origin === 'sourced' ? 'AND u.last_login_at IS NULL' : '';
+        // The candidate's own answer: looking / open to offers / working / not answered yet.
+        const statusClause = { looking: "AND c.employment_status = 'looking'",
+            open: "AND c.employment_status = 'open'",
+            working: "AND c.employment_status = 'working'",
+            unset: 'AND c.employment_status IS NULL',
+            open_to_work: "AND c.employment_status IN ('looking','open')" }[availability] || '';
 
         let searchClause = '';
         if (search.trim()) {
@@ -619,6 +632,11 @@ exports.listTalentPoolExec = async (req, res) => {
             `SELECT
                 c.id AS candidate_id,
                 c.is_premium,
+                c.employment_status,
+                c.employment_status_updated_at,
+                u.last_login_at,
+                u.created_at AS registered_at,
+                (u.last_login_at IS NOT NULL) AS self_registered,
                 u.name AS candidate_name,
                 u.email AS candidate_email,
                 cp.headline,
@@ -656,6 +674,8 @@ exports.listTalentPoolExec = async (req, res) => {
                ${searchClause}
                ${expClause}
                ${skillClause}
+               ${originClause}
+               ${statusClause}
              ORDER BY c.is_premium DESC, ${jobIdInt ? `COALESCE(
                  (SELECT mr.fit_score FROM applications a_ord
                   JOIN match_results mr ON mr.application_id = a_ord.id
@@ -682,7 +702,32 @@ exports.listTalentPoolExec = async (req, res) => {
                )
                ${searchClause}
                ${expClause}
-               ${skillClause}`,
+               ${skillClause}
+               ${originClause}
+               ${statusClause}`,
+            params
+        );
+
+        // Header counts for the "registered / sourced" switch. They ignore the origin filter itself
+        // so each button always shows how many people it would bring up.
+        const [[originCounts]] = await db.query(
+            `SELECT COALESCE(SUM(u.last_login_at IS NOT NULL), 0) AS registered,
+                    COALESCE(SUM(u.last_login_at IS NULL), 0) AS sourced,
+                    COALESCE(SUM(u.last_login_at IS NOT NULL AND c.employment_status IN ('looking','open')), 0) AS open_to_work
+             FROM candidates c
+             JOIN users u ON u.id = c.user_id
+             LEFT JOIN candidate_profiles cp ON cp.candidate_id = c.id
+             WHERE c.deleted_at IS NULL
+               AND u.deleted_at IS NULL
+               AND u.status = 'active'
+               AND NOT EXISTS (
+                   SELECT 1 FROM applications a2
+                   WHERE a2.candidate_id = c.id AND a2.status = 'hired' AND a2.deleted_at IS NULL
+               )
+               ${searchClause}
+               ${expClause}
+               ${skillClause}
+               ${statusClause}`,
             params
         );
 
@@ -703,6 +748,7 @@ exports.listTalentPoolExec = async (req, res) => {
                     catch { return []; }
                 })(),
                 already_applied: !!row.already_applied,
+                self_registered: !!row.self_registered,
                 fit_score: row.fit_score ?? (live ? live.score : null),
                 matched_skills: live ? live.matched_skills : [],
                 missing_skills: live ? live.missing_skills : [],
@@ -714,7 +760,14 @@ exports.listTalentPoolExec = async (req, res) => {
             candidates.sort((a, b) => (b.fit_score ?? -1) - (a.fit_score ?? -1));
         }
 
-        res.json({ success: true, data: candidates, total: countRows[0].total, page: parseInt(page), limit });
+        res.json({
+            success: true, data: candidates, total: countRows[0].total, page: parseInt(page), limit,
+            counts: {
+                registered: Number(originCounts.registered),
+                sourced: Number(originCounts.sourced),
+                open_to_work: Number(originCounts.open_to_work),
+            },
+        });
     } catch (err) {
         console.error('[recruitment.talentPool]', err.message);
         res.status(500).json({ success: false, message: 'Failed to fetch talent pool.' });

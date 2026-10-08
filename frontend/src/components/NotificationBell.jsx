@@ -66,8 +66,11 @@ export default function NotificationBell() {
         }
         setOpen(false);
         // Navigate to relevant page based on notification type
-        const meta = notif.metadata ? JSON.parse(notif.metadata) : {};
-        if (notif.type.includes('interview')) navigate('/hr/interview-requests');
+        // The API returns JSON columns already parsed; older rows may still arrive as a string.
+        let meta = notif.metadata || {};
+        if (typeof meta === 'string') { try { meta = JSON.parse(meta); } catch { meta = {}; } }
+        if (notif.type === 'status_reminder' && meta.link) navigate(meta.link);
+        else if (notif.type.includes('interview')) navigate('/hr/interview-requests');
         else if (notif.type.includes('offer')) navigate('/hr/offer-requests');
         else if (notif.type.includes('invoice') || notif.type.includes('payment')) navigate('/company/payments');
     };

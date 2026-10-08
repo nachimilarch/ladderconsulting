@@ -353,7 +353,7 @@ exports.deleteCompany = async (req, res) => {
 // ── CANDIDATE MANAGEMENT ──────────────────────────────────────────────────────
 
 exports.listCandidates = async (req, res) => {
-    const { status, location, search, premium, page = 1, limit = 20 } = req.query;
+    const { status, location, search, premium, origin, availability, page = 1, limit = 20 } = req.query;
     const offset = (parseInt(page) - 1) * parseInt(limit);
 
     try {
@@ -368,9 +368,21 @@ exports.listCandidates = async (req, res) => {
             where.push('(u.name LIKE ? OR u.email LIKE ?)');
             params.push(`%${search}%`, `%${search}%`);
         }
+        // The candidate's own answer to "working or looking?" (fixed list, so no user text reaches SQL).
+        const availabilityWhere = { looking: "c.employment_status = 'looking'", open: "c.employment_status = 'open'",
+            working: "c.employment_status = 'working'", unset: 'c.employment_status IS NULL',
+            open_to_work: "c.employment_status IN ('looking','open')" }[availability];
+        if (availabilityWhere) where.push(availabilityWhere);
+
+        // The "registered / sourced" switch shows how many each side has, so its counts skip the origin filter.
+        const countsWhere = [...where];
+        if (origin === 'registered') where.push('u.last_login_at IS NOT NULL');
+        else if (origin === 'sourced') where.push('u.last_login_at IS NULL');
 
         const [candidates] = await db.query(
             `SELECT u.id, u.name AS full_name, u.email, u.status, u.created_at,
+                    u.last_login_at, (u.last_login_at IS NOT NULL) AS self_registered,
+                    c.employment_status, c.employment_status_updated_at,
                     c.id AS candidate_id, c.is_premium,
                     (SELECT s.status FROM ai_subscriptions s
                        WHERE s.candidate_id = c.id AND s.deleted_at IS NULL LIMIT 1) AS ai_status,
@@ -387,7 +399,8 @@ exports.listCandidates = async (req, res) => {
              LEFT JOIN hired_employees he ON he.candidate_id = c.id AND he.deleted_at IS NULL
              LEFT JOIN certificates cert ON cert.hired_employee_id = he.id AND cert.deleted_at IS NULL
              WHERE ${where.join(' AND ')}
-             GROUP BY u.id, c.id, c.is_premium, u.name, u.email, u.status, u.created_at,
+             GROUP BY u.id, c.id, c.is_premium, u.name, u.email, u.status, u.created_at, u.last_login_at,
+                      c.employment_status, c.employment_status_updated_at,
                       cp.current_location, cp.total_experience, cp.headline
              ORDER BY u.created_at DESC
              LIMIT ? OFFSET ?`,
@@ -404,7 +417,22 @@ exports.listCandidates = async (req, res) => {
             params
         );
 
-        res.json({ success: true, data: candidates, total: Number(total), page: parseInt(page), limit: parseInt(limit) });
+        const [[counts]] = await db.query(
+            `SELECT COALESCE(SUM(u.last_login_at IS NOT NULL), 0) AS registered,
+                    COALESCE(SUM(u.last_login_at IS NULL), 0) AS sourced,
+                    COALESCE(SUM(u.last_login_at IS NOT NULL AND c.employment_status IN ('looking','open')), 0) AS open_to_work
+             FROM users u
+             JOIN roles ro ON ro.id = u.role_id
+             LEFT JOIN candidates c ON c.user_id = u.id
+             LEFT JOIN candidate_profiles cp ON cp.candidate_id = c.id
+             WHERE ${countsWhere.join(' AND ')}`,
+            params
+        );
+
+        res.json({
+            success: true, data: candidates, total: Number(total), page: parseInt(page), limit: parseInt(limit),
+            counts: { registered: Number(counts.registered), sourced: Number(counts.sourced), open_to_work: Number(counts.open_to_work) },
+        });
     } catch (err) {
         console.error('listCandidates:', err);
         res.status(500).json({ success: false, message: 'Failed to fetch candidates.' });
@@ -415,6 +443,8 @@ exports.getCandidateDetail = async (req, res) => {
     try {
         const [[user]] = await db.query(
             `SELECT u.id, u.name AS full_name, u.email, u.phone, u.status, u.created_at,
+                    u.last_login_at, (u.last_login_at IS NOT NULL) AS self_registered,
+                    c.employment_status, c.employment_status_updated_at,
                     c.is_premium, c.premium_activated_at,
                     cp.headline, cp.summary,
                     cp.total_experience AS experience_years,

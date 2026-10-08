@@ -14,6 +14,7 @@ const { upsertCandidateSkills } = require('../utils/skillTags');
 const premiumCtrl = require('../controllers/candidatePremiumController');
 const { saveCandidateProfile } = require('../utils/candidateProfile');
 const { applyToJob } = require('../utils/candidateApplications');
+const { LABELS, DEFAULT_REFRESH_DAYS, refreshDays, isValidStatus } = require('../utils/employmentStatus');
 
 // Ensure a candidates row exists for this user and return its id
 const getCandidateId = async (userId) => {
@@ -712,6 +713,60 @@ router.get('/documents/:id/download', authenticateToken, authorizeRole('candidat
 // ── Premium candidate tier — CTC declaration + payslip-backed verification ────
 // Payslips themselves are uploaded via the existing /documents endpoints above
 // with doc_type='payslip' — no separate upload path needed.
+// ── Job status: working / open to offers / looking ───────────────────────────
+// The portal asks for this at login (and by reminder) while it is missing or stale.
+router.get('/employment-status', authenticateToken, authorizeRole('candidate'), async (req, res) => {
+    try {
+        const candidateId = await getCandidateId(req.user.id);
+        const [[row]] = await db.query(
+            `SELECT employment_status, employment_status_updated_at,
+                    TIMESTAMPDIFF(DAY, employment_status_updated_at, NOW()) AS days_since
+             FROM candidates WHERE id = ?`, [candidateId]);
+        const [[setting]] = await db.query(
+            "SELECT value FROM platform_settings WHERE setting_key = 'candidate_status_refresh_days'");
+        const base = parseInt(setting?.value, 10) > 0 ? parseInt(setting.value, 10) : DEFAULT_REFRESH_DAYS;
+        const status = row.employment_status;
+        const needsUpdate = !status || Number(row.days_since) >= refreshDays(status, base);
+        res.json({
+            success: true,
+            data: {
+                status,
+                label: status ? LABELS[status] : null,
+                updated_at: row.employment_status_updated_at,
+                days_since: status ? Number(row.days_since) : null,
+                needs_update: needsUpdate,
+                refresh_days: status ? refreshDays(status, base) : base,
+            },
+        });
+    } catch (err) {
+        console.error('[GET /candidates/employment-status]', err.message);
+        res.status(500).json({ success: false, message: 'Failed to load your job status.' });
+    }
+});
+
+router.put('/employment-status', authenticateToken, authorizeRole('candidate'), async (req, res) => {
+    const { status } = req.body || {};
+    if (!isValidStatus(status)) {
+        return res.status(400).json({ success: false, message: 'Choose one of: looking, open, working.' });
+    }
+    try {
+        const candidateId = await getCandidateId(req.user.id);
+        // Answering resets the reminder count, so a fresh cycle starts from today.
+        await db.query(
+            `UPDATE candidates
+             SET employment_status = ?, employment_status_updated_at = NOW(),
+                 status_reminders_sent = 0, status_last_reminder_at = NULL
+             WHERE id = ?`, [status, candidateId]);
+        await db.query(
+            "UPDATE notifications SET is_read = 1 WHERE user_id = ? AND type = 'status_reminder' AND is_read = 0",
+            [req.user.id]);
+        res.json({ success: true, data: { status, label: LABELS[status] }, message: 'Thanks, your job status is updated.' });
+    } catch (err) {
+        console.error('[PUT /candidates/employment-status]', err.message);
+        res.status(500).json({ success: false, message: 'Failed to save your job status.' });
+    }
+});
+
 router.get('/premium/status',  authenticateToken, authorizeRole('candidate'), premiumCtrl.getPremiumStatus);
 router.post('/premium/request', authenticateToken, authorizeRole('candidate'), premiumCtrl.submitPremiumRequest);
 router.post('/premium/pay',    authenticateToken, authorizeRole('candidate'), premiumCtrl.payPremiumFee);

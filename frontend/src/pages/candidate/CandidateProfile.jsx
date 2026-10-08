@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { useOutletContext } from 'react-router-dom';
 import { profileAPI, resumeAPI } from '../../api/candidate';
 import AiSubscriptionCard from '../../components/AiSubscriptionCard';
 import AiAssistantPromo from '../../components/AiAssistantPromo';
@@ -13,6 +14,7 @@ const EMPTY_FORM = {
 const EMPTY_EDU = { degree: '', institution: '', field: '', start_year: '', end_year: '', grade: '' };
 
 export default function CandidateProfile() {
+    const { jobStatus, askJobStatus } = useOutletContext() || {};
     const [loading, setLoading]       = useState(true);
     const [saving, setSaving]         = useState(false);
     const [uploading, setUploading]   = useState(false);
@@ -169,6 +171,25 @@ export default function CandidateProfile() {
                 text="let it rewrite your headline and summary so they stand out."
                 prompt="Polish my profile"
             />
+
+            {/* ── Job status ──────────────────────────────────────────────── */}
+            {jobStatus && (
+                <div className="mb-5 bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex flex-wrap items-center gap-x-4 gap-y-2">
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">Job status</p>
+                        <p className="text-sm font-semibold text-gray-800 mt-0.5">{jobStatus.label || 'Not set yet'}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                            {jobStatus.status
+                                ? `Updated ${jobStatus.days_since === 0 ? 'today' : `${jobStatus.days_since} day${jobStatus.days_since === 1 ? '' : 's'} ago`}. Only the LadderStep team can see this.`
+                                : 'Tell us if you are working or looking for a job. Only the LadderStep team can see this.'}
+                        </p>
+                    </div>
+                    <button type="button" onClick={askJobStatus}
+                        className="shrink-0 text-sm font-medium text-indigo-600 border border-indigo-200 rounded-xl px-3.5 py-1.5 hover:bg-indigo-50 transition">
+                        {jobStatus.status ? 'Change' : 'Set status'}
+                    </button>
+                </div>
+            )}
 
             {/* ── Extracted banner ─────────────────────────────────────────── */}
             {extracted && (

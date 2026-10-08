@@ -4,6 +4,7 @@ const { startMailPoller } = require('./services/mailPoller');
 const { startWAPoller }   = require('./services/waPoller');
 const { startSubscriptionBiller } = require('./services/subscriptionBiller');
 const { startCampaignScheduler } = require('./services/campaignScheduler');
+const { startCandidateStatusReminders } = require('./services/candidateStatusReminder');
 
 // Load DB-stored env overrides into process.env so UI-configured values are
 // picked up at startup without needing to edit .env files.
@@ -191,12 +192,13 @@ loadEnvOverrides().then(() => {
     // (e.g. a Docker container tested against the same database as a live instance)
     // without it double-polling or double-sending. Unset, behavior is unchanged.
     if (process.env.DISABLE_BACKGROUND_JOBS === 'true') {
-      console.log('DISABLE_BACKGROUND_JOBS=true — mail poller, WhatsApp poller, subscription biller and campaign scheduler are NOT running in this process.');
+      console.log('DISABLE_BACKGROUND_JOBS=true — mail poller, WhatsApp poller, subscription biller, campaign scheduler and candidate status reminders are NOT running in this process.');
     } else {
       startMailPoller();
       startWAPoller();
       startSubscriptionBiller();
       startCampaignScheduler();
+      startCandidateStatusReminders();
     }
   });
 });
