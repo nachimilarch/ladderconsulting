@@ -40,6 +40,7 @@ router.get('/candidates',                  ...admin, ctrl.listCandidates);
 router.get('/candidates/:id',              ...admin, ctrl.getCandidateDetail);
 router.patch('/candidates/:id/suspend',    ...admin, ctrl.suspendCandidate);
 router.patch('/candidates/:id/reactivate', ...admin, ctrl.reactivateCandidate);
+router.delete('/candidates/:id',           ...admin, ctrl.deleteCandidate);
 
 // HR Staff
 router.get('/staff',                       ...admin, ctrl.listStaff);

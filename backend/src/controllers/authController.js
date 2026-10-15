@@ -368,10 +368,14 @@ exports.getMe = async (req, res) => {
     try {
         const [rows] = await db.query(
             `SELECT u.id, u.name, u.email, u.status, r.name AS role
-       FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ?`,
+       FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = ? AND u.deleted_at IS NULL`,
             [req.user.id]
         );
-        if (rows.length === 0) return res.status(404).json({ message: 'User not found.' });
+        if (rows.length === 0) {
+            // Account removed (for example by an admin): end the session so the person can register again.
+            res.clearCookie('token');
+            return res.status(401).json({ message: 'This account no longer exists.' });
+        }
         res.json({ user: rows[0] });
     } catch (err) {
         res.status(500).json({ message: 'Server error.' });

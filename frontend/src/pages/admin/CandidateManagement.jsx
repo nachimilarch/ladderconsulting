@@ -43,6 +43,8 @@ export default function CandidateManagement() {
     const listTop = useRef(null);
     const [selected, setSelected] = useState(null);
     const [actionModal, setActionModal] = useState(null);
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleting, setDeleting] = useState(false);
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
 
@@ -110,6 +112,22 @@ export default function CandidateManagement() {
             toast.error(e.response?.data?.message || 'Action failed');
         } finally {
             setSaving(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        if (!selected) return;
+        setDeleting(true);
+        try {
+            const r = await adminCandidateAPI.remove(selected.id);
+            toast.success(r.data?.message || 'Candidate deleted');
+            setDeleteOpen(false);
+            setSelected(null);
+            load();
+        } catch (e) {
+            toast.error(e.response?.data?.message || 'Could not delete this candidate');
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -301,10 +319,63 @@ export default function CandidateManagement() {
                                     Reactivate
                                 </button>
                             )}
+                            <button
+                                onClick={() => setDeleteOpen(true)}
+                                className="px-3 py-1.5 border border-red-300 text-red-700 text-xs rounded hover:bg-red-50"
+                            >
+                                Delete…
+                            </button>
                         </div>
                     </div>
                 )}
             </div>
+
+            {/* Delete confirmation */}
+            {deleteOpen && selected && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4" role="dialog" aria-modal="true" aria-labelledby="delete-candidate-title">
+                    <div className="bg-white rounded-xl p-6 w-full max-w-md shadow-xl">
+                        <h3 id="delete-candidate-title" className="font-semibold text-gray-900 mb-1">
+                            Delete {selected.full_name || 'this candidate'}?
+                        </h3>
+                        <p className="text-xs text-gray-500 mb-4">{selected.email}</p>
+
+                        {selected.delete_blocked_reason ? (
+                            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                                {selected.delete_blocked_reason}
+                            </div>
+                        ) : (
+                            <>
+                                <p className="text-sm text-gray-700 mb-2">This permanently removes:</p>
+                                <ul className="mb-3 list-disc pl-5 text-sm text-gray-700 space-y-1">
+                                    <li>the account and profile</li>
+                                    <li>their resume and uploaded documents, including the files</li>
+                                    <li>{selected.application_count ?? 0} application{selected.application_count === 1 ? '' : 's'}, which disappear from company pipelines</li>
+                                </ul>
+                                <div className="mb-4 rounded-lg bg-indigo-50 p-3 text-sm text-indigo-900">
+                                    The email address and Google sign-in become free, so the person can register again,
+                                    for example as a company. Invoices and payment records are kept.
+                                </div>
+                                <p className="text-xs text-red-600 mb-4">This cannot be undone. If you only want to stop them using the account, suspend it instead.</p>
+                            </>
+                        )}
+
+                        <div className="flex justify-end gap-3">
+                            <button onClick={() => setDeleteOpen(false)} className="px-4 py-2 text-sm text-gray-600">
+                                {selected.delete_blocked_reason ? 'Close' : 'Cancel'}
+                            </button>
+                            {!selected.delete_blocked_reason && (
+                                <button
+                                    onClick={handleDelete}
+                                    disabled={deleting}
+                                    className="px-4 py-2 text-sm bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                >
+                                    {deleting ? 'Deleting…' : 'Delete permanently'}
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* Action modal */}
             {actionModal && (

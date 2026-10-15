@@ -348,6 +348,7 @@ GET /verify/:cashfreeOrderId, POST /webhook/cashfree (no auth, signature verifie
 ### Admin — `/api/admin` (admin)
 Companies: list, unassigned, detail, approve/reject/suspend/reactivate/delete, assign-executive, placement-fee-rate, agreement.
 Requests, Candidates, Staff (create/update/deactivate/performance), Recruitment, Analytics, AI recompute, Invoices, Settings.
+**Candidates:** GET /candidates, GET /candidates/:id (id = user id), PATCH /candidates/:id/suspend|reactivate, **DELETE /candidates/:id** (soft-deletes the account, profile, resumes + files, documents and applications; tombstones the email and removes the Google link so the person can re-register; blocked while hired, an offer is open or an interview is upcoming; invoices untouched).
 
 ### Training Services — `/api/training-services`
 GET /catalogue, POST /request (company), GET /my-requests (company), GET /admin, PUT /admin/:id/approve, PUT /admin/:id/reject, POST|PUT|PATCH /admin/catalogue

@@ -29,6 +29,7 @@ export const adminCandidateAPI = {
     getDetail: (id) => api.get(`/admin/candidates/${id}`),
     suspend: (id, data) => api.patch(`/admin/candidates/${id}/suspend`, data),
     reactivate: (id) => api.patch(`/admin/candidates/${id}/reactivate`),
+    remove: (id) => api.delete(`/admin/candidates/${id}`),
 };
 
 export const adminStaffAPI = {

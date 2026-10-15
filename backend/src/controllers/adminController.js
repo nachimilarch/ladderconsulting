@@ -5,6 +5,8 @@ const { sendEmail } = require('../utils/email');
 const { logAction } = require('../utils/auditLog');
 const crypto = require('crypto');
 const wa = require('../utils/whatsappNotify');
+const bcrypt = require('bcryptjs');
+const { getDeleteBlockers, describeBlockers, removeUploads } = require('../utils/candidateDeletion');
 
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0] || req.socket.remoteAddress;
@@ -510,7 +512,9 @@ exports.getCandidateDetail = async (req, res) => {
             [cand.id]
         ) : [[]];
 
-        res.json({ success: true, data: { ...user, candidate_id: cand?.id ?? null, premium_request: premiumRequest || null, ai_subscription: aiSubscription || null, applications, skills: skills.map(s => s.name), training, certificates: certs, application_count: applications.length, training_count: training.length, certificate_count: certs.length } });
+        const deleteBlockers = await getDeleteBlockers(cand?.id);
+        res.json({ success: true, data: { ...user, candidate_id: cand?.id ?? null,
+            delete_blocked_reason: describeBlockers(deleteBlockers), premium_request: premiumRequest || null, ai_subscription: aiSubscription || null, applications, skills: skills.map(s => s.name), training, certificates: certs, application_count: applications.length, training_count: training.length, certificate_count: certs.length } });
     } catch (err) {
         console.error('getCandidateDetail:', err);
         res.status(500).json({ success: false, message: 'Failed to fetch candidate detail.' });
@@ -528,6 +532,82 @@ exports.suspendCandidate = async (req, res) => {
     } catch (err) {
         console.error('suspendCandidate:', err);
         res.status(500).json({ message: 'Failed to suspend candidate.' });
+    }
+};
+
+// DELETE /api/admin/candidates/:id  (id = user id)
+// For accounts made by mistake (a company that signed in as a candidate, a duplicate). Removes the
+// account and what hangs off it, frees the email and Google sign-in so the person can register again,
+// and leaves invoices and payment records alone.
+exports.deleteCandidate = async (req, res) => {
+    const userId = parseInt(req.params.id, 10);
+    if (!userId) return res.status(400).json({ success: false, message: 'Invalid candidate.' });
+    let conn;
+    try {
+        const [[user]] = await db.query(
+            `SELECT u.id, u.name, u.email, c.id AS candidate_id
+             FROM users u
+             JOIN roles ro ON ro.id = u.role_id
+             LEFT JOIN candidates c ON c.user_id = u.id AND c.deleted_at IS NULL
+             WHERE u.id = ? AND ro.name = 'candidate' AND u.deleted_at IS NULL`,
+            [userId]
+        );
+        if (!user) return res.status(404).json({ success: false, message: 'Candidate not found.' });
+
+        const blockers = await getDeleteBlockers(user.candidate_id);
+        const blocked = describeBlockers(blockers);
+        if (blocked) return res.status(409).json({ success: false, code: 'DELETE_BLOCKED', message: blocked, blockers });
+
+        const cid = user.candidate_id;
+        let resumes = [], docs = [], apps = 0;
+        if (cid) {
+            [resumes] = await db.query('SELECT file_key FROM resumes WHERE candidate_id = ? AND deleted_at IS NULL', [cid]);
+            [docs] = await db.query('SELECT file_path FROM candidate_documents WHERE candidate_id = ? AND deleted_at IS NULL', [cid]);
+        }
+
+        // The old address becomes a tombstone and the password unusable; the email is then free, and the
+        // person can register again (for example as a company) with the same Google account.
+        const tombstone = `deleted+${user.id}+${Date.now()}@removed.invalid`;
+        const unusable = await bcrypt.hash(crypto.randomBytes(24).toString('hex'), 10);
+
+        conn = await db.getConnection();
+        await conn.beginTransaction();
+        if (cid) {
+            const [a] = await conn.query('UPDATE applications SET deleted_at = NOW() WHERE candidate_id = ? AND deleted_at IS NULL', [cid]);
+            apps = a.affectedRows;
+            for (const table of ['resumes', 'candidate_documents', 'candidate_profiles', 'candidate_premium_requests', 'match_insights']) {
+                await conn.query(`UPDATE ${table} SET deleted_at = NOW() WHERE candidate_id = ? AND deleted_at IS NULL`, [cid]);
+            }
+            await conn.query(
+                `UPDATE ai_subscriptions SET status = 'cancelled', cancelled_at = NOW(), deleted_at = NOW()
+                 WHERE candidate_id = ? AND deleted_at IS NULL`, [cid]);
+            await conn.query('UPDATE candidates SET deleted_at = NOW() WHERE id = ?', [cid]);
+        }
+        await conn.query(
+            `UPDATE users SET deleted_at = NOW(), status = 'suspended', email = ?, password = ?, phone = NULL WHERE id = ?`,
+            [tombstone, unusable, user.id]
+        );
+        await conn.query('DELETE FROM user_oauth_identities WHERE user_id = ?', [user.id]);
+        await conn.commit();
+
+        const filesRemoved = removeUploads(resumes.map((r) => r.file_key)) +
+            removeUploads(docs.map((d) => d.file_path && path.join('uploads', 'documents', d.file_path)));
+
+        await logAction(req.user.id, 'delete_candidate', 'user', user.id,
+            { candidate_name: user.name, original_email: user.email, candidate_id: cid,
+              applications_removed: apps, resumes_removed: resumes.length, documents_removed: docs.length }, ip(req));
+
+        res.json({
+            success: true,
+            message: `${user.name || 'Candidate'} deleted. ${user.email} can now register again.`,
+            data: { applications_removed: apps, resumes_removed: resumes.length, documents_removed: docs.length, files_removed: filesRemoved },
+        });
+    } catch (err) {
+        if (conn) { try { await conn.rollback(); } catch { /* ignore */ } }
+        console.error('deleteCandidate:', err);
+        res.status(500).json({ success: false, message: 'Failed to delete candidate.' });
+    } finally {
+        if (conn) conn.release();
     }
 };
 
