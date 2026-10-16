@@ -10,6 +10,7 @@ import TermsOfService from './pages/legal/TermsOfService';
 import RefundPolicy from './pages/legal/RefundPolicy';
 
 // Auth pages
+import Sites from './pages/site/Home';
 import Register from './pages/auth/Register';
 import Login from './pages/auth/Login';
 import TrainerLogin from './pages/auth/TrainerLogin';
@@ -147,7 +148,7 @@ export default function App() {
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Routes>
         {/* The main page is the sign-in page (the marketing website is not served). */}
-        <Route path="/" element={<Navigate to="/login" replace />} />
+        <Route path="/" element={<Navigate to="/" replace />} />
 
         {/* Public legal pages (linked from sign-in and sign-up, and needed by the payment gateway) */}
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -155,6 +156,7 @@ export default function App() {
         <Route path="/refund-and-cancellation" element={<RefundPolicy />} />
 
         {/* Public portal pages */}
+        <Route path="/" element={<Site />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/login/trainer" element={<TrainerLogin />} />
