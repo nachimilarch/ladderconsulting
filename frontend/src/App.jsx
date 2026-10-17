@@ -9,8 +9,15 @@ import PrivacyPolicy from './pages/legal/PrivacyPolicy';
 import TermsOfService from './pages/legal/TermsOfService';
 import RefundPolicy from './pages/legal/RefundPolicy';
 
+// Public marketing website
+import SiteLayout from './components/site/SiteLayout';
+import SiteHome from './pages/site/Home';
+import SiteAbout from './pages/site/About';
+import SiteContact from './pages/site/Contact';
+import SiteWho from './pages/site/WhoWeWorkWith';
+import { PillarPage as SitePillar } from './pages/site/ServicePages';
+
 // Auth pages
-import Sites from './pages/site/Home';
 import Register from './pages/auth/Register';
 import Login from './pages/auth/Login';
 import TrainerLogin from './pages/auth/TrainerLogin';
@@ -147,8 +154,17 @@ export default function App() {
     <AuthProvider>
       <Toaster position="top-right" toastOptions={{ duration: 4000 }} />
       <Routes>
-        {/* The main page is the sign-in page (the marketing website is not served). */}
-        <Route path="/" element={<Navigate to="/" replace />} />
+        {/* Public website: Home, About Us, the 4 Pillars, Who We Work With, Contact */}
+        <Route element={<SiteLayout />}>
+          <Route path="/" element={<SiteHome />} />
+          <Route path="/about" element={<SiteAbout />} />
+          <Route path="/strategy" element={<SitePillar slug="strategy" />} />
+          <Route path="/talent" element={<SitePillar slug="talent" />} />
+          <Route path="/protection" element={<SitePillar slug="protection" />} />
+          <Route path="/growth" element={<SitePillar slug="growth" />} />
+          <Route path="/who-we-work-with" element={<SiteWho />} />
+          <Route path="/contact" element={<SiteContact />} />
+        </Route>
 
         {/* Public legal pages (linked from sign-in and sign-up, and needed by the payment gateway) */}
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
@@ -156,7 +172,6 @@ export default function App() {
         <Route path="/refund-and-cancellation" element={<RefundPolicy />} />
 
         {/* Public portal pages */}
-        <Route path="/" element={<Site />} />
         <Route path="/register" element={<Register />} />
         <Route path="/login" element={<Login />} />
         <Route path="/login/trainer" element={<TrainerLogin />} />

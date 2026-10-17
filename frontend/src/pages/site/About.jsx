@@ -96,14 +96,11 @@ function Directors() {
                                     <img src={m.photo} alt={m.alt} width="800" height="1200" loading="lazy" className="relative aspect-[2/3] w-full rounded-md bg-ls-navy-700 object-cover" />
                                 </div>
                                 <div className="lg:col-span-8 motion-safe:animate-ls-fade-up">
-                                    {p && (
-                                        <span className="inline-flex items-center gap-2 rounded-full bg-white/10 px-3.5 py-1.5 text-sm font-bold text-white">
-                                            <span className={`h-2.5 w-2.5 rounded-full ${t.brightBg}`} aria-hidden="true" />
-                                            Leads {p.word}
-                                        </span>
-                                    )}
-                                    <h3 className="mt-4 text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">{m.name}</h3>
-                                    <p className={`mt-2 text-lg font-bold sm:text-xl ${t.softText}`}>{m.title}</p>
+                                    <h3 className="text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl">{m.name}</h3>
+                                    <p className={`mt-2 text-lg font-bold sm:text-xl ${t.softText}`}>
+                                        {m.title}
+                                        {(m.leads || p) && <span className="block text-base font-semibold text-white/85 sm:text-lg">{m.leads || `Leads our ${p.word.toLowerCase()} pillar`}</span>}
+                                    </p>
                                     {m.facts?.length > 0 && (
                                         <dl className="mt-8 grid gap-x-8 gap-y-5 border-y border-white/15 py-6 sm:grid-cols-2 xl:grid-cols-3">
                                             {m.facts.map((f) => (

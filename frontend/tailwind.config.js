@@ -121,10 +121,147 @@ export default {
         rose: danger,
         purple: plum,
         fuchsia: plum,
+        // Public marketing website (pages/site): the Ladderstep Consulting "Take-off" brand
+        // (ladderstep-brand/ladderstep-brand-context.md, 8 Oct 2026), kept apart from the portal violet.
+        // White is the canvas, navy leads, blue supports, red is the single accent per screen.
+        // The bright tones are for navy backgrounds only.
+        ls: {
+          navy: '#14213D',
+          'navy-700': '#1B2B4D',
+          blue: '#1D3A8A',
+          red: '#E63946',
+          'red-shade': '#B52434',
+          'blue-bright': '#4C7BFF',
+          'red-bright': '#FF3B5C',
+          'blue-soft': '#9DB6FF',
+          muted: '#5B6478',
+          paper: '#F6F7FA',
+          line: '#E2E5EC',
+          // Tints and shades derived from the palette, for card surfaces, section washes and the
+          // four pillar identities (Strategy blue, Talent teal, Protection indigo, Growth red).
+          // Every pairing used on the site was checked for WCAG AA (see components/site/tones.js).
+          'navy-deep': '#0E1830',
+          'navy-50': '#EDF0F7',
+          'navy-100': '#DDE3F0',
+          'blue-mid': '#2F5FE0',
+          'blue-50': '#EEF3FF',
+          'blue-100': '#DCE6FF',
+          teal: '#0B7285',
+          'teal-deep': '#0A5A68',
+          'teal-bright': '#35C5D6',
+          'teal-soft': '#9BE3EC',
+          'teal-50': '#E6F5F7',
+          'teal-100': '#C7EAEF',
+          indigo: '#4338B8',
+          'indigo-deep': '#2E2790',
+          'indigo-bright': '#8E84FF',
+          'indigo-soft': '#C2BBFF',
+          'indigo-50': '#EFEEFF',
+          'indigo-100': '#DEDBFF',
+          'red-deep': '#8A1F30',
+          'red-soft': '#FFB0BC',
+          'red-50': '#FFF0F2',
+          'red-100': '#FFDDE2',
+        },
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
         display: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+        // Legacy stand-in; the logo wordmark is now outlined Montserrat (see logoPaths.js).
+        wordmark: ['"Helvetica Neue"', 'Helvetica', 'Arial', 'sans-serif'],
+      },
+      keyframes: {
+        // Logo build: the steps grow left to right, then the plane lifts off up and to the right.
+        'ls-step': {
+          '0%': { transform: 'scaleX(0)' },
+          '100%': { transform: 'scaleX(1)' },
+        },
+        'ls-takeoff': {
+          '0%': { opacity: '0', transform: 'translate(-28px, 28px)' },
+          '100%': { opacity: '1', transform: 'translate(0, 0)' },
+        },
+        'ls-path': {
+          '0%': { strokeDashoffset: '400' },
+          '100%': { strokeDashoffset: '0' },
+        },
+        'ls-fade-up': {
+          '0%': { opacity: '0', transform: 'translateY(14px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' },
+        },
+        'ls-panel': {
+          '0%': { opacity: '0', transform: 'translateX(18px)' },
+          '100%': { opacity: '1', transform: 'translateX(0)' },
+        },
+        'ls-orbit': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(360deg)' },
+        },
+        'ls-upright': {
+          '0%': { transform: 'rotate(0deg)' },
+          '100%': { transform: 'rotate(-360deg)' },
+        },
+        'ls-grow': {
+          '0%': { transform: 'scaleY(0)' },
+          '100%': { transform: 'scaleY(1)' },
+        },
+        'ls-float': {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
+        'ls-dash': {
+          '0%': { strokeDashoffset: '0' },
+          '100%': { strokeDashoffset: '-48' },
+        },
+        'ls-pop': {
+          '0%': { opacity: '0', transform: 'scale(0.6)' },
+          '100%': { opacity: '1', transform: 'scale(1)' },
+        },
+        'ls-ring': {
+          '0%': { opacity: '0.55', transform: 'scale(1)' },
+          '100%': { opacity: '0', transform: 'scale(1.7)' },
+        },
+        'ls-marquee': {
+          '0%': { transform: 'translateX(0)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+        'ls-draw': {
+          '0%': { strokeDashoffset: '100' },
+          '100%': { strokeDashoffset: '0' },
+        },
+        'ls-bar': {
+          '0%': { transform: 'scaleX(0)' },
+          '100%': { transform: 'scaleX(1)' },
+        },
+        'ls-travel': {
+          '0%': { left: '0%', opacity: '0' },
+          '15%': { opacity: '1' },
+          '85%': { opacity: '1' },
+          '100%': { left: 'calc(100% - 10px)', opacity: '0' },
+        },
+        'ls-fly': {
+          '0%': { opacity: '0', transform: 'translate(-40px, 40px)' },
+          '15%': { opacity: '1' },
+          '100%': { opacity: '0', transform: 'translate(220px, -220px)' },
+        },
+      },
+      animation: {
+        'ls-step-1': 'ls-step 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.1s both',
+        'ls-step-2': 'ls-step 0.6s cubic-bezier(0.2, 0.7, 0.2, 1) 0.45s both',
+        'ls-takeoff': 'ls-takeoff 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) 0.9s both',
+        'ls-path': 'ls-path 1.4s ease-out 1.2s both',
+        'ls-fade-up': 'ls-fade-up 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) backwards',
+        'ls-panel': 'ls-panel 0.45s cubic-bezier(0.2, 0.7, 0.2, 1) backwards',
+        'ls-orbit': 'ls-orbit 36s linear infinite',
+        'ls-upright': 'ls-upright 36s linear infinite',
+        'ls-float': 'ls-float 5s ease-in-out infinite',
+        'ls-dash': 'ls-dash 2.4s linear infinite',
+        'ls-pop': 'ls-pop 0.5s cubic-bezier(0.2, 0.9, 0.3, 1.3) both',
+        'ls-ring': 'ls-ring 2.6s ease-out infinite',
+        'ls-marquee': 'ls-marquee 60s linear infinite',
+        'ls-draw': 'ls-draw 1.2s ease-out 0.2s both',
+        'ls-fly': 'ls-fly 1.4s ease-in forwards',
+        'ls-travel': 'ls-travel 2.2s ease-in-out infinite',
+        'ls-bar': 'ls-bar 6s linear forwards',
       },
       boxShadow: {
         card: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.06)',
