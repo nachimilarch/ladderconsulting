@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate, Navigate } from 'react-router-dom';
+import { Link, useNavigate, Navigate, useSearchParams } from 'react-router-dom';
 import { GoogleLogin } from '@react-oauth/google';
 import { useAuth } from '../../context/AuthContext';
 import { msalInstance, msalLoginRequest } from '../../msalConfig';
@@ -15,6 +15,10 @@ const ROLE_HOME = {
 export default function Login() {
     const { loginWithMicrosoft, loginWithGoogle, user, loading: authLoading } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    // The website links here with ?role=candidate or ?role=company; the account's real role still decides the dashboard.
+    const asked = searchParams.get('role');
+    const who = asked === 'company' ? 'company' : asked === 'candidate' ? 'candidate' : null;
     const [error, setError] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -58,8 +62,8 @@ export default function Login() {
                     <img src="/logo-full.png" alt="LadderStep Human Consulting" className="h-24 object-contain" />
                 </div>
 
-                <h1 className="auth-title">Welcome back</h1>
-                <p className="auth-subtitle">Sign in to your account</p>
+                <h1 className="auth-title">{who === 'company' ? 'Company login' : who === 'candidate' ? 'Candidate login' : 'Welcome back'}</h1>
+                <p className="auth-subtitle">{who === 'company' ? 'Sign in to manage your jobs, shortlists and interviews' : who === 'candidate' ? 'Sign in to your jobs, applications and interviews' : 'Sign in to your account'}</p>
 
                 {error && <div className="alert-error mb-5">{error}</div>}
 
@@ -74,9 +78,15 @@ export default function Login() {
                 </div>
 
                 <p className="text-sm text-center text-gray-500 mt-5">
-                    New hiring company or candidate?{' '}
-                    <Link to="/register" className="link">Create an account</Link>
+                    {who === 'company' ? 'New hiring company?' : who === 'candidate' ? 'New here?' : 'New hiring company or candidate?'}{' '}
+                    <Link to={who ? `/register?role=${who}` : '/register'} className="link">Create an account</Link>
                 </p>
+                {who && (
+                    <p className="text-sm text-center text-gray-500 mt-2">
+                        {who === 'company' ? 'Looking for a job?' : 'Hiring?'}{' '}
+                        <Link to={`/login?role=${who === 'company' ? 'candidate' : 'company'}`} className="link">{who === 'company' ? 'Candidate login' : 'Company login'}</Link>
+                    </p>
+                )}
 
                 <p className="text-xs text-center text-gray-400 mt-4 leading-5">
                     By signing in you agree to our{' '}

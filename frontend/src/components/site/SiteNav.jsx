@@ -105,7 +105,18 @@ export default function SiteNav() {
                             <Button to="/dashboard" variant="navy" size="sm" arrow>My dashboard</Button>
                         ) : (
                             <>
-                                <Link to="/login" className="px-3 py-2 mr-1 text-[0.9375rem] font-semibold text-ls-blue hover:text-ls-navy transition-colors">Log in</Link>
+                                {/* Wide screens: two links. Narrower desktop widths: one "Log in" menu so the bar never overflows. */}
+                                <Link to="/login?role=candidate" className="hidden xl:inline px-2.5 py-2 text-[0.9375rem] font-semibold text-ls-blue hover:text-ls-navy transition-colors">Candidate Login</Link>
+                                <Link to="/login?role=company" className="hidden xl:inline px-2.5 py-2 mr-1 text-[0.9375rem] font-semibold text-ls-blue hover:text-ls-navy transition-colors">Company Login</Link>
+                                <details className="group relative mr-1 xl:hidden">
+                                    <summary className="flex cursor-pointer list-none items-center gap-1 px-2.5 py-2 text-[0.9375rem] font-semibold text-ls-blue hover:text-ls-navy transition-colors [&::-webkit-details-marker]:hidden">
+                                        Log in <ChevronDownIcon className="h-4 w-4 transition-transform group-open:rotate-180" aria-hidden="true" />
+                                    </summary>
+                                    <div className="absolute right-0 top-full z-50 mt-2 w-48 rounded-md border border-ls-line bg-white py-1 shadow-lg">
+                                        <Link to="/login?role=candidate" onClick={(e) => e.currentTarget.closest('details')?.removeAttribute('open')} className="block px-4 py-2.5 text-sm font-semibold text-ls-navy hover:bg-ls-blue-50">Candidate Login</Link>
+                                        <Link to="/login?role=company" onClick={(e) => e.currentTarget.closest('details')?.removeAttribute('open')} className="block px-4 py-2.5 text-sm font-semibold text-ls-navy hover:bg-ls-blue-50">Company Login</Link>
+                                    </div>
+                                </details>
                                 <Button to={enquiryHref('call')} variant="navy" size="sm">Book a Call</Button>
                             </>
                         )}
@@ -154,12 +165,17 @@ export default function SiteNav() {
                                 )}
                             </div>
                         ))}
-                        <div className="flex gap-3 pt-4">
+                        {!user && (
+                            <div className="flex gap-3 pt-4">
+                                <Button to="/login?role=candidate" variant="outline" className="flex-1" onClick={() => setOpen(false)}>Candidate Login</Button>
+                                <Button to="/login?role=company" variant="outline" className="flex-1" onClick={() => setOpen(false)}>Company Login</Button>
+                            </div>
+                        )}
+                        <div className="flex gap-3 pt-3">
                             {user ? (
                                 <Button to="/dashboard" variant="navy" className="flex-1" arrow onClick={() => setOpen(false)}>My dashboard</Button>
                             ) : (
                                 <>
-                                    <Button to="/login" variant="outline" className="flex-1">Log in</Button>
                                     <Button to={enquiryHref('call')} variant="navy" className="flex-1" onClick={() => setOpen(false)}>Book a Call</Button>
                                 </>
                             )}

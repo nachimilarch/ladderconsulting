@@ -57,8 +57,9 @@ export default function SiteFooter() {
                                 {companyInfo.city}
                             </li>
                         </ul>
-                        <div className="mt-6">
-                            <Link to="/login" className="inline-block rounded-md border-2 border-white/60 px-4 py-2 text-sm font-semibold text-white hover:bg-white hover:text-ls-navy transition-colors">Log in</Link>
+                        <div className="mt-6 flex flex-wrap gap-3">
+                            <Link to="/login?role=candidate" className="inline-block rounded-md border-2 border-white/60 px-4 py-2 text-sm font-semibold text-white hover:bg-white hover:text-ls-navy transition-colors">Candidate Login</Link>
+                            <Link to="/login?role=company" className="inline-block rounded-md border-2 border-white/60 px-4 py-2 text-sm font-semibold text-white hover:bg-white hover:text-ls-navy transition-colors">Company Login</Link>
                         </div>
                     </div>
                 </div>
