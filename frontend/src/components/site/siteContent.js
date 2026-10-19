@@ -253,6 +253,11 @@ export const pillars = [
             { title: 'Apply', text: 'We prepare and submit your application.' },
             { title: 'Grow', text: 'You receive funds and get back to growing.' },
         ],
+        clientSuccess: {
+            heading: 'Client success',
+            text: 'Clients trust us to make borrowing clearer and the paperwork lighter.',
+            items: [3],
+        },
         cta: {
             title: 'Ready to scale up?',
             primary: { label: 'Check Your Funding Eligibility', topic: 'funding-eligibility' },

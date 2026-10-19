@@ -217,11 +217,11 @@ export function Card({ children, className = '', accent, tone = 'blue', surface 
 // Client quotes as tinted cards, one pillar colour each. Used on the home page and the Talent page.
 const QUOTE_TONES = [TONES.blue, TONES.teal, TONES.indigo, TONES.red];
 
-export function Testimonials({ items }) {
+export function Testimonials({ items, tone }) {
     return (
-        <div className={`grid gap-6 ${items.length > 2 && items.length !== 4 ? 'lg:grid-cols-3' : 'md:grid-cols-2'}`}>
+        <div className={`grid gap-6 ${items.length === 1 ? 'max-w-3xl' : items.length > 2 && items.length !== 4 ? 'lg:grid-cols-3' : 'md:grid-cols-2'}`}>
             {items.map((q, i) => {
-                const t = QUOTE_TONES[i % QUOTE_TONES.length];
+                const t = tone || QUOTE_TONES[i % QUOTE_TONES.length];
                 return (
                     <Reveal key={q.name} delay={i * 90} className="h-full">
                         <figure className={`flex h-full flex-col rounded-md border border-t-[4px] p-7 sm:p-8 ${t.tint} ${t.tintBorder} ${t.top}`}>
