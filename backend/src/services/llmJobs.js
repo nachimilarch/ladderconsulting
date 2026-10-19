@@ -1,12 +1,18 @@
-// Background work for the local model (resume enrichment, match notes).
-// Ollama runs one request at a time on a small shared box, so these jobs go through a
-// single serial queue with a small cap; when it is full a job is refused rather than
-// piling up behind the chat assistant.
+// Background AI work (resume enrichment, match notes, outreach writing).
+// With Ollama (one request at a time on a small shared box) jobs go through a single serial
+// queue with a small cap; when it is full a job is refused rather than piling up behind the
+// chat assistant. With Claude there is nothing to protect, so jobs run immediately, a few at
+// a time, and never wait for the chat to go quiet.
 const db = require('../config/db');
+const { claudeActive } = require('./lailaLlm');
 
 const MAX_PENDING = 8;
+const CLAUDE_MAX_PENDING = 30;
+const CLAUDE_CONCURRENCY = 4;
 let chain = Promise.resolve();
 let pending = 0;
+let claudeRunning = 0;
+const claudeWaiting = [];
 
 // The chat assistant has priority. A background job does not START while a chat request is
 // in flight or just finished (a short quiet gap), so people asking the assistant something
@@ -38,7 +44,25 @@ async function waitForQuiet() {
 }
 
 // Returns false when the queue is full. Errors are logged, never thrown.
+function enqueueClaude(label, fn) {
+    if (pending >= CLAUDE_MAX_PENDING) return false;
+    pending += 1;
+    const start = async () => {
+        claudeRunning += 1;
+        try { await fn(); } catch (err) { console.error(`[llm:${label}]`, err.message); }
+        finally {
+            claudeRunning -= 1;
+            pending -= 1;
+            const next = claudeWaiting.shift();
+            if (next) next();
+        }
+    };
+    if (claudeRunning < CLAUDE_CONCURRENCY) start(); else claudeWaiting.push(start);
+    return true;
+}
+
 function enqueue(label, fn) {
+    if (claudeActive()) return enqueueClaude(label, fn);
     if (pending >= MAX_PENDING) return false;
     pending += 1;
     chain = chain

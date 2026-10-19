@@ -6,6 +6,8 @@ const db = require('../config/db');
 const rules = require('../services/outreachAiRules');
 const tasks = require('../services/outreachAiTasks');
 const { isEnabled } = require('../services/llmJobs');
+const llm = require('../services/lailaLlm');
+const claude = require('../services/claudeLlmService');
 const campaignCtrl = require('./outreachCampaignController');
 const waCtrl = require('./whatsappController');
 const { logAction } = require('../utils/auditLog');
@@ -323,7 +325,7 @@ exports.status = wrap(async (req, res) => {
         data: {
             ai_enabled: await isEnabled(tasks.FLAG),
             scheduler_enabled: await isEnabled('campaign_scheduler_enabled'),
-            model: process.env.OLLAMA_MODEL || 'qwen2.5:7b',
+            model: llm.claudeActive() ? claude.getModel() : (process.env.OLLAMA_MODEL || 'qwen2.5:7b'),
         },
     });
 }, 'status');

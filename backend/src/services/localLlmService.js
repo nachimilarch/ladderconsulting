@@ -1,8 +1,9 @@
 // Local LLM service — mirrors trainingService.js's callAI axios-call shape
 // (the only other LLM usage in this codebase), but points at a self-hosted
-// Ollama instance instead of OpenAI: no API key, model/endpoint configurable
-// via env vars, and adds `tools` (function-calling) support since the chatbot
-// needs it and trainingService.js's plain JSON-mode call didn't.
+// Ollama instance instead of OpenAI: model/endpoint configurable via env vars
+// (an API key only if the server sits behind a key-checking proxy, see
+// OLLAMA_API_KEY), and adds `tools` (function-calling) support since the
+// chatbot needs it and trainingService.js's plain JSON-mode call didn't.
 //
 // Verified against a real local Ollama instance (qwen2.5:7b) — its
 // OpenAI-compatible /v1/chat/completions endpoint returns tool_calls as
@@ -12,9 +13,15 @@
 
 const axios = require('axios');
 
-const getBaseUrl = () => process.env.OLLAMA_BASE_URL || 'http://localhost:11434';
+// Base address without /v1 (we append /v1/chat/completions); trailing slashes and a pasted /v1 are tolerated.
+const getBaseUrl = () => (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').trim().replace(/\/+$/, '').replace(/\/v1$/, '');
 const getModel = () => process.env.OLLAMA_MODEL || 'qwen2.5:7b';
-const getTimeout = () => parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 120000;
+const getTimeout = () => parseInt(process.env.OLLAMA_TIMEOUT_MS, 10) || 300000;
+// Plain Ollama needs no key; a key-checking proxy in front of it (e.g. behind Tailscale Funnel) wants a Bearer token.
+const getHeaders = () => {
+    const key = (process.env.OLLAMA_API_KEY || '').trim();
+    return key ? { Authorization: `Bearer ${key}` } : {};
+};
 
 // Non-streaming call — used for internal tool-loop iterations (e.g. after a
 // read-only tool result comes back, ask the model to continue) where there's
@@ -32,7 +39,7 @@ async function chatCompletion({ messages, tools, json = false, temperature, maxT
             ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
             ...(maxTokens ? { max_tokens: maxTokens } : {}),
         },
-        { timeout: timeoutMs || getTimeout() }
+        { timeout: timeoutMs || getTimeout(), headers: getHeaders() }
     );
     return res.data.choices[0].message; // { role, content, tool_calls? }
 }
@@ -50,7 +57,7 @@ async function streamChatCompletion({ messages, tools, onToken }) {
             stream: true,
             ...(tools?.length ? { tools, tool_choice: 'auto' } : {}),
         },
-        { timeout: getTimeout(), responseType: 'stream' }
+        { timeout: getTimeout(), responseType: 'stream', headers: getHeaders() }
     );
 
     return new Promise((resolve, reject) => {

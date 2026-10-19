@@ -128,8 +128,9 @@ const sections = [
                     We limit what is sent to what LAILA needs for that conversation.
                 </P>
                 <P>
-                    Other AI features, such as suggestions from your resume and short notes explaining why a candidate fits a job, run on a model hosted
-                    on our own servers, so that text is not sent to an outside AI provider. The one other exception is course recommendations for hired
+                    Other AI features, such as suggestions from your resume, short notes explaining why a candidate fits a job and drafting help for our
+                    outreach team, can also be produced by Claude when that is switched on. For those, the resume text (or the skills and job details needed for the note) is sent to
+                    Anthropic, and notes never include a candidate's name or contact details. The one other exception is course recommendations for hired
                     employees, which send only a job title, skill names and course titles, never names or contact details, to OpenAI.
                 </P>
                 <P>

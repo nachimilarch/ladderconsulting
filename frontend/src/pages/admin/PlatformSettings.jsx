@@ -41,9 +41,19 @@ const PLATFORM_SETTINGS = {
         type: 'toggle',
     },
     laila_use_claude: {
-        label: 'LAILA Answers With Claude',
-        description: 'When on (and an Anthropic API key is saved below), LAILA chats are answered by Claude instead of the local model. If Claude is ever unavailable, LAILA falls back to the local model by itself. Resume suggestions and match notes always use the local model.',
+        label: 'Use Claude For All AI Features',
+        description: 'Off by default: every AI feature runs on the Ollama model. When on (and an Anthropic API key is saved below), LAILA chat, resume suggestions, "why this fit" notes and the outreach writing tools are all answered by Claude instead, and cost money per use.',
         type: 'toggle',
+    },
+    ollama_fallback: {
+        label: 'Fall Back To Ollama If Claude Fails',
+        description: 'On by default. Only matters while Claude is on: a failed Claude call is retried on Ollama. Turn off to never contact Ollama while Claude is on.',
+        type: 'toggle',
+    },
+    claude_monthly_budget_usd: {
+        label: 'Claude Monthly Budget (USD)',
+        description: 'Hard stop for all AI features: once the estimated spend this calendar month reaches this amount, Claude calls are refused until the 1st or until you raise it. 0 or blank means no limit.',
+        type: 'number',
     },
     laila_monthly_message_cap: {
         label: 'LAILA Messages Per Person Per Month',
@@ -211,19 +221,20 @@ const ENV_SECTIONS = [
     },
     {
         id: 'ollama',
-        title: 'LAILA (Local LLM)',
-        description: 'Ollama server behind LAILA. It must be reachable from the backend server and run a tool-calling model (e.g. qwen2.5:7b). Leave blank to use the server defaults.',
+        title: 'Local LLM (Ollama)',
+        description: 'The default AI model, used whenever Claude is off (and as the fallback while it is on). It must be reachable from the backend server and run a tool-calling model (e.g. qwen2.5:7b). Enter the address without /v1. If the server sits behind a proxy that checks an API key, enter that key too. Leave blank to use the server defaults.',
         icon: '✨',
         fields: [
-            { key: 'ollama_base_url',   label: 'Ollama URL',      type: 'text',   placeholder: 'http://10.0.1.25:11434' },
-            { key: 'ollama_model',      label: 'Model',           type: 'text',   placeholder: 'qwen2.5:7b' },
-            { key: 'ollama_timeout_ms', label: 'Timeout (ms)',    type: 'number', placeholder: '120000' },
+            { key: 'ollama_base_url',   label: 'Ollama URL',      type: 'text',     placeholder: 'http://10.0.1.25:11434' },
+            { key: 'ollama_api_key',    label: 'API Key (only if the server needs one)', type: 'password', placeholder: 'mk-…' },
+            { key: 'ollama_model',      label: 'Model',           type: 'text',     placeholder: 'qwen2.5:7b' },
+            { key: 'ollama_timeout_ms', label: 'Timeout (ms)',    type: 'number',   placeholder: '300000' },
         ],
     },
     {
         id: 'claude',
-        title: 'LAILA (Claude by Anthropic)',
-        description: 'API key and model for Claude. Save, then use "Test connection". Switch it on with "LAILA Answers With Claude" above.',
+        title: 'Claude by Anthropic (optional)',
+        description: 'API key and model for Claude. Save, then use "Test connection". Switch it on with "Use Claude For All AI Features" above.',
         icon: '🧠',
         fields: [
             { key: 'anthropic_api_key', label: 'Anthropic API Key',  type: 'password', placeholder: 'sk-ant-…' },
