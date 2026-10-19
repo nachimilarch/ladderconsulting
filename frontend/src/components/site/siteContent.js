@@ -61,6 +61,11 @@ export const clientQuotes = [
         quote: 'LadderStep brought down our hiring costs significantly, and the quality of candidates was better than we’d ever got before.',
         name: 'Rakesh', designation: 'HR Manager', company: 'White Shield',
     },
+    {
+        // Home loan client (20 Oct 2026). Growth pillar.
+        quote: 'I would like to express my sincere appreciation to Ladder Consulting for assisting me with my home loan process. The overall experience has been positive, and I appreciate the support and guidance provided throughout the process. The team has helped me with the necessary formalities and documentation, making the home loan process easier to understand. I am grateful for their assistance and professionalism in helping me move closer to achieving my dream of owning a home. Thank you, Ladder Consulting, for your support and service.',
+        name: 'Narendra Kumar Pedada', designation: 'Sterilization Specialist', company: 'Johns Hopkins Aramco Healthcare', city: 'Saudi Arabia',
+    },
 ];
 
 export const pillars = [
