@@ -112,4 +112,24 @@ exports.notifyAppStatusCand = (phone, candidateName, jobTitle, companyName, stat
 
 /** Company: reminder to post job descriptions */
 exports.notifyJDReminder = (phone, contactName, companyName) =>
-    sendWANotification(phone, 'ladderstep_jd_reminder1', [contactName, companyName]);
+    sendWANotification(phone, 'ladderstep_jd_reminder3', [contactName, companyName]);
+
+/** Candidate: application received */
+exports.notifyApplicationReceivedCand = (phone, candidateName, jobTitle, companyName) =>
+    sendWANotification(phone, 'ladderstep_application_received_cand1', [candidateName, jobTitle, companyName]);
+
+/** Company: a candidate applied to one of its jobs */
+exports.notifyNewApplicantCompany = (phone, contactName, jobTitle) =>
+    sendWANotification(phone, 'ladderstep_new_applicant_co1', [contactName, jobTitle]);
+
+/** Executive: a candidate applied to an assigned company's job */
+exports.notifyNewApplicantExec = (phone, execName, candidateName, jobTitle, companyName) =>
+    sendWANotification(phone, 'ladderstep_new_applicant_exec2', [execName, candidateName, jobTitle, companyName]);
+
+/** Company / candidate: payment received (receipt) */
+exports.notifyPaymentReceived = (phone, name, amount, invoiceNumber) =>
+    sendWANotification(phone, 'ladderstep_payment_received2', [name, amount, invoiceNumber]);
+
+/** Admin: a payment came in */
+exports.notifyPaymentAdmin = (phone, payerName, amount, invoiceNumber) =>
+    sendWANotification(phone, 'ladderstep_payment_admin_alert2', [payerName, amount, invoiceNumber]);

@@ -6,6 +6,7 @@ import { outreachAiAPI } from '../../api/outreachAi';
 import { toLocalInput, toIso } from '../../utils/schedule';
 import EmailDraftPanel from '../../components/outreach/ai/EmailDraftPanel';
 import { CopyReport } from '../../components/outreach/ai/common';
+import PendingFiles from '../../components/outreach/PendingFiles';
 
 const MERGE_TAGS = ['{{first_name}}','{{full_name}}','{{company_name}}','{{designation}}','{{city}}','{{executive_name}}'];
 
@@ -17,6 +18,8 @@ export default function EmailCampaignNew() {
     const [lists, setLists]           = useState([]);
     const [templates, setTemplates]   = useState([]);
     const [appliedTpl, setAppliedTpl] = useState(null);
+    const [files, setFiles]         = useState([]);
+    const tplBytes = (appliedTpl?.attachments || []).reduce((n, a) => n + a.file_size, 0);
     const [saving, setSaving]         = useState(false);
     const [showAi, setShowAi]         = useState(false);
     const [report, setReport]         = useState(null);
@@ -93,7 +96,7 @@ export default function EmailCampaignNew() {
             return toast.error('Fill in all required fields');
         }
         setSaving(true);
-        const payload = { ...form, scheduled_at: toIso(form.scheduled_at) };
+        const payload = { ...form, scheduled_at: toIso(form.scheduled_at), template_id: appliedTpl?.id || undefined };
         try {
             if (editId) {
                 await emailCampaignAPI.update(editId, payload);
@@ -101,7 +104,15 @@ export default function EmailCampaignNew() {
                 navigate(`/outreach/email/${editId}`);
             } else {
                 const r = await emailCampaignAPI.create(payload);
-                toast.success('Campaign created!');
+                const failedFiles = [];
+                for (const f of files) {
+                    const fd = new FormData();
+                    fd.append('file', f);
+                    try { await emailCampaignAPI.uploadAttachment(r.data.id, fd); }
+                    catch (err) { failedFiles.push(`${f.name}: ${err.response?.data?.message || 'upload failed'}`); }
+                }
+                if (failedFiles.length) toast.error(`Campaign created, but some files were not attached. ${failedFiles.join('; ')}`, { duration: 8000 });
+                else toast.success('Campaign created!');
                 navigate(`/outreach/email/${r.data.id}`);
             }
         } catch (err) {
@@ -142,6 +153,7 @@ export default function EmailCampaignNew() {
                             {appliedTpl && (
                                 <p className="text-xs text-green-600 mt-2">
                                     ✓ Subject and body loaded from <strong>{appliedTpl.name}</strong>. Edit freely below.
+                                    {appliedTpl.attachments?.length > 0 && <> Its {appliedTpl.attachments.length} attachment(s) will be included: {appliedTpl.attachments.map(a => a.file_name).join(', ')}.</>}
                                 </p>
                             )}
                         </>
@@ -210,6 +222,13 @@ export default function EmailCampaignNew() {
                 </div>
 
                 <CopyReport report={report} />
+
+                {!editId && (
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-600 mb-1">Attachments</label>
+                        <PendingFiles files={files} onChange={setFiles} includedBytes={tplBytes} disabled={saving} />
+                    </div>
+                )}
 
                 {!editId && (
                     <div>

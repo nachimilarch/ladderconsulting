@@ -5,7 +5,8 @@
 // writes two or three plain sentences explaining that score. It only sees skills,
 // experience and the job text, never the candidate's name or contact details.
 const db = require('../config/db');
-const { chatCompletion } = require('./localLlmService');
+const { chatCompletion, claudeActive } = require('./lailaLlm');
+const claudeSvc = require('./claudeLlmService');
 const { scorePoolAgainstJob } = require('./matchingService');
 const { enqueue, isEnabled, parseJsonReply, cleanText } = require('./llmJobs');
 
@@ -76,6 +77,7 @@ async function generate(jobId, candidateId) {
         temperature: 0.3,
         maxTokens: 200,
         timeoutMs: 240000,
+        meta: { feature: 'match_insight' },
     });
     const note = cleanText(parseJsonReply(reply.content)?.note, 500);
     if (!note) throw new Error('model returned no note');
@@ -85,7 +87,7 @@ async function generate(jobId, candidateId) {
          VALUES (?, ?, ?, ?, ?)
          ON DUPLICATE KEY UPDATE fit_score = VALUES(fit_score), note = VALUES(note),
                                  model = VALUES(model), created_at = CURRENT_TIMESTAMP, deleted_at = NULL`,
-        [jobId, candidateId, scored.score, note, process.env.OLLAMA_MODEL || 'qwen2.5:7b']
+        [jobId, candidateId, scored.score, note, claudeActive() ? claudeSvc.getModel() : (process.env.OLLAMA_MODEL || 'qwen2.5:7b')]
     );
 }
 

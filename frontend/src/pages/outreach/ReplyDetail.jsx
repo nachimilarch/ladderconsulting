@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { replyAPI } from '../../api/outreach';
 import { outreachAiAPI } from '../../api/outreachAi';
@@ -12,6 +12,7 @@ import { useAuth } from '../../context/AuthContext';
 export default function ReplyDetail() {
     const { id }    = useParams();
     const navigate  = useNavigate();
+    const location  = useLocation();
     const { user }  = useAuth();
     const isAdmin   = user?.role === 'admin';
 
@@ -102,7 +103,9 @@ export default function ReplyDetail() {
     return (
         <div className="max-w-3xl mx-auto">
             <div className="flex items-center gap-3 mb-6">
-                <Link to="/outreach/replies" className="text-sm text-gray-400 hover:text-gray-600">← Replies</Link>
+                <Link to="/outreach/replies"
+                    onClick={(e) => { if (location.key !== 'default') { e.preventDefault(); navigate(-1); } }}
+                    className="text-sm text-gray-400 hover:text-gray-600">← Replies</Link>
                 <span className="text-gray-300">/</span>
                 <h2 className="text-xl font-bold text-gray-800 flex-1 truncate">
                     {reply.from_name || reply.contact_name || reply.from_email || reply.from_phone}

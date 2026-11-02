@@ -2,6 +2,7 @@ const db = require('../config/db');
 const cashfree = require('../services/cashfreeService');
 const { sendEmail } = require('../utils/email');
 const { fulfillPaidInvoice } = require('../utils/invoiceFulfillment');
+const { notifyPaymentReceivedEvent } = require('../utils/eventNotifications');
 
 const safeEmail = (opts) => sendEmail(opts).catch(e => console.error('[Email]', e.message));
 
@@ -67,6 +68,9 @@ const processSuccessfulPayment = async (txn, paymentId, conn) => {
     }
 
     if (admin?.id) notify(admin.id, 'payment_received', `Payment Received — ${inv.invoice_number}`, notifMsg, { invoice_id: inv.id });
+
+    // Receipt to the payer + email/WhatsApp to admins (fire-and-forget)
+    notifyPaymentReceivedEvent(inv, txn.amount, newStatus);
 };
 
 // ── POST /api/company/invoices/:id/pay ───────────────────────────────────────

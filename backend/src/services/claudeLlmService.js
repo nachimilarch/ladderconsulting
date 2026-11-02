@@ -32,6 +32,27 @@ const PRICES = {
     'claude-opus-5-5':   { in: 4.00, out: 20.0, cacheRead: 0.20, cacheWrite: 5.00 },
 };
 
+// Hard stop on spend. CLAUDE_MONTHLY_BUDGET_USD = 0 or unset means no limit. Spend is read from our own
+// llm_usage log (an estimate), cached for a minute so it costs one cheap query per minute at most.
+const budgetUsd = () => { const n = parseFloat(process.env.CLAUDE_MONTHLY_BUDGET_USD); return Number.isFinite(n) && n > 0 ? n : 0; };
+let spendCache = { at: 0, usd: 0 };
+async function assertWithinBudget() {
+    const cap = budgetUsd();
+    if (!cap) return;
+    if (Date.now() - spendCache.at > 60000) {
+        try {
+            const [[r]] = await db.query(
+                "SELECT COALESCE(SUM(cost_usd), 0) AS usd FROM llm_usage WHERE provider = 'claude' AND created_at >= DATE_FORMAT(UTC_TIMESTAMP(), '%Y-%m-01')");
+            spendCache = { at: Date.now(), usd: Number(r.usd) };
+        } catch (e) { console.error('[claude:budget]', e.message); return; }
+    }
+    if (spendCache.usd >= cap) {
+        const e = new Error(`Monthly Claude budget of $${cap} reached (about $${spendCache.usd.toFixed(2)} used). Raise it in Platform Settings.`);
+        e.status = 429;
+        throw e;
+    }
+}
+
 const getKey = () => process.env.ANTHROPIC_API_KEY || '';
 const getModel = () => (process.env.CLAUDE_MODEL || DEFAULT_MODEL).trim();
 const getEffort = () => (EFFORTS.includes(process.env.CLAUDE_EFFORT) ? process.env.CLAUDE_EFFORT : 'medium');
@@ -207,6 +228,7 @@ async function toClaudeError(err) {
 // ── Non-streaming call ──────────────────────────────────────────────────────
 async function chatCompletion({ messages, tools, json = false, maxTokens, timeoutMs, meta }) {
     if (!isConfigured()) throw new Error('Claude is not configured (no API key).');
+    await assertWithinBudget();
     const { body, model } = buildRequest({ messages, tools, json, maxTokens });
     let res;
     try {
@@ -220,6 +242,7 @@ async function chatCompletion({ messages, tools, json = false, maxTokens, timeou
 // ── Streaming call ──────────────────────────────────────────────────────────
 async function streamChatCompletion({ messages, tools, onToken, maxTokens, meta }) {
     if (!isConfigured()) throw new Error('Claude is not configured (no API key).');
+    await assertWithinBudget();
     const { body, model } = buildRequest({ messages, tools, maxTokens, stream: true });
     let res;
     try {

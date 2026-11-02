@@ -1,14 +1,17 @@
 /**
- * Which model answers LAILA.
+ * Which model answers. This is the ONE entry point for every AI feature in the backend:
+ * LAILA chat, resume enrichment, "why this fit" notes and the outreach writing tools.
  *
  * Settings (platform_settings, loaded into process.env at boot and on save):
  *   LAILA_USE_CLAUDE = 'true'  and  ANTHROPIC_API_KEY set   -> Claude
  *   anything else                                           -> the local Ollama model
  *
- * If Claude is switched on but a call fails (network, overload, rate limit, bad key) the same request
- * is retried on Ollama, as long as nothing has been streamed to the person yet, so LAILA keeps
- * answering. Only LAILA's chat uses this. Resume suggestions, match notes and the outreach tools stay
- * on Ollama by calling localLlmService directly.
+ * Ollama (the MacBook model reached over Tailscale Funnel, or a local one) is the default and the
+ * normal path. Claude is opt-in. While Claude is on, a failed Claude call is retried on Ollama as long as
+ * nothing has been streamed yet, unless OLLAMA_FALLBACK = 'false'. There is no Ollama -> Claude fallback:
+ * if Ollama is down the call fails (chat shows its usual apology, background jobs are marked failed).
+ *
+ * Pass meta: { userId, feature } on every call so spend is logged per feature in llm_usage.
  */
 
 const local = require('./localLlmService');
@@ -18,6 +21,7 @@ const db = require('../config/db');
 const DEFAULT_CAP = 300;
 
 const claudeActive = () => process.env.LAILA_USE_CLAUDE === 'true' && claude.isConfigured();
+const ollamaFallback = () => String(process.env.OLLAMA_FALLBACK).toLowerCase() !== 'false';
 
 function provider() {
     return claudeActive() ? 'claude' : 'ollama';
@@ -32,8 +36,8 @@ async function streamChatCompletion(opts) {
                 onToken: (t) => { emitted = true; opts.onToken?.(t); },
             });
         } catch (err) {
-            console.error('[laila] Claude failed, ', emitted ? 'cannot fall back (already streaming):' : 'falling back to Ollama:', err.message);
-            if (emitted) throw err;
+            console.error('[ai] Claude failed, ', emitted || !ollamaFallback() ? 'not falling back:' : 'falling back to Ollama:', err.message);
+            if (emitted || !ollamaFallback()) throw err;
         }
     }
     return local.streamChatCompletion(opts);
@@ -44,7 +48,8 @@ async function chatCompletion(opts) {
         try {
             return await claude.chatCompletion(opts);
         } catch (err) {
-            console.error('[laila] Claude failed, falling back to Ollama:', err.message);
+            console.error('[ai] Claude failed,', ollamaFallback() ? 'falling back to Ollama:' : 'not falling back:', err.message);
+            if (!ollamaFallback()) throw err;
         }
     }
     return local.chatCompletion(opts);
@@ -74,4 +79,4 @@ async function capReached(userId) {
     return `You have used all ${cap} of your LAILA messages for this month. They reset on the 1st. You can still do everything yourself from the menu.`;
 }
 
-module.exports = { streamChatCompletion, chatCompletion, provider, claudeActive, capReached, monthlyCap };
+module.exports = { streamChatCompletion, chatCompletion, provider, claudeActive, ollamaFallback, capReached, monthlyCap };

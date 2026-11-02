@@ -1785,6 +1785,62 @@ exports.updateEmailTemplate = async (req, res) => {
     }
 };
 
+// ── Email template attachments ───────────────────────────────────────────────
+exports.listTemplateAttachments = async (req, res) => {
+    try {
+        const [rows] = await db.query(
+            'SELECT id, file_name, mime_type, file_size, created_at FROM email_template_attachments WHERE template_id = ? AND deleted_at IS NULL ORDER BY id ASC',
+            [req.params.id]
+        );
+        res.json({ success: true, data: rows });
+    } catch (err) {
+        console.error('admin.listTemplateAttachments:', err);
+        res.status(500).json({ message: 'Failed to fetch attachments.' });
+    }
+};
+
+exports.uploadTemplateAttachment = async (req, res) => {
+    const att = require('../utils/attachments');
+    try {
+        if (!req.file) return res.status(422).json({ message: 'No file uploaded.' });
+        const [[tpl]] = await db.query('SELECT id FROM email_templates WHERE id = ? AND deleted_at IS NULL', [req.params.id]);
+        if (!tpl) { att.safeUnlink(req.file.path); return res.status(404).json({ message: 'Template not found.' }); }
+        const [[tot]] = await db.query(
+            'SELECT COALESCE(SUM(file_size),0) AS bytes FROM email_template_attachments WHERE template_id = ? AND deleted_at IS NULL',
+            [tpl.id]
+        );
+        const check = att.checkUploadedFile(req.file, Number(tot.bytes));
+        if (check.error) return res.status(422).json({ message: check.error });
+        const [r] = await db.query(
+            'INSERT INTO email_template_attachments (template_id, file_name, file_path, mime_type, file_size) VALUES (?, ?, ?, ?, ?)',
+            [tpl.id, req.file.originalname, req.file.path, check.mime, req.file.size]
+        );
+        await logAction(req.user.id, 'add_email_template_attachment', 'email_template', tpl.id, { file: req.file.originalname }, ip(req));
+        res.json({ success: true, data: { id: r.insertId, file_name: req.file.originalname, mime_type: check.mime, file_size: req.file.size } });
+    } catch (err) {
+        if (req.file) require('../utils/attachments').safeUnlink(req.file.path);
+        console.error('admin.uploadTemplateAttachment:', err);
+        res.status(500).json({ message: 'Failed to upload attachment.' });
+    }
+};
+
+exports.deleteTemplateAttachment = async (req, res) => {
+    try {
+        const [[a]] = await db.query(
+            'SELECT id, file_path, file_name FROM email_template_attachments WHERE id = ? AND template_id = ? AND deleted_at IS NULL',
+            [req.params.attId, req.params.id]
+        );
+        if (!a) return res.status(404).json({ message: 'Attachment not found.' });
+        await db.query('UPDATE email_template_attachments SET deleted_at = NOW() WHERE id = ?', [a.id]);
+        require('../utils/attachments').safeUnlink(a.file_path);
+        await logAction(req.user.id, 'remove_email_template_attachment', 'email_template', req.params.id, { file: a.file_name }, ip(req));
+        res.json({ success: true, message: 'Attachment removed.' });
+    } catch (err) {
+        console.error('admin.deleteTemplateAttachment:', err);
+        res.status(500).json({ message: 'Failed to remove attachment.' });
+    }
+};
+
 exports.deleteEmailTemplate = async (req, res) => {
     try {
         const [[tpl]] = await db.query('SELECT id, name FROM email_templates WHERE id = ? AND deleted_at IS NULL', [req.params.id]);

@@ -1,4 +1,4 @@
-// Resume enrichment with the local model, alongside the offline parser.
+// Resume enrichment with the AI model (Claude, or Ollama if that is what is switched on), alongside the offline parser.
 //
 // The offline parser (utils/resumeParser.js) stays the source of truth and runs first.
 // This asks the model to fill in what rules tend to miss (a headline, a short summary,
@@ -6,7 +6,7 @@
 // on the resume row as SUGGESTIONS: nothing touches the candidate's profile until the
 // candidate accepts it and saves.
 const db = require('../config/db');
-const { chatCompletion } = require('./localLlmService');
+const { chatCompletion } = require('./lailaLlm');
 const { extractSkills } = require('../utils/resumeParser');
 const { enqueue, isEnabled, parseJsonReply, cleanText } = require('./llmJobs');
 
@@ -107,6 +107,7 @@ async function run(resumeId, text) {
             temperature: 0.1,
             maxTokens: 500,
             timeoutMs: 420000,
+            meta: { feature: 'resume_enrichment' },
         });
         const extract = sanitize(parseJsonReply(reply.content), who?.name);
         if (!extract) throw new Error('model returned no usable JSON');

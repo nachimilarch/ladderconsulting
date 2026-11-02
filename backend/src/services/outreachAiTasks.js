@@ -6,7 +6,7 @@
 // Anything that can be computed with rules (scores, segments, schedule, copy checks) is
 // done in outreachAiRules.js and never comes here.
 const db = require('../config/db');
-const { chatCompletion } = require('./localLlmService');
+const { chatCompletion } = require('./lailaLlm');
 const { enqueue, isEnabled, parseJsonReply, cleanText } = require('./llmJobs');
 const rules = require('./outreachAiRules');
 
@@ -345,13 +345,14 @@ async function campaignStats(user, days) {
 }
 
 // ── Running a task ───────────────────────────────────────────────────────────
-async function run(taskId, kind, prepared) {
+async function run(taskId, kind, prepared, userId) {
     const def = KINDS[kind];
     try {
         const m = def.messages(prepared);
         const reply = await chatCompletion({
             messages: [{ role: 'system', content: m.system }, { role: 'user', content: m.user }],
             json: true, temperature: 0.5, maxTokens: m.maxTokens, timeoutMs: 420000,
+            meta: { userId, feature: `outreach_${kind}` },
         });
         const parsed = parseJsonReply(reply.content);
         if (!parsed) throw new Error('the model did not return JSON');
@@ -377,7 +378,7 @@ async function startTask({ user, kind, input }) {
     const prepared = await KINDS[kind].prepare({ input: input || {}, user });
     const [ins] = await db.query("INSERT INTO ai_tasks (user_id, kind, input, status) VALUES (?, ?, ?, 'pending')",
         [user.id, kind, JSON.stringify(kind === 'campaign_insights' ? { days: prepared.days } : { ...prepared, stats: undefined })]);
-    if (!enqueue(`outreach:${kind}`, () => run(ins.insertId, kind, prepared))) {
+    if (!enqueue(`outreach:${kind}`, () => run(ins.insertId, kind, prepared, user.id))) {
         await db.query("UPDATE ai_tasks SET status = 'failed', error = 'The AI is busy with other requests.' WHERE id = ?", [ins.insertId]);
         throw badInput('The AI is busy with other requests. Try again in a minute.', 503);
     }
