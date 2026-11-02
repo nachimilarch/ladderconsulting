@@ -632,7 +632,11 @@ Located at `backend/migrations/`:
 - Frontend static: `/var/www/ladderstep/frontend/dist` (served by nginx)
 - Node: v22 via nvm (`source ~/.nvm/nvm.sh && nvm use 22`)
 
-**Standard deploy:**
+**Frontend deploy (recommended, since 2 Nov 2026):** `bash deploy/deploy-frontend.sh`. It builds on your own machine (the server has about 2 GB of RAM), uploads the finished `dist/`, keeps the previous one as `dist.bak-<date>` and checks the live site. It also keeps the public website pages pre-rendered. Do not build the frontend on the server from an old copy of `frontend/src`: that is how the website disappeared on 29 Oct 2026 (the server's copy had no website pages).
+
+**Server git note:** `/var/www/ladderstep` has its own history (remote `codecommit`, many local commits) and uncommitted files, so `git pull origin main` there will conflict. Backend changes are currently copied to the server and restarted with PM2; push the same files to GitHub so `main` stays the full picture.
+
+**Older deploy (backend, only if the server's git state is clean):**
 ```bash
 ssh -i ladder-key.pem ubuntu@13.203.48.124 "
   cd /var/www/ladderstep && git pull origin main
