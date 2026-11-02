@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import api from '../../api/axios';
+import PendingFiles from '../../components/outreach/PendingFiles';
+import { formatSize } from '../../utils/attachmentRules';
 
 const EMPTY = { name: '', description: '', subject: '', body_html: '', variables: '', is_active: true };
 
@@ -11,6 +13,8 @@ export default function AdminEmailTemplates() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [search, setSearch] = useState('');
+    const [files, setFiles] = useState([]);
+    const [existing, setExisting] = useState([]);
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -23,7 +27,7 @@ export default function AdminEmailTemplates() {
 
     useEffect(() => { load(); }, [load]);
 
-    const openAdd = () => { setCurrent(EMPTY); setError(''); setModal('add'); };
+    const openAdd = () => { setCurrent(EMPTY); setFiles([]); setExisting([]); setError(''); setModal('add'); };
     const openEdit = async (tpl) => {
         try {
             const { data } = await api.get(`/admin/email-templates/${tpl.id}`);
@@ -34,6 +38,9 @@ export default function AdminEmailTemplates() {
                 is_active: !!t.is_active,
             });
             setError('');
+            setFiles([]);
+            const a = await api.get(`/admin/email-templates/${tpl.id}/attachments`).catch(() => null);
+            setExisting(a?.data?.data || []);
             setModal('edit');
         } catch { setError('Failed to load template.'); }
     };
@@ -61,17 +68,44 @@ export default function AdminEmailTemplates() {
                     ? current.variables.split(',').map(v => v.trim()).filter(Boolean)
                     : [],
             };
+            let tplId = current.id;
             if (modal === 'add') {
-                await api.post('/admin/email-templates', payload);
+                const r = await api.post('/admin/email-templates', payload);
+                tplId = r.data.data.id;
             } else {
                 await api.put(`/admin/email-templates/${current.id}`, payload);
             }
+            const failed = [];
+            for (const f of files) {
+                const fd = new FormData();
+                fd.append('file', f);
+                try { await api.post(`/admin/email-templates/${tplId}/attachments`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }); }
+                catch (err) { failed.push(`${f.name}: ${err.response?.data?.message || 'upload failed'}`); }
+            }
             await load();
-            closeModal();
+            if (failed.length) {
+                // Template is saved; keep the modal open (in edit mode) so the person can see what failed.
+                setCurrent(c => ({ ...c, id: tplId }));
+                setModal('edit');
+                setFiles([]);
+                const a = await api.get(`/admin/email-templates/${tplId}/attachments`).catch(() => null);
+                setExisting(a?.data?.data || []);
+                setError(`Template saved, but some files were not attached. ${failed.join('; ')}`);
+            } else {
+                closeModal();
+            }
         } catch (err) {
             setError(err.response?.data?.message || 'Save failed.');
         }
         setSaving(false);
+    };
+
+    const removeExisting = async (att) => {
+        if (!window.confirm(`Remove "${att.file_name}"?`)) return;
+        try {
+            await api.delete(`/admin/email-templates/${current.id}/attachments/${att.id}`);
+            setExisting(list => list.filter(a => a.id !== att.id));
+        } catch { setError('Could not remove the attachment.'); }
     };
 
     const handleDelete = async () => {
@@ -208,6 +242,22 @@ export default function AdminEmailTemplates() {
                                     rows={14}
                                     placeholder="<p>Hi {{candidate_name}},</p>…"
                                     className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+                            </div>
+                            <div>
+                                <label className="block text-xs font-semibold text-gray-600 mb-1">Attachments</label>
+                                {existing.length > 0 && (
+                                    <ul className="mb-2 space-y-1">
+                                        {existing.map(a => (
+                                            <li key={a.id} className="flex items-center justify-between text-sm bg-gray-50 rounded-lg px-3 py-1.5">
+                                                <span className="truncate">{a.file_name} <span className="text-xs text-gray-400">{formatSize(a.file_size)}</span></span>
+                                                <button type="button" onClick={() => removeExisting(a)} className="text-xs text-red-500 hover:text-red-700 ml-3">Remove</button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                                <PendingFiles files={files} onChange={setFiles} disabled={saving}
+                                    includedBytes={existing.reduce((n, a) => n + a.file_size, 0)} />
+                                <p className="text-xs text-gray-400 mt-1">Sent with every campaign created from this template.</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <input type="checkbox" id="is_active" checked={current.is_active}

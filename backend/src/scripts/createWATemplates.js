@@ -112,6 +112,60 @@ const TEMPLATES = [
         body:     'Hi {{1}}, this is a reminder from LadderStep Human Consulting. Your company account {{2}} is active, but no job openings have been posted yet.\n\nPlease log in to your Company Portal and post your open positions so we can start sourcing the right candidates for you.\n\nPost Jobs Now: https://theladderconsulting.com/company/jobs\n\n- Team LadderStep',
         variables: 2,
     },
+    {
+        name:     'ladderstep_jd_reminder3',
+        category: 'MARKETING',
+        language: 'en',
+        body:     'Hi {{1}}, this is a reminder from LadderStep Human Consulting. Your company account {{2}} is active, but no job openings have been posted yet.\n\nPlease log in to your Company Portal and post your open positions so we can start sourcing the right candidates for you.\n\n- Team LadderStep',
+        variables: 2,
+        examples: ["Nachiket", "Acme Pvt Ltd"],
+        button:   { text: 'Open Portal', url: 'https://theladderconsulting.com/login' },
+    },
+    {
+        name:     'ladderstep_application_received_cand1',
+        category: 'UTILITY',
+        language: 'en',
+        body:     'Hi {{1}}, we have received your application for the role of {{2}} at {{3}}. We will let you know as it progresses.\n\n- Team LadderStep',
+        variables: 3,
+        examples: ["Nachiket", "Software Engineer", "Acme Pvt Ltd"],
+        button:   { text: 'Open Portal', url: 'https://theladderconsulting.com/login' },
+    },
+    {
+        name:     'ladderstep_new_applicant_co1',
+        category: 'UTILITY',
+        language: 'en',
+        body:     'Hi {{1}}, a new candidate has applied for your job posting {{2}}. Log in to your LadderStep Company Portal to review the application.\n\n- Team LadderStep',
+        variables: 2,
+        examples: ["Nachiket", "Software Engineer"],
+        button:   { text: 'Open Portal', url: 'https://theladderconsulting.com/login' },
+    },
+    {
+        name:     'ladderstep_new_applicant_exec2',
+        category: 'UTILITY',
+        language: 'en',
+        body:     'Hi {{1}}, {{2}} has applied for the role of {{3}} at {{4}}, one of your assigned companies.\n\n- Team LadderStep',
+        variables: 4,
+        examples: ["Nachiket", "Priya Sharma", "Software Engineer", "Acme Pvt Ltd"],
+        button:   { text: 'Open Portal', url: 'https://theladderconsulting.com/login' },
+    },
+    {
+        name:     'ladderstep_payment_received2',
+        category: 'UTILITY',
+        language: 'en',
+        body:     'Hi {{1}}, we have received your payment of {{2}} for invoice {{3}}. Thank you!\n\n- Team LadderStep',
+        variables: 3,
+        examples: ["Nachiket", "Rs 5,000", "INV-2026-001"],
+        button:   { text: 'Open Portal', url: 'https://theladderconsulting.com/login' },
+    },
+    {
+        name:     'ladderstep_payment_admin_alert2',
+        category: 'UTILITY',
+        language: 'en',
+        body:     'Payment received on LadderStep: {{1}} paid {{2}} for invoice {{3}}.\n\n- Team LadderStep',
+        variables: 3,
+        examples: ["Acme Pvt Ltd", "Rs 5,000", "INV-2026-001"],
+        button:   { text: 'Open Portal', url: 'https://theladderconsulting.com/login' },
+    },
 ];
 
 // ── Seed templates into local DB + attempt Vaartabot submission ──────────────
@@ -126,7 +180,8 @@ async function run() {
 
     let seeded = 0, submitted = 0, failed = 0;
 
-    for (const tpl of TEMPLATES) {
+    const only = (process.env.ONLY || '').split(',').map(x => x.trim()).filter(Boolean);
+    for (const tpl of TEMPLATES.filter(t => !only.length || only.includes(t.name))) {
         // 1. Upsert into local DB (inactive until Meta approves)
         try {
             await db.query(
@@ -152,7 +207,10 @@ async function run() {
             const res = await axios.post(
                 `${VB_BASE}/templates`,
                 { name: tpl.name, category: tpl.category, language: tpl.language,
-                  components: [{ type: 'BODY', text: tpl.body }] },
+                  components: [
+                      { type: 'BODY', text: tpl.body, ...(tpl.examples && { example: { body_text: [tpl.examples] } }) },
+                      ...(tpl.button ? [{ type: 'BUTTONS', buttons: [{ type: 'URL', text: tpl.button.text, url: tpl.button.url }] }] : []),
+                  ] },
                 { headers, timeout: 10000 }
             );
             const status = res.data?.data?.status || res.data?.status || 'submitted';

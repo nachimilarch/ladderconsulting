@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
-const { uploadDocument } = require('../middleware/upload');
+const { uploadDocument, uploadCampaignAttachment } = require('../middleware/upload');
 const ctrl = require('../controllers/adminController');
 
 const admin = [authenticateToken, authorizeRole('admin')];
@@ -105,5 +105,8 @@ router.get('/email-templates/:id',         ...admin, ctrl.getEmailTemplate);
 router.post('/email-templates',            ...admin, ctrl.createEmailTemplate);
 router.put('/email-templates/:id',         ...admin, ctrl.updateEmailTemplate);
 router.delete('/email-templates/:id',      ...admin, ctrl.deleteEmailTemplate);
+router.get('/email-templates/:id/attachments',            ...admin, ctrl.listTemplateAttachments);
+router.post('/email-templates/:id/attachments',           ...admin, uploadCampaignAttachment.single('file'), ctrl.uploadTemplateAttachment);
+router.delete('/email-templates/:id/attachments/:attId',  ...admin, ctrl.deleteTemplateAttachment);
 
 module.exports = router;

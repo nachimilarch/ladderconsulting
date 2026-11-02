@@ -3,6 +3,7 @@ const path = require('path');
 const db = require('../config/db');
 const { getTransporter, getDefaultFrom, getDomain, replaceMergeTags, buildReplyToAddress } = require('../utils/outreachEmail');
 const { logAction } = require('../utils/auditLog');
+const { checkUploadedFile, copyStoredFile, safeUnlink } = require('../utils/attachments');
 
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || null;
 
@@ -33,7 +34,7 @@ const isFuture = (d) => !!d && d.getTime() > Date.now() + 60 * 1000;
 // Creates an email campaign for `user` and returns { id } or throws { status, message }.
 // A campaign with a future schedule starts as 'scheduled' (the scheduler sends it), else 'draft'.
 async function createEmailCampaignRecord(user, body) {
-    const { campaign_name, list_id, subject, message_body, from_name, scheduled_at } = body;
+    const { campaign_name, list_id, subject, message_body, from_name, scheduled_at, template_id } = body;
     const fail = (status, message) => Object.assign(new Error(message), { status, userFacing: true });
     if (!campaign_name || !list_id || !subject || !message_body) throw fail(422, 'campaign_name, list_id, subject, message_body required.');
     const parsed = parseWhen(scheduled_at);
@@ -62,6 +63,26 @@ async function createEmailCampaignRecord(user, body) {
         [user.id, campaign_name, list_id, subject, message_body,
          fromEmail, resolvedFromName, isFuture(parsed.when) ? 'scheduled' : 'draft', parsed.when]
     );
+
+    // Created from a template: carry its attachments over (own copy of each file).
+    if (template_id) {
+        try {
+            const [tplFiles] = await db.query(
+                'SELECT file_name, file_path, mime_type, file_size FROM email_template_attachments WHERE template_id = ? AND deleted_at IS NULL ORDER BY id ASC',
+                [template_id]
+            );
+            for (const f of tplFiles) {
+                const dest = copyStoredFile(f.file_path);
+                if (!dest) continue;
+                await db.query(
+                    'INSERT INTO outreach_campaign_attachments (campaign_id, file_name, file_path, mime_type, file_size) VALUES (?, ?, ?, ?, ?)',
+                    [result.insertId, f.file_name, dest, f.mime_type, f.file_size]
+                );
+            }
+        } catch (err) {
+            console.error('[createEmailCampaignRecord] template attachments:', err.message);
+        }
+    }
     return { id: result.insertId };
 }
 
@@ -423,6 +444,14 @@ exports.listEmailTemplatesForOutreach = async (req, res) => {
              WHERE is_active = 1 AND deleted_at IS NULL
              ORDER BY name ASC`
         );
+        if (rows.length) {
+            const [atts] = await db.query(
+                `SELECT id, template_id, file_name, mime_type, file_size FROM email_template_attachments
+                 WHERE deleted_at IS NULL AND template_id IN (?) ORDER BY id ASC`,
+                [rows.map(r => r.id)]
+            );
+            rows.forEach(r => { r.attachments = atts.filter(a => a.template_id === r.id); });
+        }
         res.json({ success: true, data: rows });
     } catch (err) {
         console.error('[outreachCampaign.listEmailTemplates]', err);
@@ -489,16 +518,6 @@ exports.getFailedLogs = async (req, res) => {
 
 // ── Campaign Attachment endpoints ─────────────────────────────────────────────
 
-const ATTACH_MIME = {
-    '.pdf':  'application/pdf',
-    '.jpg':  'image/jpeg',
-    '.jpeg': 'image/jpeg',
-    '.png':  'image/png',
-    '.gif':  'image/gif',
-    '.doc':  'application/msword',
-    '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-};
-
 async function getCampOrFail(id, userId, role, res) {
     const [[camp]] = await db.query(
         'SELECT id, created_by FROM outreach_campaigns WHERE id = ? AND campaign_type = ? AND deleted_at IS NULL',
@@ -529,18 +548,23 @@ exports.listCampaignAttachments = async (req, res) => {
 exports.uploadCampaignAttachment = async (req, res) => {
     try {
         const camp = await getCampOrFail(req.params.id, req.user.id, req.user.role, res);
-        if (!camp) return;
+        if (!camp) { if (req.file) safeUnlink(req.file.path); return; }
         if (!req.file) return res.status(422).json({ success: false, message: 'No file uploaded.' });
 
-        const ext      = path.extname(req.file.originalname).toLowerCase();
-        const mimeType = ATTACH_MIME[ext] || req.file.mimetype || 'application/octet-stream';
+        const [[tot]] = await db.query(
+            'SELECT COALESCE(SUM(file_size),0) AS bytes FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL',
+            [camp.id]
+        );
+        const check = checkUploadedFile(req.file, Number(tot.bytes));
+        if (check.error) return res.status(422).json({ success: false, message: check.error });
 
         const [result] = await db.query(
             'INSERT INTO outreach_campaign_attachments (campaign_id, file_name, file_path, mime_type, file_size) VALUES (?, ?, ?, ?, ?)',
-            [camp.id, req.file.originalname, req.file.path, mimeType, req.file.size]
+            [camp.id, req.file.originalname, req.file.path, check.mime, req.file.size]
         );
-        res.json({ success: true, data: { id: result.insertId, file_name: req.file.originalname, mime_type: mimeType, file_size: req.file.size } });
+        res.json({ success: true, data: { id: result.insertId, file_name: req.file.originalname, mime_type: check.mime, file_size: req.file.size } });
     } catch (err) {
+        if (req.file) safeUnlink(req.file.path);
         console.error('[uploadCampaignAttachment]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }

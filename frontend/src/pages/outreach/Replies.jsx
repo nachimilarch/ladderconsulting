@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { replyAPI } from '../../api/outreach';
 import { outreachAiAPI } from '../../api/outreachAi';
@@ -17,15 +17,24 @@ export default function Replies() {
     const [replies, setReplies]   = useState([]);
     const [loading, setLoading]   = useState(true);
     const [total, setTotal]       = useState(0);
-    const [page, setPage]         = useState(1);
-    const [status, setStatus]     = useState('');
-    const [channel, setChannel]   = useState('');
+    // Filters and page live in the URL, so coming back from a message keeps them.
+    const [sp, setSp]             = useSearchParams();
+    const status  = sp.get('status')  || '';
+    const channel = sp.get('channel') || '';
+    const page    = Math.max(1, parseInt(sp.get('page'), 10) || 1);
+    const update = (changes) => setSp(prev => {
+        const n = new URLSearchParams(prev);
+        Object.entries(changes).forEach(([k, v]) => { if (v && v !== 1) n.set(k, v); else n.delete(k); });
+        return n;
+    }, { replace: true });
+    const scrollKey = 'outreach-replies-scroll';
+    const restored = useRef(false);
     const [triage, setTriage]     = useState({});
     const LIMIT = 20;
 
-    const fetch = (p = 1) => {
+    const load = () => {
         setLoading(true);
-        replyAPI.getAll({ page: p, limit: LIMIT, status: status || undefined, channel: channel || undefined })
+        replyAPI.getAll({ page, limit: LIMIT, status: status || undefined, channel: channel || undefined })
             .then(r => {
                 const rows = r.data.data || [];
                 setReplies(rows); setTotal(r.data.total || 0);
@@ -36,7 +45,20 @@ export default function Replies() {
             .finally(() => setLoading(false));
     };
 
-    useEffect(() => { setPage(1); fetch(1); }, [status, channel]);
+    useEffect(() => { load(); }, [status, channel, page]); // eslint-disable-line react-hooks/exhaustive-deps
+
+    // Put the list back where it was after returning from a message.
+    useEffect(() => {
+        if (loading || restored.current) return;
+        restored.current = true;
+        const y = Number(sessionStorage.getItem(scrollKey));
+        const main = document.querySelector('main');
+        if (y && main) main.scrollTop = y;
+    }, [loading]);
+    const rememberScroll = () => {
+        const main = document.querySelector('main');
+        if (main) sessionStorage.setItem(scrollKey, String(main.scrollTop));
+    };
 
     const unreadCount = replies.filter(r => r.reply_status === 'unread').length;
 
@@ -54,7 +76,7 @@ export default function Replies() {
             </div>
 
             <div className="flex gap-3 mb-4 flex-wrap">
-                <select value={status} onChange={e => setStatus(e.target.value)}
+                <select value={status} onChange={e => { sessionStorage.removeItem(scrollKey); update({ status: e.target.value, page: 1 }); }}
                     className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
                     <option value="">All Statuses</option>
                     <option value="unread">Unread</option>
@@ -63,7 +85,7 @@ export default function Replies() {
                     <option value="converted">Converted</option>
                     <option value="ignored">Ignored</option>
                 </select>
-                <select value={channel} onChange={e => setChannel(e.target.value)}
+                <select value={channel} onChange={e => { sessionStorage.removeItem(scrollKey); update({ channel: e.target.value, page: 1 }); }}
                     className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
                     <option value="">All Channels</option>
                     <option value="email">Email</option>
@@ -82,7 +104,7 @@ export default function Replies() {
                     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">
                         <div className="divide-y divide-gray-50">
                             {replies.map(r => (
-                                <Link key={r.id} to={`/outreach/replies/${r.id}`}
+                                <Link key={r.id} to={`/outreach/replies/${r.id}`} onClick={rememberScroll}
                                     className={`block px-5 py-3 hover:bg-gray-50 transition ${r.reply_status === 'unread' ? 'bg-yellow-50/30' : ''}`}>
                                     <div className="flex items-start justify-between">
                                         <div className="min-w-0 flex-1">
@@ -115,9 +137,9 @@ export default function Replies() {
                         <div className="flex items-center justify-between mt-4 text-sm text-gray-500">
                             <span>{(page-1)*LIMIT+1}–{Math.min(page*LIMIT,total)} of {total}</span>
                             <div className="flex gap-2">
-                                <button disabled={page===1} onClick={() => { setPage(p => p-1); fetch(page-1); }}
+                                <button disabled={page===1} onClick={() => { sessionStorage.removeItem(scrollKey); update({ page: page-1 }); }}
                                     className="px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40">Prev</button>
-                                <button disabled={page*LIMIT>=total} onClick={() => { setPage(p => p+1); fetch(page+1); }}
+                                <button disabled={page*LIMIT>=total} onClick={() => { sessionStorage.removeItem(scrollKey); update({ page: page+1 }); }}
                                     className="px-3 py-1 border border-gray-200 rounded-lg disabled:opacity-40">Next</button>
                             </div>
                         </div>

@@ -839,6 +839,12 @@ exports.syncTemplates = async (req, res) => {
         if (!bodyText) bodyText = t.body_text || t.body || '';
         if (!templateName) continue;
 
+        // Meta-rejected templates can never send: keep them out of the local list.
+        if (approvalStatus === 'REJECTED') {
+            await db.query('UPDATE whatsapp_templates SET deleted_at = NOW() WHERE template_name = ? AND deleted_at IS NULL', [templateName]);
+            continue;
+        }
+
         const [[existing]] = await db.query(
             'SELECT id FROM whatsapp_templates WHERE template_name = ? AND deleted_at IS NULL LIMIT 1',
             [templateName]

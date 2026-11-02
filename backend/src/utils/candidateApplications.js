@@ -1,6 +1,7 @@
 const db = require('../config/db');
 const matchingService = require('../services/matchingService');
 const { isCandidateHired } = require('./candidateStatus');
+const { notifyApplicationReceived } = require('./eventNotifications');
 
 // Shared by POST /api/candidates/applications/:jobId (routes/candidates.js) and
 // the chatbot's confirmed apply_to_job action (chatbotTools.js) — identical
@@ -54,6 +55,8 @@ const applyToJob = async (userId, jobId, coverLetter) => {
         matchingService.calculateMatchScore(applicationId)
             .catch(err => console.error('[AI match]', err.message))
     );
+
+    notifyApplicationReceived(applicationId);
 
     return applicationId;
 };
