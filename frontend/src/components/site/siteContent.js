@@ -78,7 +78,7 @@ export const pillars = [
         offerings: ['Go-to-Market Strategy', 'Referral Marketing', 'Sales and Negotiation Training', 'Behavioural and Soft Skills', 'Customised Training', 'Executive Coaching'],
         summary: 'Go-to-market strategy, referral marketing, sales and negotiation training, behavioural and soft skills programs, and executive coaching.',
         meta: {
-            title: 'Go-to-Market, Sales Training & Executive Coaching',
+            title: 'Go-to-Market, Sales Training & Coaching | LadderStep',
             description: 'GTM strategy, referral marketing, sales and negotiation training, soft skills programs and executive coaching for growing businesses.',
         },
         headline: 'A clear plan to win customers, and a team that can deliver it.',
@@ -114,7 +114,7 @@ export const pillars = [
         offerings: ['Hiring portal', 'HR Policies', 'Onboarding', 'Exit Interviews'],
         summary: 'Our hiring portal combines human recruiters with an AI layer to fill entry-level and middle-management roles quickly. Plus HR policies, onboarding and exit interviews.',
         meta: {
-            title: 'AI-Powered Hiring & HR Services for MSMEs',
+            title: 'AI-Powered Hiring & HR Services for MSMEs | LadderStep',
             description: 'Hire entry-level and mid-management talent faster and at lower cost. Plus HR policies, onboarding and exit interviews.',
         },
         headline: 'The right people, hired faster and at a fraction of the cost.',
@@ -169,7 +169,7 @@ export const pillars = [
         offerings: ['HR Compliance Consulting', 'ESG Reporting and Consulting', 'Corporate Insurance', 'Closing the insurance gap'],
         summary: 'HR compliance, GRI-standard ESG reporting, and engineering and construction insurance, with simple tools to spot and close gaps in your cover.',
         meta: {
-            title: 'HR Compliance, ESG Reporting & Corporate Insurance',
+            title: 'HR Compliance, ESG Reporting & Insurance | LadderStep',
             description: 'GRI-certified ESG reports, labour law compliance, and engineering and construction insurance for manufacturers and builders.',
         },
         headline: 'Protect your business, your people and your reputation.',
@@ -227,7 +227,7 @@ export const pillars = [
         offerings: ['Unsecured Business Loans', 'Secured Mortgage Loans', 'Short-Term Financing'],
         summary: 'Unsecured business loans, secured mortgage loans and short-term financing, structured around your cash flow.',
         meta: {
-            title: 'Business Loans & Short-Term Financing for MSMEs',
+            title: 'Business Loans & Short-Term Finance for MSMEs | LadderStep',
             description: 'Unsecured business loans, mortgage loans and short-term finance, matched to your cash flow. Check your eligibility today.',
         },
         headline: 'The right capital, at the right time, on the right terms.',
@@ -412,7 +412,7 @@ export const about = {
 // ── Who We Work With ─────────────────────────────────────────────────────────────────────
 export const whoWeWorkWith = {
     meta: {
-        title: 'Consulting for Manufacturing, Construction & Startups',
+        title: 'Consulting for Manufacturers, Builders & Startups | LadderStep',
         description: 'How LadderStep helps MSMEs and startups in manufacturing, construction, trading and services grow with confidence.',
     },
     headline: 'Built for the businesses that are building India.',
