@@ -13,6 +13,7 @@ const NAV = [
     { title: 'Your workflow', items: [
         { label: 'My Companies',      to: '/hr/companies',                   icon: '🏢', step: 1 },
         { label: 'Resume Sourcing',   to: '/hr/sourcing',                    icon: '📄', step: 2 },
+        { label: 'Candidates',        to: '/hr/candidates',                  icon: '👥' },
         { label: 'Interviews',        to: '/hr/interviews',                  icon: '🗓', step: 3, badge: 'interviews', also: ['/hr/interview-requests', '/hr/scheduled-interviews'] },
         { label: 'Offer Requests',    to: '/hr/offer-requests',              icon: '📋', step: 4, badge: 'offers' },
         { label: 'Invoices',          to: '/hr/invoices',                    icon: '🧾', step: 5, hint: 'placement fees' },

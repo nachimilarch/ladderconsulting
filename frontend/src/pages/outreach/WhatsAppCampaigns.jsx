@@ -47,6 +47,16 @@ export default function WhatsAppCampaigns() {
         }
     };
 
+    const handleDelete = async (id, name) => {
+        if (!confirm(`Delete campaign "${name}"? It will be removed from your list. Replies and leads already received are kept.`)) return;
+        try {
+            await waCampaignAPI.remove(id);
+            toast.success('Campaign deleted'); fetch();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Failed to delete');
+        }
+    };
+
     return (
         <div className="max-w-5xl mx-auto">
             <div className="flex items-center justify-between mb-6">
@@ -98,6 +108,9 @@ export default function WhatsAppCampaigns() {
                                     <Link to={`/outreach/whatsapp/${c.id}`} className="text-xs text-blue-600 hover:underline">View</Link>
                                     {['draft', 'scheduled'].includes(c.status) && (
                                         <button onClick={() => handleSend(c.id)} className="text-xs text-green-600 hover:underline">Send</button>
+                                    )}
+                                    {c.status !== 'sending' && (
+                                        <button onClick={() => handleDelete(c.id, c.campaign_name)} className="text-xs text-red-500 hover:underline">Delete</button>
                                     )}
                                 </div>
                             </div>

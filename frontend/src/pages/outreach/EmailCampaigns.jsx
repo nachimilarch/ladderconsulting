@@ -46,7 +46,7 @@ export default function EmailCampaigns() {
     };
 
     const handleDelete = async (id, name) => {
-        if (!confirm(`Delete draft campaign "${name}"?`)) return;
+        if (!confirm(`Delete campaign "${name}"? It will be removed from your list. Replies and leads already received are kept.`)) return;
         try {
             await emailCampaignAPI.remove(id);
             toast.success('Campaign deleted');
@@ -106,10 +106,10 @@ export default function EmailCampaigns() {
                                         <button onClick={() => handlePause(c.id)} className="text-xs text-yellow-600 hover:underline">Pause</button>
                                     )}
                                     {['draft','scheduled'].includes(c.status) && (
-                                        <>
-                                            <Link to={`/outreach/email/new?edit=${c.id}`} className="text-xs text-gray-500 hover:underline">Edit</Link>
-                                            <button onClick={() => handleDelete(c.id, c.campaign_name)} className="text-xs text-red-500 hover:underline">Delete</button>
-                                        </>
+                                        <Link to={`/outreach/email/new?edit=${c.id}`} className="text-xs text-gray-500 hover:underline">Edit</Link>
+                                    )}
+                                    {c.status !== 'sending' && (
+                                        <button onClick={() => handleDelete(c.id, c.campaign_name)} className="text-xs text-red-500 hover:underline">Delete</button>
                                     )}
                                 </div>
                             </div>

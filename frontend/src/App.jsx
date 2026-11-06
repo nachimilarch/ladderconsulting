@@ -73,6 +73,7 @@ import InterviewRequestDetail from './pages/hr/InterviewRequestDetail';
 import Interviews from './pages/hr/Interviews';
 import HRInvoices from './pages/hr/HRInvoices';
 import ResumeSourcing from './pages/hr/ResumeSourcing';
+import HRCandidates from './pages/hr/Candidates';
 import CandidateDocumentsView from './pages/hr/CandidateDocumentsView';
 import AssignedCompanies from './pages/hr/AssignedCompanies';
 
@@ -212,6 +213,7 @@ export default function App() {
           <Route path="invoices" element={<HRInvoices />} />
           <Route path="invoices/:id" element={<HRInvoices />} />
           <Route path="sourcing" element={<ResumeSourcing />} />
+          <Route path="candidates" element={<HRCandidates />} />
           <Route path="companies" element={<AssignedCompanies />} />
           <Route path="candidates/:candidateId/documents" element={<CandidateDocumentsView />} />
         </Route>

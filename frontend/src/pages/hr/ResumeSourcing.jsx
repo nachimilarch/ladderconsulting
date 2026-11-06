@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { recruitmentAPI } from '../../api/recruitment';
 import toast from 'react-hot-toast';
 import { matchTextCls, matchBoxCls } from '../../utils/matchScore';
+import FailedUploadsPanel from '../../components/hr/FailedUploadsPanel';
+import JobApplicantsModal from '../../components/hr/JobApplicantsModal';
 import { CandidateOriginLine, OriginFilters } from '../../components/hr/CandidateOrigin';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -237,6 +239,7 @@ function JobPicker({ jobs, selected, onSelect }) {
 
 // ── JD Detail block ───────────────────────────────────────────────────────────
 function JDDetail({ job, jobDetail, loading }) {
+    const [showApplicants, setShowApplicants] = useState(false);
     if (!job) return null;
     return (
         <div className="card-p mb-6">
@@ -245,8 +248,16 @@ function JDDetail({ job, jobDetail, loading }) {
                     <h2 className="text-lg font-display font-bold text-gray-900">{jobDetail?.title || job.title}</h2>
                     <p className="text-sm text-gray-500">{jobDetail?.company_name || job.company_name}{jobDetail?.industry ? ` · ${jobDetail.industry}` : ''}</p>
                 </div>
-                <span className="badge-blue shrink-0">Active Requirement</span>
+                <div className="flex items-center gap-2 shrink-0">
+                    {job.applicant_count > 0 && (
+                        <button onClick={() => setShowApplicants(true)} className="text-xs font-medium text-indigo-600 border border-indigo-200 rounded-lg px-2.5 py-1 hover:bg-indigo-50">
+                            View applicants ({job.applicant_count})
+                        </button>
+                    )}
+                    <span className="badge-blue">Active Requirement</span>
+                </div>
             </div>
+            {showApplicants && <JobApplicantsModal jobId={job.id} onClose={() => setShowApplicants(false)} />}
             {loading ? <p className="text-sm text-gray-400 py-4">Loading…</p> : !jobDetail ? null : (
                 <>
                     <div className="flex flex-wrap gap-2 mb-3">
@@ -650,6 +661,7 @@ export default function ResumeSourcing() {
                     { key: 'upload',    label: 'Upload Resumes' },
                     { key: 'freepool',  label: `Free Pool${fpTotal > 0 ? ` (${fpTotal})` : ''}` },
                     { key: 'pool',      label: 'Assign from Pool' },
+                    { key: 'failed',    label: 'Failed Uploads' },
                 ].map(t => (
                     <button key={t.key} onClick={() => setTab(t.key)}
                         className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${tab === t.key
@@ -659,6 +671,8 @@ export default function ResumeSourcing() {
                     </button>
                 ))}
             </div>
+
+            {tab === 'failed' && <FailedUploadsPanel onChanged={() => { loadBatches(); }} />}
 
             {/* ── UPLOAD TAB ── */}
             {tab === 'upload' && (

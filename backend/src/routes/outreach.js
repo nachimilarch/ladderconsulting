@@ -35,9 +35,16 @@ router.use(authorizeRole('hr_staff', 'admin'));
 // ── Contact Lists ────────────────────────────────────────────────────────────
 router.post('/contact-lists/upload',           uploadExcel.single('file'), contactCtrl.upload);
 router.get('/contact-lists',                   contactCtrl.getLists);
+router.post('/contact-lists',                  contactCtrl.createList);
 router.get('/contact-lists/:id',               contactCtrl.getList);
 router.get('/contact-lists/:id/contacts',      contactCtrl.getContacts);
+router.put('/contact-lists/:id',               contactCtrl.updateList);
 router.delete('/contact-lists/:id',            contactCtrl.deleteList);
+router.post('/contact-lists/:id/contacts',        contactCtrl.addContact);
+router.post('/contact-lists/:id/contacts/bulk',   contactCtrl.addContactsBulk);
+router.post('/contact-lists/:id/contacts/delete', contactCtrl.deleteContactsBulk);
+router.put('/contacts/:id',                    contactCtrl.updateContact);
+router.delete('/contacts/:id',                 contactCtrl.deleteContact);
 router.patch('/contacts/:id/unsubscribe',      contactCtrl.unsubscribeContact);
 router.get('/contacts/:id/call-history',       contactCtrl.getContactCallHistory);
 
@@ -50,7 +57,13 @@ router.get('/email-campaigns',                 campaignCtrl.listEmailCampaigns);
 router.get('/email-campaigns/:id',             campaignCtrl.getEmailCampaign);
 router.get('/email-campaigns/:id/failed',      campaignCtrl.getFailedLogs);
 router.get('/email-campaigns/:id/attachments',                      campaignCtrl.listCampaignAttachments);
-router.post('/email-campaigns/:id/attachments', uploadCampaignAttachment.single('file'), campaignCtrl.uploadCampaignAttachment);
+router.post('/email-campaigns/:id/attachments', (req, res, next) => {
+    uploadCampaignAttachment.single('file')(req, res, (err) => {
+        if (!err) return next();
+        const msg = err.code === 'LIMIT_FILE_SIZE' ? 'File is too large. The maximum is 25 MB.' : err.message;
+        res.status(422).json({ success: false, message: msg });
+    });
+}, campaignCtrl.uploadCampaignAttachment);
 router.delete('/email-campaigns/:id/attachments/:attId',            campaignCtrl.deleteCampaignAttachment);
 router.put('/email-campaigns/:id',             campaignCtrl.updateEmailCampaign);
 router.post('/email-campaigns/:id/send',       campaignCtrl.sendEmailCampaign);
@@ -90,6 +103,14 @@ router.get('/whatsapp-campaigns',              whatsappCtrl.listWACampaigns);
 router.get('/whatsapp-campaigns/:id',          whatsappCtrl.getWACampaign);
 router.get('/whatsapp-campaigns/:id/failed',   campaignCtrl.getWAFailedLogs);
 router.post('/whatsapp-campaigns/:id/send',    whatsappCtrl.sendWACampaign);
+router.post('/whatsapp-campaigns/:id/media', (req, res, next) => {
+    uploadCampaignAttachment.single('file')(req, res, (err) => {
+        if (!err) return next();
+        res.status(422).json({ success: false, message: err.code === 'LIMIT_FILE_SIZE' ? 'File is too large.' : err.message });
+    });
+}, whatsappCtrl.uploadWAMedia);
+router.delete('/whatsapp-campaigns/:id/media', whatsappCtrl.deleteWAMedia);
+router.delete('/whatsapp-campaigns/:id',       campaignCtrl.deleteWACampaign);
 router.patch('/whatsapp-campaigns/:id/schedule', whatsappCtrl.updateWASchedule);
 
 // ── Email Auto-Replies ───────────────────────────────────────────────────────

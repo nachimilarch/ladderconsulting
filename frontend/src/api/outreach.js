@@ -10,6 +10,13 @@ export const contactListAPI = {
     getOne:         (id)       => api.get(`/outreach/contact-lists/${id}`),
     getContacts:    (id, params) => api.get(`/outreach/contact-lists/${id}/contacts`, { params }),
     remove:         (id)       => api.delete(`/outreach/contact-lists/${id}`),
+    create:         (data)     => api.post('/outreach/contact-lists', data),
+    update:         (id, data) => api.put(`/outreach/contact-lists/${id}`, data),
+    addContact:     (id, data) => api.post(`/outreach/contact-lists/${id}/contacts`, data),
+    addContacts:    (id, contacts) => api.post(`/outreach/contact-lists/${id}/contacts/bulk`, { contacts }),
+    updateContact:  (contactId, data) => api.put(`/outreach/contacts/${contactId}`, data),
+    removeContact:  (contactId) => api.delete(`/outreach/contacts/${contactId}`),
+    removeContacts: (id, ids)  => api.post(`/outreach/contact-lists/${id}/contacts/delete`, { ids }),
     unsubscribe:    (id)       => api.patch(`/outreach/contacts/${id}/unsubscribe`),
     callHistory:    (id)       => api.get(`/outreach/contacts/${id}/call-history`),
 };
@@ -49,6 +56,9 @@ export const waCampaignAPI = {
     getOne:     (id)     => api.get(`/outreach/whatsapp-campaigns/${id}`),
     failedLogs: (id)     => api.get(`/outreach/whatsapp-campaigns/${id}/failed`),
     send:       (id)     => api.post(`/outreach/whatsapp-campaigns/${id}/send`),
+    remove:     (id)     => api.delete(`/outreach/whatsapp-campaigns/${id}`),
+    uploadMedia: (id, file) => { const fd = new FormData(); fd.append('file', file); return api.post(`/outreach/whatsapp-campaigns/${id}/media`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }); },
+    removeMedia: (id)    => api.delete(`/outreach/whatsapp-campaigns/${id}/media`),
     schedule:   (id, scheduled_at) => api.patch(`/outreach/whatsapp-campaigns/${id}/schedule`, { scheduled_at }),
 };
 

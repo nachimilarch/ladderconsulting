@@ -3,6 +3,7 @@ const router = express.Router();
 const { authenticateToken, authorizeRole } = require('../middleware/auth');
 const { uploadResume } = require('../middleware/upload');
 const ctrl = require('../controllers/recruitmentController');
+const mgmt = require('../controllers/candidateManagementController');
 
 const exec = [authenticateToken, authorizeRole('hr_staff', 'admin')];
 
@@ -45,5 +46,25 @@ router.get('/resumes/:resumeId/download', ...exec, ctrl.downloadResume);
 
 // DELETE a sourced candidate profile (soft-delete user + candidate + resumes, removes resume files)
 router.delete('/candidates/:candidateId', ...exec, ctrl.deleteCandidate);
+
+// Candidate management (admin: any candidate; hr_staff: only the ones they sourced)
+router.get('/jobs/:jobId/applicants',                       ...exec, mgmt.getJobApplicants);
+router.get('/my-candidates',                                ...exec, mgmt.listMyCandidates);
+router.post('/candidates', ...exec, (req, res, next) => {
+    uploadResume.single('resume')(req, res, (err) => err ? res.status(400).json({ success: false, message: err.message }) : next());
+}, mgmt.createCandidate);
+router.post('/candidates/message-list',                     ...exec, mgmt.createMessageList);
+router.get('/candidates/:id/manage',                        ...exec, mgmt.getManagedCandidate);
+router.put('/candidates/:id',                               ...exec, mgmt.updateCandidate);
+router.post('/candidates/:id/resume', ...exec, (req, res, next) => {
+    uploadResume.single('resume')(req, res, (err) => err ? res.status(400).json({ success: false, message: err.message }) : next());
+}, mgmt.uploadCandidateResume);
+router.delete('/candidates/:id/applications/:appId',        ...exec, mgmt.removeApplication);
+
+// Failed upload review: list, open the original file, delete one / several / all
+router.get('/failed-uploads',               ...exec, ctrl.listFailedUploads);
+router.get('/upload-items/:id/download',    ...exec, ctrl.downloadUploadItem);
+router.post('/upload-items/delete',         ...exec, ctrl.deleteUploadItems);
+router.delete('/upload-items/:id',          ...exec, ctrl.deleteUploadItem);
 
 module.exports = router;

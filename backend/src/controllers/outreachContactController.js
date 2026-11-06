@@ -331,6 +331,7 @@ exports.getList = async (req, res) => {
 // ── GET /outreach/contact-lists/:id/contacts ──────────────────────────────────
 exports.getContacts = async (req, res) => {
     const { page = 1, limit = 50, search, has_email, has_phone, unsubscribed } = req.query;
+    if (!(await loadOwnedList(req, res, req.params.id))) return;
     const offset  = (parseInt(page) - 1) * parseInt(limit);
     const filters = ['c.list_id = ?', 'c.deleted_at IS NULL'];
     const params  = [req.params.id];
@@ -379,6 +380,229 @@ exports.deleteList = async (req, res) => {
         res.json({ success: true, message: 'List deleted.' });
     } catch (err) {
         console.error('[outreach.deleteList]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── Manual contact management (no Excel needed) ──────────────────────────────
+
+// Loads a list and checks the caller may use it. Sends the error response itself and returns null on failure.
+async function loadOwnedList(req, res, listId) {
+    const [[list]] = await db.query(
+        'SELECT id, uploaded_by, file_name FROM outreach_contact_lists WHERE id = ? AND deleted_at IS NULL', [listId]
+    );
+    if (!list) { res.status(404).json({ success: false, message: 'List not found.' }); return null; }
+    if (req.user.role === 'hr_staff' && list.uploaded_by !== req.user.id) {
+        res.status(403).json({ success: false, message: 'Access denied.' }); return null;
+    }
+    return list;
+}
+
+// Loads a contact (with its list) and checks the caller may use it.
+async function loadOwnedContact(req, res, contactId) {
+    const [[c]] = await db.query(
+        `SELECT c.*, l.uploaded_by AS list_owner FROM outreach_contacts c
+         JOIN outreach_contact_lists l ON l.id = c.list_id AND l.deleted_at IS NULL
+         WHERE c.id = ? AND c.deleted_at IS NULL`, [contactId]
+    );
+    if (!c) { res.status(404).json({ success: false, message: 'Contact not found.' }); return null; }
+    if (req.user.role === 'hr_staff' && c.list_owner !== req.user.id) {
+        res.status(403).json({ success: false, message: 'Access denied.' }); return null;
+    }
+    return c;
+}
+
+// Keeps the list's counters true after any add / delete.
+// Lists built by hand have no file, so "total" is simply how many contacts they hold.
+async function recountList(listId) {
+    await db.query(
+        `UPDATE outreach_contact_lists l SET
+            l.imported_contacts = (SELECT COUNT(*) FROM outreach_contacts c WHERE c.list_id = l.id AND c.deleted_at IS NULL),
+            l.total_contacts = IF(l.file_name IS NULL,
+                (SELECT COUNT(*) FROM outreach_contacts c WHERE c.list_id = l.id AND c.deleted_at IS NULL), l.total_contacts)
+         WHERE l.id = ?`, [listId]
+    );
+}
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const clean = (v, max) => {
+    if (v === undefined || v === null) return null;
+    const t = String(v).trim();
+    return t ? t.slice(0, max) : null;
+};
+const onePhone = (v) => {
+    const t = clean(v, 60);
+    if (!t) return { value: null };
+    const nums = splitPhones(t);
+    if (!nums.length) return { error: `"${t}" is not a valid phone number (7–15 digits).` };
+    return { value: nums[0] };
+};
+
+// Validates one contact payload. Returns { data } or { error }.
+function validateContact(body) {
+    const email = clean(body.email, 191)?.toLowerCase() || null;
+    if (email && !EMAIL_RE.test(email)) return { error: `"${email}" is not a valid email address.` };
+    const ph = onePhone(body.phone);        if (ph.error) return { error: ph.error };
+    const wa = onePhone(body.whatsapp_number); if (wa.error) return { error: wa.error };
+    if (!email && !ph.value && !wa.value) return { error: 'Add an email address or a phone / WhatsApp number.' };
+    return { data: {
+        full_name: clean(body.full_name, 200), email,
+        phone: ph.value, whatsapp_number: wa.value,
+        company_name: clean(body.company_name, 200), designation: clean(body.designation, 150), city: clean(body.city, 100),
+    } };
+}
+
+// ── POST /outreach/contact-lists — create an empty list ──────────────────────
+exports.createList = async (req, res) => {
+    const name = clean(req.body.list_name, 255);
+    if (!name) return res.status(422).json({ success: false, message: 'list_name is required.' });
+    try {
+        const [r] = await db.query(
+            `INSERT INTO outreach_contact_lists (uploaded_by, list_name, description, import_status, total_contacts, imported_contacts, failed_rows)
+             VALUES (?, ?, ?, 'done', 0, 0, 0)`,
+            [req.user.id, name, clean(req.body.description, 2000)]
+        );
+        logAction(req.user.id, 'create_contact_list', 'outreach_contact_list', r.insertId, { list_name: name }, ip(req));
+        res.status(201).json({ success: true, message: 'List created.', list_id: r.insertId });
+    } catch (err) {
+        console.error('[outreach.createList]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── PUT /outreach/contact-lists/:id — rename / describe ──────────────────────
+exports.updateList = async (req, res) => {
+    const name = clean(req.body.list_name, 255);
+    if (!name) return res.status(422).json({ success: false, message: 'list_name is required.' });
+    try {
+        if (!(await loadOwnedList(req, res, req.params.id))) return;
+        await db.query('UPDATE outreach_contact_lists SET list_name = ?, description = ? WHERE id = ?',
+            [name, clean(req.body.description, 2000), req.params.id]);
+        res.json({ success: true, message: 'List updated.' });
+    } catch (err) {
+        console.error('[outreach.updateList]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// Inserts validated contacts into a list, skipping emails the list already has. Returns { added, skipped[] }.
+async function insertContacts(listId, userId, rows) {
+    const [existing] = await db.query(
+        'SELECT email FROM outreach_contacts WHERE list_id = ? AND deleted_at IS NULL AND email IS NOT NULL', [listId]
+    );
+    const seen = new Set(existing.map((r) => r.email.toLowerCase()));
+    const skipped = [];
+    let added = 0;
+    for (const [i, row] of rows.entries()) {
+        const v = validateContact(row);
+        if (v.error) { skipped.push({ row: i + 1, reason: v.error }); continue; }
+        const d = v.data;
+        if (d.email && seen.has(d.email)) { skipped.push({ row: i + 1, reason: `Already in this list: ${d.email}` }); continue; }
+        if (d.email) seen.add(d.email);
+        await db.query(
+            `INSERT INTO outreach_contacts (list_id, uploaded_by, full_name, email, phone, whatsapp_number, company_name, designation, city, source)
+             VALUES (?,?,?,?,?,?,?,?,?, 'manual')`,
+            [listId, userId, d.full_name, d.email, d.phone, d.whatsapp_number, d.company_name, d.designation, d.city]
+        );
+        added++;
+    }
+    await recountList(listId);
+    return { added, skipped };
+}
+
+// ── POST /outreach/contact-lists/:id/contacts — add one contact ──────────────
+exports.addContact = async (req, res) => {
+    try {
+        if (!(await loadOwnedList(req, res, req.params.id))) return;
+        const { added, skipped } = await insertContacts(req.params.id, req.user.id, [req.body || {}]);
+        if (!added) return res.status(422).json({ success: false, message: skipped[0]?.reason || 'Could not add contact.' });
+        logAction(req.user.id, 'add_outreach_contact', 'outreach_contact_list', req.params.id, {}, ip(req));
+        res.status(201).json({ success: true, message: 'Contact added.' });
+    } catch (err) {
+        console.error('[outreach.addContact]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── POST /outreach/contact-lists/:id/contacts/bulk — add many (pasted rows) ──
+exports.addContactsBulk = async (req, res) => {
+    const contacts = Array.isArray(req.body?.contacts) ? req.body.contacts : null;
+    if (!contacts || !contacts.length) return res.status(422).json({ success: false, message: 'No contacts supplied.' });
+    if (contacts.length > 500) return res.status(422).json({ success: false, message: 'Add at most 500 contacts at a time.' });
+    try {
+        if (!(await loadOwnedList(req, res, req.params.id))) return;
+        const { added, skipped } = await insertContacts(req.params.id, req.user.id, contacts);
+        logAction(req.user.id, 'add_outreach_contacts_bulk', 'outreach_contact_list', req.params.id, { added }, ip(req));
+        res.status(added ? 201 : 422).json({
+            success: added > 0,
+            message: added ? `${added} contact${added === 1 ? '' : 's'} added${skipped.length ? `, ${skipped.length} skipped` : ''}.` : 'No contacts were added.',
+            added, skipped,
+        });
+    } catch (err) {
+        console.error('[outreach.addContactsBulk]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── PUT /outreach/contacts/:id — edit a contact ──────────────────────────────
+exports.updateContact = async (req, res) => {
+    try {
+        const c = await loadOwnedContact(req, res, req.params.id);
+        if (!c) return;
+        const v = validateContact(req.body || {});
+        if (v.error) return res.status(422).json({ success: false, message: v.error });
+        const d = v.data;
+        if (d.email) {
+            const [[dup]] = await db.query(
+                'SELECT id FROM outreach_contacts WHERE list_id = ? AND email = ? AND id <> ? AND deleted_at IS NULL LIMIT 1',
+                [c.list_id, d.email, c.id]
+            );
+            if (dup) return res.status(409).json({ success: false, message: `Another contact in this list already uses ${d.email}.` });
+        }
+        await db.query(
+            `UPDATE outreach_contacts SET full_name = ?, email = ?, phone = ?, whatsapp_number = ?,
+                    company_name = ?, designation = ?, city = ? WHERE id = ?`,
+            [d.full_name, d.email, d.phone, d.whatsapp_number, d.company_name, d.designation, d.city, c.id]
+        );
+        logAction(req.user.id, 'update_outreach_contact', 'outreach_contact', c.id, {}, ip(req));
+        res.json({ success: true, message: 'Contact updated.' });
+    } catch (err) {
+        console.error('[outreach.updateContact]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── DELETE /outreach/contacts/:id ────────────────────────────────────────────
+exports.deleteContact = async (req, res) => {
+    try {
+        const c = await loadOwnedContact(req, res, req.params.id);
+        if (!c) return;
+        await db.query('UPDATE outreach_contacts SET deleted_at = NOW() WHERE id = ?', [c.id]);
+        await recountList(c.list_id);
+        logAction(req.user.id, 'delete_outreach_contact', 'outreach_contact', c.id, {}, ip(req));
+        res.json({ success: true, message: 'Contact deleted.' });
+    } catch (err) {
+        console.error('[outreach.deleteContact]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── POST /outreach/contact-lists/:id/contacts/delete — delete several ────────
+exports.deleteContactsBulk = async (req, res) => {
+    const ids = (Array.isArray(req.body?.ids) ? req.body.ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0);
+    if (!ids.length) return res.status(422).json({ success: false, message: 'Select at least one contact.' });
+    if (ids.length > 1000) return res.status(422).json({ success: false, message: 'Delete at most 1000 contacts at a time.' });
+    try {
+        if (!(await loadOwnedList(req, res, req.params.id))) return;
+        const [r] = await db.query(
+            'UPDATE outreach_contacts SET deleted_at = NOW() WHERE list_id = ? AND deleted_at IS NULL AND id IN (?)',
+            [req.params.id, ids]
+        );
+        await recountList(req.params.id);
+        logAction(req.user.id, 'delete_outreach_contacts_bulk', 'outreach_contact_list', req.params.id, { count: r.affectedRows }, ip(req));
+        res.json({ success: true, message: `${r.affectedRows} contact${r.affectedRows === 1 ? '' : 's'} deleted.`, deleted: r.affectedRows });
+    } catch (err) {
+        console.error('[outreach.deleteContactsBulk]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { waCampaignAPI } from '../../api/outreach';
 import { fmtIst } from '../../utils/schedule';
@@ -12,6 +12,7 @@ const STATUS_COLORS = {
 
 export default function WhatsAppCampaignDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [campaign, setCampaign]   = useState(null);
     const [failedLogs, setFailedLogs] = useState([]);
     const [tab, setTab]             = useState('overview');
@@ -45,6 +46,32 @@ export default function WhatsAppCampaignDetail() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!confirm(`Delete campaign "${campaign.campaign_name}"? It will be removed from your list. Replies and leads already received are kept.`)) return;
+        try {
+            await waCampaignAPI.remove(id);
+            toast.success('Campaign deleted');
+            navigate('/outreach/whatsapp');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Delete failed');
+        }
+    };
+
+    const handleMedia = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        try {
+            await waCampaignAPI.uploadMedia(id, file);
+            toast.success('Media saved'); fetch();
+        } catch (err) { toast.error(err.response?.data?.message || 'Upload failed'); }
+    };
+
+    const handleRemoveMedia = async () => {
+        try { await waCampaignAPI.removeMedia(id); toast.success('Media removed'); fetch(); }
+        catch (err) { toast.error(err.response?.data?.message || 'Could not remove'); }
+    };
+
     const handleSend = async () => {
         if (!confirm('Send this WhatsApp campaign?')) return;
         try {
@@ -74,11 +101,38 @@ export default function WhatsAppCampaignDetail() {
                 </div>
             )}
 
-            {['draft', 'scheduled'].includes(campaign.status) && (
-                <button onClick={handleSend} className="mb-4 bg-green-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-green-700 transition">
-                    Send Now
-                </button>
+            {campaign.media_header_enabled && ['image', 'video', 'document'].includes(campaign.template_header_type) && (
+                <div className="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <p className="text-sm font-medium text-gray-700 mb-1">
+                        Template {campaign.template_header_type}
+                        <span className="ml-2 text-[10px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">not verified with Vaartabot</span>
+                    </p>
+                    <p className="text-xs text-gray-500 mb-2">
+                        This template has a {campaign.template_header_type} header. {campaign.template_header_type === 'image' ? 'JPG or PNG, up to 5 MB.' : campaign.template_header_type === 'video' ? 'MP4, up to 16 MB.' : 'PDF, up to 16 MB.'}
+                        {' '}Send a test to your own number first.
+                    </p>
+                    {campaign.has_header_media ? (
+                        <p className="text-sm text-green-700">✓ File added
+                            {['draft', 'scheduled'].includes(campaign.status) && <button onClick={handleRemoveMedia} className="ml-3 text-xs text-red-500 hover:underline">Remove</button>}
+                        </p>
+                    ) : ['draft', 'scheduled'].includes(campaign.status) ? (
+                        <input type="file" accept={campaign.template_header_type === 'image' ? '.jpg,.jpeg,.png' : campaign.template_header_type === 'video' ? '.mp4' : '.pdf'} onChange={handleMedia} className="text-sm" />
+                    ) : <p className="text-sm text-gray-400">No file was added.</p>}
+                </div>
             )}
+
+            <div className="flex gap-2 mb-4 flex-wrap">
+                {['draft', 'scheduled'].includes(campaign.status) && (
+                    <button onClick={handleSend} className="bg-green-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-green-700 transition">
+                        Send Now
+                    </button>
+                )}
+                {campaign.status !== 'sending' && (
+                    <button onClick={handleDelete} className="border border-red-200 text-red-600 text-sm px-4 py-2 rounded-xl hover:bg-red-50 transition">
+                        Delete
+                    </button>
+                )}
+            </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 {[

@@ -4,6 +4,9 @@ const crypto = require('crypto');
 const { createLeadFromContact } = require('../services/leadConverter');
 const inbox = require('../services/whatsappInbox');
 const waMedia = require('../services/whatsappMedia');
+const fs = require('fs');
+const path = require('path');
+const { classifyCampaignUpload, safeUnlink, fileLinkUrl } = require('../utils/attachments');
 
 const VB_BASE = 'https://vaartabot.com/api/v1';
 const vbHeaders = () => ({ 'X-API-Key': process.env.VAARTABOT_API_KEY, 'Content-Type': 'application/json' });
@@ -201,7 +204,14 @@ exports.getWACampaign = async (req, res) => {
         if (req.user.role === 'hr_staff' && row.created_by !== req.user.id) {
             return res.status(403).json({ success: false, message: 'Access denied.' });
         }
-        res.json({ success: true, data: row });
+        const [[tpl]] = await db.query('SELECT header_type FROM whatsapp_templates WHERE id = ?', [row.whatsapp_template_id]);
+        const { header_media_path, header_media_token, ...safeRow } = row;
+        res.json({ success: true, data: {
+            ...safeRow,
+            has_header_media: !!header_media_token,
+            template_header_type: tpl?.header_type || 'none',
+            media_header_enabled: await mediaHeaderEnabled(),
+        } });
     } catch (err) {
         res.status(500).json({ success: false, message: 'Server error.' });
     }
@@ -227,6 +237,73 @@ exports.sendWACampaign = async (req, res) => {
         if (started.error) return res.status(422).json({ success: false, message: started.error });
         res.json({ success: true, message: `WhatsApp send started for ${started.total} contacts.`, total_recipients: started.total });
     } catch (err) {
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+// ── Media in the template header (image / video / PDF) ───────────────────────
+// UNVERIFIED with Vaartabot: their public docs were not found, so this is off by default
+// (platform setting whatsapp_media_header_enabled) and the request field name is a setting
+// (vaartabot_media_param). Turn it on, send one test campaign to your own number, and confirm
+// the picture arrives before using it for real.
+const getSetting = async (key, fallback = '') => {
+    const [[r]] = await db.query('SELECT value FROM platform_settings WHERE setting_key = ?', [key]);
+    return r?.value ?? fallback;
+};
+const mediaHeaderEnabled = async () => String(await getSetting('whatsapp_media_header_enabled', 'false')).toLowerCase() === 'true';
+
+const HEADER_RULES = {   // template header type -> allowed extensions and size cap (Meta's limits)
+    image:    { exts: ['.jpg', '.jpeg', '.png'], max: 5 * 1024 * 1024,  label: 'a JPG or PNG up to 5 MB' },
+    video:    { exts: ['.mp4'],                  max: 16 * 1024 * 1024, label: 'an MP4 up to 16 MB' },
+    document: { exts: ['.pdf'],                  max: 16 * 1024 * 1024, label: 'a PDF up to 16 MB' },
+};
+
+exports.uploadWAMedia = async (req, res) => {
+    const file = req.file;
+    const fail = (code, message) => { if (file) safeUnlink(file.path); return res.status(code).json({ success: false, message }); };
+    try {
+        if (!file) return res.status(422).json({ success: false, message: 'No file uploaded.' });
+        if (!(await mediaHeaderEnabled())) return fail(403, 'Media in WhatsApp templates is switched off. An admin can turn it on in Platform Settings.');
+        const [[c]] = await db.query(
+            `SELECT c.id, c.created_by, c.status, c.header_media_path, t.header_type
+             FROM outreach_campaigns c LEFT JOIN whatsapp_templates t ON t.id = c.whatsapp_template_id
+             WHERE c.id = ? AND c.campaign_type = 'whatsapp' AND c.deleted_at IS NULL`, [req.params.id]);
+        if (!c) return fail(404, 'Campaign not found.');
+        if (req.user.role === 'hr_staff' && c.created_by !== req.user.id) return fail(403, 'Access denied.');
+        if (!['draft', 'scheduled'].includes(c.status)) return fail(422, 'Media can only be changed before the campaign is sent.');
+        const rule = HEADER_RULES[c.header_type];
+        if (!rule) return fail(422, 'This template has no image, video or document header, so there is nowhere to put a file.');
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (!rule.exts.includes(ext)) return fail(422, `This template needs ${rule.label}.`);
+        if (file.size > rule.max) return fail(422, `This template needs ${rule.label}.`);
+        const check = classifyCampaignUpload(file);
+        if (check.error) return res.status(422).json({ success: false, message: check.error });
+
+        if (c.header_media_path) safeUnlink(c.header_media_path);
+        const token = crypto.randomBytes(24).toString('base64url');
+        await db.query(
+            'UPDATE outreach_campaigns SET header_media_path = ?, header_media_mime = ?, header_media_name = ?, header_media_token = ? WHERE id = ?',
+            [file.path, check.mime, file.originalname.slice(0, 250), token, c.id]);
+        res.json({ success: true, message: 'Media saved.', data: { name: file.originalname, mime: check.mime, size: file.size } });
+    } catch (err) {
+        if (file) safeUnlink(file.path);
+        console.error('[whatsapp.uploadMedia]', err);
+        res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+exports.deleteWAMedia = async (req, res) => {
+    try {
+        const [[c]] = await db.query(
+            "SELECT id, created_by, status, header_media_path FROM outreach_campaigns WHERE id = ? AND campaign_type = 'whatsapp' AND deleted_at IS NULL", [req.params.id]);
+        if (!c) return res.status(404).json({ success: false, message: 'Campaign not found.' });
+        if (req.user.role === 'hr_staff' && c.created_by !== req.user.id) return res.status(403).json({ success: false, message: 'Access denied.' });
+        if (!['draft', 'scheduled'].includes(c.status)) return res.status(422).json({ success: false, message: 'Media can only be changed before the campaign is sent.' });
+        if (c.header_media_path) safeUnlink(c.header_media_path);
+        await db.query('UPDATE outreach_campaigns SET header_media_path = NULL, header_media_mime = NULL, header_media_name = NULL, header_media_token = NULL WHERE id = ?', [c.id]);
+        res.json({ success: true, message: 'Media removed.' });
+    } catch (err) {
+        console.error('[whatsapp.deleteMedia]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
@@ -328,10 +405,19 @@ async function sendWABatch(campaign, template, contacts) {
         const byPhone = {};
         for (const { contact, phone } of batch) byPhone[phone.replace('+', '')] = contact;
 
+        // Optional header media (see the UNVERIFIED note above). The link is public, random and long.
+        const extra = {};
+        if (campaign.header_media_token && await mediaHeaderEnabled()) {
+            const param = (await getSetting('vaartabot_media_param', 'headerMediaUrl')).replace(/[^\w]/g, '') || 'headerMediaUrl';
+            extra[param] = fileLinkUrl(campaign.header_media_token);
+            extra.headerMediaType = template.header_type;
+            extra.headerMediaFilename = campaign.header_media_name;
+        }
+
         try {
             const response = await axios.post(
                 `${baseUrl}/messages/bulk-send`,
-                { templateName: template.template_name, recipients },
+                { templateName: template.template_name, ...extra, recipients },
                 { headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' } }
             );
 
