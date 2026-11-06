@@ -26,14 +26,19 @@ cp .env.deploy .env.production.local
 trap 'rm -f .env.deploy .env.production.local' EXIT
 npm ci --no-audit --no-fund
 npm run build
-test -f dist/index.html && test -f dist/about/index.html
+test -f dist/index.html && test -f dist/about/index.html && test -f dist/app.html
+# Never ship a build that talks to a local API (this broke every portal sign-in on 4 Nov 2026).
+if ! grep -q 'theladderconsulting.com/api' dist/assets/index-*.js || grep -q 'http://localhost' .env.deploy; then
+  echo "Refusing to deploy: VITE_API_URL must be https://theladderconsulting.com/api (check $APP/.env on the server)"; exit 1
+fi
+chmod -R a+rX dist
 
 echo "3/5 Uploading"
-tar czf /tmp/ladder-dist.tgz dist
+tar czf /tmp/ladder-dist.tgz --mode='u+rwX,go+rX' dist
 scp -i "$KEY" -o BatchMode=yes /tmp/ladder-dist.tgz "$HOST:/tmp/ladder-dist.tgz"
 
 echo "4/5 Swapping in the new build (old one is kept as dist.bak-$STAMP)"
-"${SSH[@]}" "$HOST" "set -e; cd $APP; rm -rf /tmp/newdist; mkdir /tmp/newdist; tar xzf /tmp/ladder-dist.tgz -C /tmp/newdist; test -f /tmp/newdist/dist/index.html; mv dist dist.bak-$STAMP; mv /tmp/newdist/dist dist"
+"${SSH[@]}" "$HOST" "set -e; cd $APP; rm -rf /tmp/newdist; mkdir /tmp/newdist; tar xzf /tmp/ladder-dist.tgz -C /tmp/newdist --no-same-owner; chmod -R a+rX /tmp/newdist/dist; test -f /tmp/newdist/dist/index.html; mv dist dist.bak-$STAMP; mv /tmp/newdist/dist dist"
 
 echo "5/5 Checking the live site"
 for p in / /about/ /login; do printf '%s -> ' "$p"; curl -sSL -o /dev/null -w '%{http_code}\n' "https://theladderconsulting.com$p"; done
