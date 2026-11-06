@@ -684,9 +684,6 @@ ssh -i ladder-key.pem ubuntu@13.203.48.124 "
 
 ---
 
-## Known Test Accounts (dev)
+## Test Accounts (dev)
 
-| Email | Role | Password |
-|-------|------|----------|
-| admin@theladderconsulting.com | admin | LadderAdmin@milarch |
-| test@test.com | hr_staff | Test@123 |
+Test logins are not listed here (this repo is public). Staff sign in with Microsoft SSO; ask the owner for a dev account, or create one in the dev database with an admin session. Never commit passwords, keys or tokens.
