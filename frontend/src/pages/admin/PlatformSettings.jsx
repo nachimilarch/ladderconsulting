@@ -35,6 +35,17 @@ const PLATFORM_SETTINGS = {
         description: 'Lets outreach staff use the AI Studio writing tools (campaign emails, subject lines, follow-ups, WhatsApp templates, reply drafts, call scripts, insights). Contact analysis, copy checks and the planner always work. Turn off if the AI server is overloaded.',
         type: 'toggle',
     },
+    whatsapp_media_header_enabled: {
+        label: 'WhatsApp Media In Templates (Not Verified)',
+        description: 'Lets a WhatsApp campaign add a picture, video or PDF to a template that has a media header. Vaartabot does not publish how to send media, so this has NOT been tested against their service. Leave off until you have sent one campaign to your own number and seen the picture arrive. If it does not, the field name below may need changing (ask Vaartabot support).',
+        type: 'toggle',
+    },
+    vaartabot_media_param: {
+        label: 'Vaartabot Media Field Name',
+        description: 'The name of the field Vaartabot expects for the media link in a bulk send. Default: headerMediaUrl. Only change this on Vaartabot support\'s advice.',
+        type: 'text',
+        placeholder: 'headerMediaUrl',
+    },
     campaign_scheduler_enabled: {
         label: 'Send Scheduled Campaigns Automatically',
         description: 'When on, campaigns scheduled for a future time send by themselves at that time. Turn off to hold every scheduled campaign (nothing is lost; turn it back on and due campaigns send).',

@@ -1,3 +1,4 @@
+import { CAMPAIGN_ACCEPT } from '../../utils/attachmentRules';
 import { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -73,7 +74,7 @@ function AttachmentsPanel({ campaignId, editable }) {
     return (
         <div className="pt-3 border-t border-gray-50">
             <div className="flex items-center justify-between mb-2">
-                <p className="text-xs text-gray-400 font-medium">Attachments (sent with every email)</p>
+                <p className="text-xs text-gray-400 font-medium">Attachments and files (sent with every email)</p>
                 {editable && (
                     <>
                         <button
@@ -87,7 +88,7 @@ function AttachmentsPanel({ campaignId, editable }) {
                         <input
                             ref={fileInputRef}
                             type="file"
-                            accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx"
+                            accept={CAMPAIGN_ACCEPT}
                             className="hidden"
                             onChange={handleFileChange}
                         />
@@ -95,7 +96,7 @@ function AttachmentsPanel({ campaignId, editable }) {
                 )}
             </div>
             {attachments.length === 0 ? (
-                <p className="text-xs text-gray-300 italic">{editable ? 'No attachments yet — click "+ Add File" to attach a PDF or image.' : 'No attachments.'}</p>
+                <p className="text-xs text-gray-300 italic">{editable ? 'No attachments yet — click "+ Add File". PDFs, images, Word, Excel and PowerPoint (small ones) are attached; video, audio and big files (up to 25 MB) go as a download link.' : 'No attachments.'}</p>
             ) : (
                 <ul className="space-y-1.5">
                     {attachments.map(a => (
@@ -103,6 +104,7 @@ function AttachmentsPanel({ campaignId, editable }) {
                             <span className="text-sm">{FILE_ICON[a.mime_type] || '📎'}</span>
                             <span className="text-xs text-gray-700 flex-1 truncate">{a.file_name}</span>
                             <span className="text-xs text-gray-400 shrink-0">{formatSize(a.file_size)}</span>
+                            {a.delivery === 'link' && <span className="text-[10px] font-medium text-indigo-600 bg-indigo-50 rounded px-1.5 py-0.5 shrink-0" title="Too big or a video/audio file: readers get a secure download link at the bottom of the email">sent as link</span>}
                             {editable && (
                                 <button
                                     onClick={() => handleRemove(a.id, a.file_name)}

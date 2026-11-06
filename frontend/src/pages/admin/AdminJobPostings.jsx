@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import toast from 'react-hot-toast';
 import { adminJobAPI } from '../../api/admin';
+import JobApplicantsModal from '../../components/hr/JobApplicantsModal';
 
 // Statuses an admin can set. `pending_payment` is system-controlled — a job is
 // created that way when a Standard company hasn't paid its ₹3,999 posting fee
@@ -23,6 +24,7 @@ export default function AdminJobPostings() {
     const [search, setSearch]     = useState('');
     const [statusFilter, setStatusFilter] = useState('');
     const [updating, setUpdating] = useState(null); // job id being updated
+    const [applicantsJob, setApplicantsJob] = useState(null);
 
     const load = useCallback(() => {
         setLoading(true);
@@ -129,7 +131,11 @@ export default function AdminJobPostings() {
                                         <span className="text-gray-400">{job.work_mode}</span>
                                     </td>
                                     <td className="px-4 py-3 text-gray-500">{job.location || '—'}</td>
-                                    <td className="px-4 py-3 text-gray-600">{job.applicant_count}</td>
+                                    <td className="px-4 py-3 text-gray-600">
+                                        {job.applicant_count > 0
+                                            ? <button onClick={() => setApplicantsJob(job.id)} className="text-indigo-600 font-medium hover:underline">{job.applicant_count} · View</button>
+                                            : '0'}
+                                    </td>
                                     <td className="px-4 py-3 text-xs">
                                         {job.company_tier === 'premium' ? (
                                             <span className="text-gray-500">Included</span>
@@ -183,6 +189,8 @@ export default function AdminJobPostings() {
                     </table>
                 </div>
             )}
+
+            {applicantsJob && <JobApplicantsModal jobId={applicantsJob} onClose={() => { setApplicantsJob(null); load(); }} />}
         </div>
     );
 }

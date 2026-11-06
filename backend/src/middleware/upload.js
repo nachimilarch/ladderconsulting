@@ -65,16 +65,17 @@ const attachStorage = multer.diskStorage({
 });
 
 const attachFilter = (req, file, cb) => {
-    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.doc', '.docx'];
+    const allowed = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx',
+        '.mp4', '.mov', '.webm', '.mp3', '.m4a', '.wav'];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowed.includes(ext)) cb(null, true);
-    else cb(new Error('Only PDF, images (JPG, PNG, GIF), and Word documents are allowed'), false);
+    else cb(new Error('Allowed: PDF, images, Word, Excel, PowerPoint, video (MP4, MOV, WebM) and audio (MP3, M4A, WAV)'), false);
 };
 
 const uploadCampaignAttachment = multer({
     storage: attachStorage,
     fileFilter: attachFilter,
-    limits: { fileSize: 10 * 1024 * 1024 },
+    limits: { fileSize: 25 * 1024 * 1024 },
 });
 
 module.exports = { uploadResume, uploadDocument, uploadCampaignAttachment };

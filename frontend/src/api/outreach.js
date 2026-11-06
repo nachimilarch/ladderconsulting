@@ -57,6 +57,8 @@ export const waCampaignAPI = {
     failedLogs: (id)     => api.get(`/outreach/whatsapp-campaigns/${id}/failed`),
     send:       (id)     => api.post(`/outreach/whatsapp-campaigns/${id}/send`),
     remove:     (id)     => api.delete(`/outreach/whatsapp-campaigns/${id}`),
+    uploadMedia: (id, file) => { const fd = new FormData(); fd.append('file', file); return api.post(`/outreach/whatsapp-campaigns/${id}/media`, fd, { headers: { 'Content-Type': 'multipart/form-data' } }); },
+    removeMedia: (id)    => api.delete(`/outreach/whatsapp-campaigns/${id}/media`),
     schedule:   (id, scheduled_at) => api.patch(`/outreach/whatsapp-campaigns/${id}/schedule`, { scheduled_at }),
 };
 

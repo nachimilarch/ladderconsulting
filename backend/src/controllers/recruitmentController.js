@@ -7,6 +7,7 @@ const { parseFullProfile } = require('../utils/aiParser');
 const { parseRecruiterFilename, isNoiseName, chooseName } = require('../utils/resumeParser');
 const matchingService = require('../services/matchingService');
 const { isCandidateHired } = require('../utils/candidateStatus');
+const { getDeleteBlockers, describeBlockers } = require('../utils/candidateDeletion');
 
 const notify = async (userId, type, title, body, metadata = null) => {
     if (!userId) return;
@@ -888,6 +889,10 @@ exports.deleteCandidate = async (req, res) => {
             [candidateId]
         );
         if (hired) return res.status(409).json({ success: false, message: 'Cannot delete a candidate who has been hired.' });
+
+        // Also keep anyone who holds an open offer or has an interview coming up
+        const blockedReason = describeBlockers(await getDeleteBlockers(candidateId));
+        if (blockedReason) return res.status(409).json({ success: false, message: blockedReason });
 
         const [resumeRows] = await db.query(
             `SELECT id, file_key FROM resumes WHERE candidate_id = ? AND deleted_at IS NULL`,

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { waCampaignAPI, waTemplateAPI, contactListAPI } from '../../api/outreach';
 import { toIso } from '../../utils/schedule';
@@ -8,10 +8,11 @@ const CONTACT_FIELDS = ['first_name','full_name','company_name','designation','c
 
 export default function WhatsAppCampaignNew() {
     const navigate   = useNavigate();
+    const [sp]       = useSearchParams();
     const [lists, setLists]         = useState([]);
     const [templates, setTemplates] = useState([]);
     const [selectedTemplate, setSelectedTemplate] = useState(null);
-    const [form, setForm]           = useState({ campaign_name:'', list_id:'', whatsapp_template_id:'', scheduled_at:'' });
+    const [form, setForm]           = useState({ campaign_name:'', list_id: sp.get('list') || '', whatsapp_template_id:'', scheduled_at:'' });
     const [varMapping, setVarMapping] = useState({});
     const [saving, setSaving]       = useState(false);
 

@@ -650,6 +650,26 @@ ssh -i ladder-key.pem ubuntu@13.203.48.124 "
 
 ---
 
+## Portal updates (6 Nov 2026)
+
+**Outreach contacts by hand.** `POST /outreach/contact-lists` (empty list), `PUT /contact-lists/:id`, `POST /contact-lists/:id/contacts` (one), `.../contacts/bulk` (pasted rows, max 500), `PUT|DELETE /outreach/contacts/:id`, `POST /contact-lists/:id/contacts/delete` (ids, max 1000). HR sees only their own lists; admin all. UI: ContactLists ("+ New List"), ContactListDetail (add, paste several, edit, delete, bulk delete).
+
+**Campaign deletion.** `DELETE /outreach/email-campaigns/:id` and `/whatsapp-campaigns/:id` now work for any status except `sending` (a send stuck >2 h counts as dead). Soft delete; replies, leads and logs stay; public file links of a deleted campaign stop working.
+
+**Failed upload review** (Resume Sourcing > Failed Uploads tab, `components/hr/FailedUploadsPanel.jsx`). `GET /recruitment/failed-uploads` (failed + stuck items), `GET /recruitment/upload-items/:id/download`, `DELETE /recruitment/upload-items/:id`, `POST /recruitment/upload-items/delete` (`{ids}` or `{all:true}`). Deleting removes the file unless a resume record uses it, then recounts the batch.
+
+**Candidate management** (`controllers/candidateManagementController.js`, routes under `/api/recruitment`, hr_staff + admin). Admin may manage any candidate. HR may manage only candidates they sourced (`candidates.created_by_user_id`, an application with `sourced_by`, or a resume upload they made) and only until the candidate signs in. Endpoints: `GET /jobs/:jobId/applicants`, `GET /my-candidates` (`?scope=registered` = self-registered candidates, view + open resume only), `POST /candidates` (multipart, optional resume pre-fills blank fields, optional `job_id`), `GET|PUT /candidates/:id/manage`, `POST /candidates/:id/resume`, `DELETE /candidates/:id/applications/:appId`, `POST /candidates/message-list`. UI: HR sidebar "Candidates" (`pages/hr/Candidates.jsx`), shared `components/hr/CandidateEditor.jsx` (also used in Admin > Candidates), `JobApplicantsModal` (Admin > Job Postings and Resume Sourcing JD card). Admin candidate detail now lists resumes with a View button. `DELETE /recruitment/candidates/:id` also refuses candidates with an open offer or upcoming interview.
+
+**Message selected candidates.** Tick candidates (HR Candidates, applicants list, Admin Candidates) > `MessageCandidatesBar` > `POST /recruitment/candidates/message-list` builds an outreach contact list (source `candidate_selection`, carries over unsubscribes) and opens `/outreach/email/new?list=ID` or `/outreach/whatsapp/new?list=ID`. Nothing is sent until the user presses Send in the campaign.
+
+**Email attachments.** Types: PDF, images, Word, Excel, PowerPoint, MP4/MOV/WebM, MP3/M4A/WAV, up to 25 MB each. `utils/attachments.classifyCampaignUpload` decides `delivery`: small documents that fit the 2.5 MB mail budget are real attachments; video/audio and anything bigger become a secure link (`outreach_campaign_attachments.delivery='link'` + `share_token`), appended to every email by `linkBlockHtml` and served without sign-in at `GET /api/outreach/files/:token` (Range supported). Max 5 link files per campaign. Needs nginx `client_max_body_size 30M` (`deploy/nginx.conf`).
+
+**WhatsApp media in template header - NOT VERIFIED with Vaartabot.** Off by default (`platform_settings.whatsapp_media_header_enabled`). When on, a draft/scheduled campaign whose template has an image/video/document header can take one file (`POST|DELETE /outreach/whatsapp-campaigns/:id/media`); the send adds `headerMediaUrl` (name from `vaartabot_media_param`), `headerMediaType`, `headerMediaFilename` to the bulk-send body. Vaartabot's real field names were not found; test with your own number before relying on it.
+
+**Migrations to run on production (in order, once):** `candidate_management.sql`, `email_attachment_links.sql`, `whatsapp_campaign_media.sql` (the other two outreach attachment tables must already exist: `campaign_attachments.sql`).
+
+---
+
 ## Known Open Items
 
 1. **Scheduled campaign sending** — `scheduled_at` stored but no cron auto-triggers

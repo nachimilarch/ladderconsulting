@@ -25,7 +25,7 @@ export default function EmailCampaignNew() {
     const [report, setReport]         = useState(null);
     const [form, setForm]             = useState({
         campaign_name: '',
-        list_id:       '',
+        list_id:       sp.get('list') || '',
         subject:       '',
         message_body:  '',
         from_name:     '',
@@ -226,7 +226,7 @@ export default function EmailCampaignNew() {
                 {!editId && (
                     <div>
                         <label className="block text-xs font-semibold text-gray-600 mb-1">Attachments</label>
-                        <PendingFiles files={files} onChange={setFiles} includedBytes={tplBytes} disabled={saving} />
+                        <PendingFiles files={files} onChange={setFiles} includedBytes={tplBytes} disabled={saving} campaign />
                     </div>
                 )}
 

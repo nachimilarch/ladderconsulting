@@ -2,7 +2,10 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { adminCandidateAPI } from '../../api/admin';
 import toast from 'react-hot-toast';
+import { recruitmentAPI } from '../../api/recruitment';
 import { CandidateOriginLine, OriginFilters } from '../../components/hr/CandidateOrigin';
+import CandidateEditor from '../../components/hr/CandidateEditor';
+import MessageCandidatesBar from '../../components/hr/MessageCandidatesBar';
 
 const statusBadge = (s) => {
     const map = { active: 'bg-green-100 text-green-700', suspended: 'bg-red-100 text-red-700' };
@@ -44,6 +47,9 @@ export default function CandidateManagement() {
     const [selected, setSelected] = useState(null);
     const [actionModal, setActionModal] = useState(null);
     const [deleteOpen, setDeleteOpen] = useState(false);
+    const [picked, setPicked] = useState(new Set());
+    const togglePick = (id) => setPicked((p) => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    const [editor, setEditor] = useState(undefined); // undefined closed, null new, number = candidates.id
     const [deleting, setDeleting] = useState(false);
     const [reason, setReason] = useState('');
     const [saving, setSaving] = useState(false);
@@ -115,6 +121,15 @@ export default function CandidateManagement() {
         }
     };
 
+    const openResume = async (id) => {
+        try {
+            const res = await recruitmentAPI.downloadResume(id);
+            window.open(URL.createObjectURL(new Blob([res.data], { type: res.headers['content-type'] || 'application/pdf' })), '_blank');
+        } catch {
+            toast.error('The resume file could not be opened.');
+        }
+    };
+
     const handleDelete = async () => {
         if (!selected) return;
         setDeleting(true);
@@ -133,11 +148,16 @@ export default function CandidateManagement() {
 
     return (
         <div className="p-4 sm:p-6 lg:p-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-1">Candidate Management</h2>
+            <div className="flex items-center justify-between gap-3 mb-1">
+                <h2 className="text-2xl font-bold text-gray-800">Candidate Management</h2>
+                <button onClick={() => setEditor(null)} className="bg-indigo-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-indigo-700">+ Add candidate</button>
+            </div>
             <p className="text-sm text-gray-500 mb-5">
                 Candidates who registered and log in themselves can tell us whether they are looking for a job.
                 Candidates our executives sourced from resumes have never logged in.
             </p>
+
+            <MessageCandidatesBar ids={[...picked]} onClear={() => setPicked(new Set())} />
 
             <OriginFilters origin={origin} onOrigin={withFirstPage(setOrigin)} availability={availability} onAvailability={withFirstPage(setAvailability)} counts={counts} />
 
@@ -180,6 +200,11 @@ export default function CandidateManagement() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 border-b">
                                 <tr>
+                                    <th className="px-3 py-3 w-8">
+                                        <input type="checkbox" aria-label="Select all on this page"
+                                            checked={candidates.length > 0 && candidates.every((c) => picked.has(c.candidate_id))}
+                                            onChange={() => setPicked(candidates.every((c) => picked.has(c.candidate_id)) ? new Set() : new Set(candidates.filter((c) => c.candidate_id).map((c) => c.candidate_id)))} />
+                                    </th>
                                     {['Name', 'Origin · job status · last login', 'Location', 'Applications', 'Plan', 'Status', ''].map((h) => (
                                         <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase">{h}</th>
                                     ))}
@@ -188,6 +213,9 @@ export default function CandidateManagement() {
                             <tbody className="divide-y divide-gray-100">
                                 {(Array.isArray(candidates) ? candidates : []).map((c) => (
                                     <tr key={c.id} className="hover:bg-gray-50 cursor-pointer" onClick={() => openDetail(c.id)}>
+                                        <td className="px-3 py-3" onClick={(e) => e.stopPropagation()}>
+                                            {c.candidate_id && <input type="checkbox" aria-label="Select candidate" checked={picked.has(c.candidate_id)} onChange={() => togglePick(c.candidate_id)} />}
+                                        </td>
                                         <td className="px-4 py-3">
                                             <p className="font-medium text-gray-800">{c.full_name || '—'}</p>
                                             <p className="text-xs text-gray-400">{c.email}</p>
@@ -287,7 +315,31 @@ export default function CandidateManagement() {
                             </div>
                         )}
 
+                        <div className="mb-4">
+                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1.5">Resumes</p>
+                            {(selected.resumes || []).length === 0 ? (
+                                <p className="text-sm text-gray-400">No resume uploaded.</p>
+                            ) : (
+                                <ul className="text-sm space-y-1">
+                                    {selected.resumes.map((r) => (
+                                        <li key={r.id} className="flex items-center justify-between">
+                                            <span className="truncate">{r.file_name}{r.is_primary ? ' (current)' : ''}</span>
+                                            <button onClick={() => openResume(r.id)} className="text-xs text-indigo-600 hover:underline shrink-0 ml-3">View</button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </div>
+
                         <div className="flex flex-wrap gap-2 mt-2">
+                            {selected.candidate_id && (
+                                <button
+                                    onClick={() => setEditor(selected.candidate_id)}
+                                    className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-xs rounded hover:bg-indigo-100 border border-indigo-200"
+                                >
+                                    Edit details / resume / JDs
+                                </button>
+                            )}
                             {selected.candidate_id && (
                                 <Link
                                     to={`/hr/candidates/${selected.candidate_id}/documents`}
@@ -404,6 +456,14 @@ export default function CandidateManagement() {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {editor !== undefined && (
+                <CandidateEditor
+                    candidateId={editor}
+                    onClose={() => setEditor(undefined)}
+                    onChanged={() => { load(); if (selected) openDetail(selected.id); }}
+                />
             )}
         </div>
     );

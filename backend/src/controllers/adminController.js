@@ -512,8 +512,11 @@ exports.getCandidateDetail = async (req, res) => {
             [cand.id]
         ) : [[]];
 
+        const [resumes] = cand ? await db.query(
+            `SELECT id, file_name, file_size, is_primary, created_at FROM resumes
+             WHERE candidate_id = ? AND deleted_at IS NULL ORDER BY is_primary DESC, created_at DESC`, [cand.id]) : [[]];
         const deleteBlockers = await getDeleteBlockers(cand?.id);
-        res.json({ success: true, data: { ...user, candidate_id: cand?.id ?? null,
+        res.json({ success: true, data: { ...user, candidate_id: cand?.id ?? null, resumes,
             delete_blocked_reason: describeBlockers(deleteBlockers), premium_request: premiumRequest || null, ai_subscription: aiSubscription || null, applications, skills: skills.map(s => s.name), training, certificates: certs, application_count: applications.length, training_count: training.length, certificate_count: certs.length } });
     } catch (err) {
         console.error('getCandidateDetail:', err);

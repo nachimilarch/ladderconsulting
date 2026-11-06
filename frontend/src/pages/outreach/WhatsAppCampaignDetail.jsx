@@ -57,6 +57,21 @@ export default function WhatsAppCampaignDetail() {
         }
     };
 
+    const handleMedia = async (e) => {
+        const file = e.target.files?.[0];
+        e.target.value = '';
+        if (!file) return;
+        try {
+            await waCampaignAPI.uploadMedia(id, file);
+            toast.success('Media saved'); fetch();
+        } catch (err) { toast.error(err.response?.data?.message || 'Upload failed'); }
+    };
+
+    const handleRemoveMedia = async () => {
+        try { await waCampaignAPI.removeMedia(id); toast.success('Media removed'); fetch(); }
+        catch (err) { toast.error(err.response?.data?.message || 'Could not remove'); }
+    };
+
     const handleSend = async () => {
         if (!confirm('Send this WhatsApp campaign?')) return;
         try {
@@ -83,6 +98,26 @@ export default function WhatsAppCampaignDetail() {
                 <div className="mb-4 rounded-xl border border-purple-200 bg-purple-50 px-4 py-3 flex items-center justify-between gap-3 flex-wrap">
                     <p className="text-sm text-purple-800">🗓 Scheduled: sends by itself on <b>{fmtIst(campaign.scheduled_at)}</b></p>
                     <button onClick={handleUnschedule} className="text-xs font-semibold text-purple-700 underline">Cancel schedule</button>
+                </div>
+            )}
+
+            {campaign.media_header_enabled && ['image', 'video', 'document'].includes(campaign.template_header_type) && (
+                <div className="mb-4 rounded-xl border border-gray-200 bg-white px-4 py-3">
+                    <p className="text-sm font-medium text-gray-700 mb-1">
+                        Template {campaign.template_header_type}
+                        <span className="ml-2 text-[10px] font-medium text-amber-700 bg-amber-50 rounded px-1.5 py-0.5">not verified with Vaartabot</span>
+                    </p>
+                    <p className="text-xs text-gray-500 mb-2">
+                        This template has a {campaign.template_header_type} header. {campaign.template_header_type === 'image' ? 'JPG or PNG, up to 5 MB.' : campaign.template_header_type === 'video' ? 'MP4, up to 16 MB.' : 'PDF, up to 16 MB.'}
+                        {' '}Send a test to your own number first.
+                    </p>
+                    {campaign.has_header_media ? (
+                        <p className="text-sm text-green-700">✓ File added
+                            {['draft', 'scheduled'].includes(campaign.status) && <button onClick={handleRemoveMedia} className="ml-3 text-xs text-red-500 hover:underline">Remove</button>}
+                        </p>
+                    ) : ['draft', 'scheduled'].includes(campaign.status) ? (
+                        <input type="file" accept={campaign.template_header_type === 'image' ? '.jpg,.jpeg,.png' : campaign.template_header_type === 'video' ? '.mp4' : '.pdf'} onChange={handleMedia} className="text-sm" />
+                    ) : <p className="text-sm text-gray-400">No file was added.</p>}
                 </div>
             )}
 

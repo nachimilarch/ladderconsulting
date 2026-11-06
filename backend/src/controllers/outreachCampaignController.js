@@ -1,9 +1,10 @@
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const db = require('../config/db');
 const { getTransporter, getDefaultFrom, getDomain, replaceMergeTags, buildReplyToAddress } = require('../utils/outreachEmail');
 const { logAction } = require('../utils/auditLog');
-const { checkUploadedFile, copyStoredFile, safeUnlink } = require('../utils/attachments');
+const { checkUploadedFile, classifyCampaignUpload, copyStoredFile, safeUnlink, linkBlockHtml } = require('../utils/attachments');
 
 const ip = (req) => req.headers['x-forwarded-for']?.split(',')[0].trim() || req.socket?.remoteAddress || null;
 
@@ -275,11 +276,13 @@ async function sendEmailBatch(campaign, contacts, senderUserId) {
 
     // Load attachments once for the whole campaign send
     const [attachRows] = await db.query(
-        'SELECT file_name, file_path, mime_type FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL',
+        'SELECT file_name, file_path, mime_type, file_size, delivery, share_token FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL',
         [campaign.id]
     );
+    // Big files / video / audio travel as a download link at the bottom of the email.
+    const linkBlock = linkBlockHtml(attachRows.filter(a => a.delivery === 'link' && a.share_token && fs.existsSync(a.file_path)));
     const graphAttachments = attachRows
-        .filter(a => fs.existsSync(a.file_path))
+        .filter(a => a.delivery !== 'link' && fs.existsSync(a.file_path))
         .map(a => ({
             name:         a.file_name,
             contentType:  a.mime_type,
@@ -298,7 +301,7 @@ async function sendEmailBatch(campaign, contacts, senderUserId) {
 
         const batch = contacts.slice(i, i + BATCH_SIZE);
         await Promise.all(batch.map(contact => sendOneEmail(
-            transporter, campaign, contact, replyToAddr, domain, executiveName, graphAttachments
+            transporter, campaign, contact, replyToAddr, domain, executiveName, graphAttachments, linkBlock
         ).then(async (msgId) => {
             sent++;
             await db.query(
@@ -352,7 +355,7 @@ function extractFirstEmail(raw) {
     return matches?.[0] ?? null;
 }
 
-async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain, executiveName, attachments = []) {
+async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain, executiveName, attachments = [], linkBlock = '') {
     const toEmail = extractFirstEmail(contact.email);
     if (!toEmail) throw new Error(`No valid email address for contact ${contact.id}: "${contact.email}"`);
 
@@ -371,7 +374,7 @@ async function sendOneEmail(transporter, campaign, contact, replyToAddr, domain,
         from:     `"${campaign.from_name}" <${campaign.from_email}>`,
         to:       toEmail,
         subject:  subjectFinal,
-        html:     htmlBody,
+        html:     htmlBody + linkBlock,
         messageId: msgId,
         replyTo:  replyToAddr,
         headers: {
@@ -543,7 +546,7 @@ exports.listCampaignAttachments = async (req, res) => {
         const camp = await getCampOrFail(req.params.id, req.user.id, req.user.role, res);
         if (!camp) return;
         const [rows] = await db.query(
-            'SELECT id, file_name, mime_type, file_size, created_at FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL ORDER BY id ASC',
+            'SELECT id, file_name, mime_type, file_size, delivery, created_at FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL ORDER BY id ASC',
             [camp.id]
         );
         res.json({ success: true, data: rows });
@@ -560,17 +563,20 @@ exports.uploadCampaignAttachment = async (req, res) => {
         if (!req.file) return res.status(422).json({ success: false, message: 'No file uploaded.' });
 
         const [[tot]] = await db.query(
-            'SELECT COALESCE(SUM(file_size),0) AS bytes FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL',
+            `SELECT COALESCE(SUM(CASE WHEN delivery = 'attach' THEN file_size ELSE 0 END), 0) AS bytes,
+                    COALESCE(SUM(delivery = 'link'), 0) AS links
+             FROM outreach_campaign_attachments WHERE campaign_id = ? AND deleted_at IS NULL`,
             [camp.id]
         );
-        const check = checkUploadedFile(req.file, Number(tot.bytes));
+        const check = classifyCampaignUpload(req.file, { attachBytes: Number(tot.bytes), linkCount: Number(tot.links) });
         if (check.error) return res.status(422).json({ success: false, message: check.error });
 
+        const token = check.delivery === 'link' ? crypto.randomBytes(24).toString('base64url') : null;
         const [result] = await db.query(
-            'INSERT INTO outreach_campaign_attachments (campaign_id, file_name, file_path, mime_type, file_size) VALUES (?, ?, ?, ?, ?)',
-            [camp.id, req.file.originalname, req.file.path, check.mime, req.file.size]
+            'INSERT INTO outreach_campaign_attachments (campaign_id, file_name, file_path, mime_type, file_size, delivery, share_token) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [camp.id, req.file.originalname, req.file.path, check.mime, req.file.size, check.delivery, token]
         );
-        res.json({ success: true, data: { id: result.insertId, file_name: req.file.originalname, mime_type: check.mime, file_size: req.file.size } });
+        res.json({ success: true, data: { id: result.insertId, file_name: req.file.originalname, mime_type: check.mime, file_size: req.file.size, delivery: check.delivery } });
     } catch (err) {
         if (req.file) safeUnlink(req.file.path);
         console.error('[uploadCampaignAttachment]', err);
@@ -597,5 +603,38 @@ exports.deleteCampaignAttachment = async (req, res) => {
     } catch (err) {
         console.error('[deleteCampaignAttachment]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
+    }
+};
+
+
+// ── GET /api/outreach/files/:token — download link inside a campaign email (no sign-in) ─────────
+// The token is long and random. The link stops working when the file or the campaign is deleted.
+exports.serveEmailFile = async (req, res) => {
+    try {
+        const token = String(req.params.token || '');
+        if (!/^[\w-]{20,64}$/.test(token)) return res.status(404).send('Not found');
+        let [[row]] = await db.query(
+            `SELECT a.file_name, a.file_path, a.mime_type
+             FROM outreach_campaign_attachments a
+             JOIN outreach_campaigns c ON c.id = a.campaign_id AND c.deleted_at IS NULL
+             WHERE a.share_token = ? AND a.delivery = 'link' AND a.deleted_at IS NULL`, [token]);
+        // Not an email file? It may be the header media of a WhatsApp campaign.
+        if (!row) {
+            [[row]] = await db.query(
+                `SELECT header_media_name AS file_name, header_media_path AS file_path, header_media_mime AS mime_type
+                 FROM outreach_campaigns WHERE header_media_token = ? AND deleted_at IS NULL`, [token]);
+        }
+        if (!row || !fs.existsSync(row.file_path)) return res.status(404).send('This file is no longer available.');
+        const inline = /^(video|audio|image)\//.test(row.mime_type) || row.mime_type === 'application/pdf';
+        const safeName = path.basename(row.file_name).replace(/[^\w.\- ()]+/g, '_').slice(0, 120) || 'file';
+        res.setHeader('Content-Type', row.mime_type);
+        res.setHeader('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${safeName}"`);
+        res.setHeader('X-Content-Type-Options', 'nosniff');
+        res.setHeader('Content-Security-Policy', "default-src 'none'; media-src 'self'; style-src 'unsafe-inline'; sandbox");
+        res.setHeader('Cache-Control', 'private, max-age=600');
+        res.sendFile(path.resolve(row.file_path));   // supports Range requests, so video can be played and skipped through
+    } catch (err) {
+        console.error('[serveEmailFile]', err.message);
+        if (!res.headersSent) res.status(500).send('Server error');
     }
 };
