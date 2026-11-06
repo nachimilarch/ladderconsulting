@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { contactListAPI } from '../../api/outreach';
 
@@ -17,6 +17,10 @@ export default function ContactLists() {
     const [showUploadForm, setShowUploadForm] = useState(false);
     const [form, setForm]           = useState({ list_name: '', description: '', file: null });
     const fileRef                   = useRef();
+    const navigate                  = useNavigate();
+    const [showNewForm, setShowNewForm] = useState(false);
+    const [newList, setNewList]      = useState({ list_name: '', description: '' });
+    const [creating, setCreating]    = useState(false);
 
     const fetchLists = () => {
         setLoading(true);
@@ -63,6 +67,20 @@ export default function ContactLists() {
         }
     };
 
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!newList.list_name.trim()) return toast.error('Enter a list name');
+        setCreating(true);
+        try {
+            const r = await contactListAPI.create(newList);
+            toast.success('List created — add your contacts');
+            navigate(`/outreach/lists/${r.data.list_id}`);
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not create the list');
+            setCreating(false);
+        }
+    };
+
     const handleDelete = async (id, name) => {
         if (!confirm(`Delete "${name}" and all its contacts?`)) return;
         try {
@@ -79,13 +97,46 @@ export default function ContactLists() {
             <div className="flex items-center justify-between mb-6">
                 <div>
                     <h2 className="text-xl font-bold text-gray-800">Contact Lists</h2>
-                    <p className="text-sm text-gray-500 mt-0.5">Upload Excel files to import outreach contacts</p>
+                    <p className="text-sm text-gray-500 mt-0.5">Create a list and add contacts by hand, or upload an Excel file</p>
                 </div>
-                <button onClick={() => setShowUploadForm(!showUploadForm)}
-                    className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">
-                    + Upload List
-                </button>
+                <div className="flex gap-2">
+                    <button onClick={() => { setShowNewForm(!showNewForm); setShowUploadForm(false); }}
+                        className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">
+                        + New List
+                    </button>
+                    <button onClick={() => { setShowUploadForm(!showUploadForm); setShowNewForm(false); }}
+                        className="border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-50 transition">
+                        Upload Excel
+                    </button>
+                </div>
             </div>
+
+            {showNewForm && (
+                <form onSubmit={handleCreate} className="bg-white rounded-2xl border border-gray-100 p-6 mb-6 shadow-sm">
+                    <h3 className="font-semibold text-gray-800 mb-4">New contact list</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">List Name *</label>
+                            <input type="text" value={newList.list_name} onChange={e => setNewList(f => ({ ...f, list_name: e.target.value }))}
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                                placeholder="e.g. Referral partners" />
+                        </div>
+                        <div>
+                            <label className="text-xs font-medium text-gray-600 block mb-1">Description</label>
+                            <input type="text" value={newList.description} onChange={e => setNewList(f => ({ ...f, description: e.target.value }))}
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500"
+                                placeholder="Optional description" />
+                        </div>
+                    </div>
+                    <div className="flex gap-3 mt-4">
+                        <button type="submit" disabled={creating}
+                            className="bg-green-600 text-white text-sm px-5 py-2 rounded-xl hover:bg-green-700 disabled:opacity-50 transition">
+                            {creating ? 'Creating…' : 'Create & add contacts'}
+                        </button>
+                        <button type="button" onClick={() => setShowNewForm(false)} className="text-sm text-gray-500 hover:underline px-4">Cancel</button>
+                    </div>
+                </form>
+            )}
 
             {showUploadForm && (
                 <form onSubmit={handleUpload} className="bg-white rounded-2xl border border-gray-100 p-6 mb-6 shadow-sm">
@@ -138,7 +189,7 @@ export default function ContactLists() {
                 <div className="flex items-center justify-center h-40 text-gray-400">Loading…</div>
             ) : lists.length === 0 ? (
                 <div className="bg-white rounded-2xl border border-gray-100 p-12 text-center">
-                    <p className="text-gray-400 text-sm">No contact lists yet. Upload your first Excel file to get started.</p>
+                    <p className="text-gray-400 text-sm">No contact lists yet. Create a list, or upload an Excel file, to get started.</p>
                 </div>
             ) : (
                 <div className="bg-white rounded-2xl border border-gray-100 shadow-sm">

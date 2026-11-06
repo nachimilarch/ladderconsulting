@@ -46,4 +46,10 @@ router.get('/resumes/:resumeId/download', ...exec, ctrl.downloadResume);
 // DELETE a sourced candidate profile (soft-delete user + candidate + resumes, removes resume files)
 router.delete('/candidates/:candidateId', ...exec, ctrl.deleteCandidate);
 
+// Failed upload review: list, open the original file, delete one / several / all
+router.get('/failed-uploads',               ...exec, ctrl.listFailedUploads);
+router.get('/upload-items/:id/download',    ...exec, ctrl.downloadUploadItem);
+router.post('/upload-items/delete',         ...exec, ctrl.deleteUploadItems);
+router.delete('/upload-items/:id',          ...exec, ctrl.deleteUploadItem);
+
 module.exports = router;

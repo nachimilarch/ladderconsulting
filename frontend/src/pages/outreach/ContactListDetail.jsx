@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { contactListAPI } from '../../api/outreach';
+import { ContactModal, PasteModal } from '../../components/outreach/ContactForms';
 
 function ImportErrors({ list }) {
     const [open, setOpen] = useState(false);
@@ -59,6 +60,8 @@ export default function ContactListDetail() {
     const [page, setPage]       = useState(1);
     const [search, setSearch]   = useState('');
     const [loading, setLoading] = useState(true);
+    const [modal, setModal]     = useState(null);       // null | 'add' | 'paste' | contact object being edited
+    const [selected, setSelected] = useState(new Set());
     const LIMIT = 50;
 
     const fetchList = () =>
@@ -76,6 +79,34 @@ export default function ContactListDetail() {
         fetchList();
         fetchContacts(1, '');
     }, [id]);
+
+    const refresh = () => { fetchList(); fetchContacts(page, search); setSelected(new Set()); };
+
+    const handleDelete = async (c) => {
+        if (!window.confirm(`Delete ${c.full_name || c.email || c.phone}? This cannot be undone.`)) return;
+        try {
+            await contactListAPI.removeContact(c.id);
+            toast.success('Contact deleted');
+            refresh();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not delete the contact');
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        if (!window.confirm(`Delete ${selected.size} selected contact${selected.size === 1 ? '' : 's'}? This cannot be undone.`)) return;
+        try {
+            const r = await contactListAPI.removeContacts(id, [...selected]);
+            toast.success(r.data.message);
+            refresh();
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Could not delete the contacts');
+        }
+    };
+
+    const toggle = (cid) => setSelected((prev) => { const n = new Set(prev); n.has(cid) ? n.delete(cid) : n.add(cid); return n; });
+    const allOnPage = contacts.length > 0 && contacts.every((c) => selected.has(c.id));
+    const toggleAll = () => setSelected(allOnPage ? new Set() : new Set(contacts.map((c) => c.id)));
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -113,11 +144,21 @@ export default function ContactListDetail() {
                             <p className={`font-bold ${list.failed_rows > 0 ? 'text-red-600' : 'text-gray-800'}`}>{list.failed_rows}</p>
                         </div>
                         <div><p className="text-xs text-gray-400">Status</p><p className="font-bold text-gray-800 capitalize">{list.import_status}</p></div>
-                        <div><p className="text-xs text-gray-400">File</p><p className="font-bold text-gray-800 truncate">{list.file_name || '—'}</p></div>
+                        <div><p className="text-xs text-gray-400">File</p><p className="font-bold text-gray-800 truncate">{list.file_name || 'Added by hand'}</p></div>
                     </div>
                     <ImportErrors list={list} />
                 </>
             )}
+
+            <div className="flex flex-wrap items-center gap-2 mb-3">
+                <button onClick={() => setModal('add')} className="bg-green-600 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-green-700 transition">+ Add contact</button>
+                <button onClick={() => setModal('paste')} className="border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-50 transition">Paste several</button>
+                {selected.size > 0 && (
+                    <button onClick={handleDeleteSelected} className="text-sm font-medium px-4 py-2 rounded-xl border border-red-200 text-red-600 hover:bg-red-50 transition">
+                        Delete selected ({selected.size})
+                    </button>
+                )}
+            </div>
 
             <form onSubmit={handleSearch} className="flex gap-3 mb-4">
                 <input type="text" value={search} onChange={e => setSearch(e.target.value)}
@@ -136,6 +177,7 @@ export default function ContactListDetail() {
                         <table className="w-full text-sm">
                             <thead className="bg-gray-50 text-xs text-gray-500 uppercase tracking-wide">
                                 <tr>
+                                    <th className="px-4 py-3 w-8"><input type="checkbox" checked={allOnPage} onChange={toggleAll} aria-label="Select all on this page" /></th>
                                     <th className="text-left px-4 py-3">Name</th>
                                     <th className="text-left px-4 py-3">Email</th>
                                     <th className="text-left px-4 py-3">Phone</th>
@@ -146,9 +188,10 @@ export default function ContactListDetail() {
                             </thead>
                             <tbody className="divide-y divide-gray-50">
                                 {contacts.length === 0 ? (
-                                    <tr><td colSpan={6} className="text-center py-8 text-gray-400">No contacts found</td></tr>
+                                    <tr><td colSpan={7} className="text-center py-8 text-gray-400">No contacts yet. Use “Add contact” or “Paste several”.</td></tr>
                                 ) : contacts.map(c => (
                                     <tr key={c.id} className={c.is_unsubscribed ? 'opacity-40' : ''}>
+                                        <td className="px-4 py-2.5"><input type="checkbox" checked={selected.has(c.id)} onChange={() => toggle(c.id)} aria-label="Select contact" /></td>
                                         <td className="px-4 py-2.5 font-medium text-gray-800">{c.full_name || '—'}</td>
                                         <td className="px-4 py-2.5 text-gray-500">{c.email || '—'}</td>
                                         <td className="px-4 py-2.5 text-gray-500">{c.phone || '—'}</td>
@@ -159,11 +202,13 @@ export default function ContactListDetail() {
                                                 : <span className="text-xs text-gray-300">—</span>
                                             }
                                         </td>
-                                        <td className="px-4 py-2.5 text-right">
+                                        <td className="px-4 py-2.5 text-right whitespace-nowrap space-x-3">
+                                            <button onClick={() => setModal(c)} className="text-xs text-blue-600 hover:underline">Edit</button>
                                             {!c.is_unsubscribed && (
                                                 <button onClick={() => handleUnsubscribe(c.id)}
-                                                    className="text-xs text-red-400 hover:underline">Unsub</button>
+                                                    className="text-xs text-amber-600 hover:underline">Unsub</button>
                                             )}
+                                            <button onClick={() => handleDelete(c)} className="text-xs text-red-500 hover:underline">Delete</button>
                                         </td>
                                     </tr>
                                 ))}
@@ -184,6 +229,10 @@ export default function ContactListDetail() {
                     )}
                 </>
             )}
+
+            {modal === 'add' && <ContactModal listId={id} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
+            {modal === 'paste' && <PasteModal listId={id} onClose={() => { setModal(null); refresh(); }} onSaved={(close) => { if (close) setModal(null); refresh(); }} />}
+            {modal && typeof modal === 'object' && <ContactModal listId={id} contact={modal} onClose={() => setModal(null)} onSaved={() => { setModal(null); refresh(); }} />}
         </div>
     );
 }

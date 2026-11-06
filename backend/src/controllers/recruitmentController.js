@@ -950,3 +950,137 @@ exports.downloadResume = async (req, res) => {
         res.status(500).json({ success: false, message: 'Failed to download resume.' });
     }
 };
+
+// ── Failed upload review ──────────────────────────────────────────────────────
+// A resume file that could not be turned into a profile ("failed"), or one that
+// got stuck half-way (pending/parsing after its batch finished or the server
+// restarted). Staff can see why, open the original file, and delete the entry.
+const STUCK_SQL = `(i.status IN ('pending','parsing')
+                    AND (b.status <> 'processing' OR i.updated_at < (NOW() - INTERVAL 30 MINUTE)))`;
+const REVIEWABLE_SQL = `(i.status = 'failed' OR ${STUCK_SQL})`;
+
+const uploadsRoot = () => path.resolve(process.cwd(), 'uploads');
+// Resolve a stored file_key to an absolute path, only if it is inside uploads/.
+const safeUploadPath = (fileKey) => {
+    if (!fileKey) return null;
+    const abs = path.resolve(process.cwd(), fileKey);
+    return abs.startsWith(uploadsRoot() + path.sep) ? abs : null;
+};
+
+// Items the caller may see/act on: admin → all, hr_staff → their own batches.
+const loadReviewableItems = async (req, ids) => {
+    const where = [`${REVIEWABLE_SQL}`, 'b.deleted_at IS NULL'];
+    const params = [];
+    if (ids) { where.push('i.id IN (?)'); params.push(ids); }
+    if (req.user.role !== 'admin') { where.push('b.uploaded_by = ?'); params.push(req.user.id); }
+    const [rows] = await db.query(
+        `SELECT i.id, i.batch_id, i.file_name, i.file_key, i.file_size, i.status, i.error_message,
+                i.extracted_name, i.extracted_email, i.created_at,
+                (i.status <> 'failed') AS is_stuck,
+                b.job_id, jp.title AS job_title, co.company_name, u.name AS uploaded_by_name
+         FROM resume_upload_items i
+         JOIN resume_upload_batches b ON b.id = i.batch_id
+         LEFT JOIN job_postings jp ON jp.id = b.job_id
+         LEFT JOIN companies co ON co.id = jp.company_id
+         JOIN users u ON u.id = b.uploaded_by
+         WHERE ${where.join(' AND ')}
+         ORDER BY i.created_at DESC, i.id DESC`,
+        params
+    );
+    return rows;
+};
+
+// GET /api/recruitment/failed-uploads
+exports.listFailedUploads = async (req, res) => {
+    try {
+        const rows = await loadReviewableItems(req);
+        const data = rows.slice(0, 500).map(({ file_key, ...r }) => ({
+            ...r,
+            is_stuck: !!r.is_stuck,
+            file_available: !!(safeUploadPath(file_key) && fs.existsSync(safeUploadPath(file_key))),
+            error_message: r.error_message || (r.is_stuck ? 'Processing did not finish (the server may have restarted).' : 'Unknown error.'),
+        }));
+        res.json({ success: true, data, total: rows.length });
+    } catch (err) {
+        console.error('[recruitment.listFailedUploads]', err);
+        res.status(500).json({ success: false, message: 'Failed to load failed uploads.' });
+    }
+};
+
+// GET /api/recruitment/upload-items/:id/download — the original file that was uploaded
+exports.downloadUploadItem = async (req, res) => {
+    try {
+        const [item] = await loadReviewableItems(req, [parseInt(req.params.id)]);
+        if (!item) return res.status(404).json({ success: false, message: 'Upload not found.' });
+        const abs = safeUploadPath(item.file_key);
+        if (!abs || !fs.existsSync(abs)) {
+            return res.status(404).json({ success: false, message: 'The original file is no longer on the server.' });
+        }
+        res.download(abs, item.file_name || 'resume');
+    } catch (err) {
+        console.error('[recruitment.downloadUploadItem]', err);
+        res.status(500).json({ success: false, message: 'Failed to download the file.' });
+    }
+};
+
+// Removes the entries (and their stored files when no resume record uses them),
+// then recounts each affected batch so its totals stay truthful.
+const deleteReviewableItems = async (req, ids) => {
+    const items = await loadReviewableItems(req, ids);
+    if (!items.length) return 0;
+
+    for (const it of items) {
+        const abs = safeUploadPath(it.file_key);
+        if (!abs) continue;
+        const [[inUse]] = await db.query(
+            'SELECT COUNT(*) AS n FROM resumes WHERE file_key = ?', [it.file_key]
+        );
+        if (!inUse.n) fs.unlink(abs, () => {});
+    }
+    await db.query('DELETE FROM resume_upload_items WHERE id IN (?)', [items.map(i => i.id)]);
+
+    for (const batchId of [...new Set(items.map(i => i.batch_id))]) {
+        await db.query(
+            `UPDATE resume_upload_batches b SET
+                total_files     = (SELECT COUNT(*) FROM resume_upload_items WHERE batch_id = b.id),
+                processed_files = (SELECT COUNT(*) FROM resume_upload_items WHERE batch_id = b.id AND status IN ('done','skipped','failed')),
+                created_count   = (SELECT COUNT(*) FROM resume_upload_items WHERE batch_id = b.id AND status = 'done'),
+                skipped_count   = (SELECT COUNT(*) FROM resume_upload_items WHERE batch_id = b.id AND status = 'skipped'),
+                failed_count    = (SELECT COUNT(*) FROM resume_upload_items WHERE batch_id = b.id AND status = 'failed')
+             WHERE b.id = ?`,
+            [batchId]
+        );
+    }
+    logAction(req.user.id, 'delete_failed_uploads', 'resume_upload_item', items[0].id,
+        { count: items.length, files: items.slice(0, 20).map(i => i.file_name) }, null);
+    return items.length;
+};
+
+// DELETE /api/recruitment/upload-items/:id
+exports.deleteUploadItem = async (req, res) => {
+    try {
+        const n = await deleteReviewableItems(req, [parseInt(req.params.id)]);
+        if (!n) return res.status(404).json({ success: false, message: 'Upload not found, or it did not fail (only failed uploads can be deleted here).' });
+        res.json({ success: true, message: 'Deleted.' });
+    } catch (err) {
+        console.error('[recruitment.deleteUploadItem]', err);
+        res.status(500).json({ success: false, message: 'Failed to delete.' });
+    }
+};
+
+// POST /api/recruitment/upload-items/delete   body: { ids: [..] }  or  { all: true }
+exports.deleteUploadItems = async (req, res) => {
+    try {
+        let ids = null;
+        if (!req.body.all) {
+            ids = Array.isArray(req.body.ids) ? req.body.ids.map(Number).filter(Number.isInteger) : [];
+            if (!ids.length) return res.status(400).json({ success: false, message: 'Choose at least one upload.' });
+            if (ids.length > 1000) return res.status(400).json({ success: false, message: 'Too many at once (max 1000).' });
+        }
+        const n = await deleteReviewableItems(req, ids);
+        res.json({ success: true, deleted: n, message: `${n} failed upload${n === 1 ? '' : 's'} deleted.` });
+    } catch (err) {
+        console.error('[recruitment.deleteUploadItems]', err);
+        res.status(500).json({ success: false, message: 'Failed to delete.' });
+    }
+};

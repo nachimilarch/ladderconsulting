@@ -412,28 +412,36 @@ exports.pauseEmailCampaign = async (req, res) => {
     }
 };
 
-// ── DELETE /outreach/email-campaigns/:id ─────────────────────────────────────
-exports.deleteEmailCampaign = async (req, res) => {
+// ── DELETE /outreach/email-campaigns/:id  and  /whatsapp-campaigns/:id ───────
+// Any campaign can be deleted except one that is sending right now (a send that
+// has been stuck for more than 2 hours counts as dead and may be deleted).
+// It is a soft delete: the campaign disappears from the lists, but replies, leads
+// and the send log are kept, and replies still show the campaign name.
+const makeDeleteCampaign = (type, auditAction) => async (req, res) => {
     try {
         const [[campaign]] = await db.query(
-            "SELECT id, created_by, status FROM outreach_campaigns WHERE id = ? AND deleted_at IS NULL AND campaign_type = 'email'",
-            [req.params.id]
+            `SELECT id, created_by, status, campaign_name,
+                    (sent_at IS NOT NULL AND sent_at < (NOW() - INTERVAL 2 HOUR)) AS stale
+             FROM outreach_campaigns WHERE id = ? AND deleted_at IS NULL AND campaign_type = ?`,
+            [req.params.id, type]
         );
         if (!campaign) return res.status(404).json({ success: false, message: 'Campaign not found.' });
         if (req.user.role === 'hr_staff' && campaign.created_by !== req.user.id) {
             return res.status(403).json({ success: false, message: 'Access denied.' });
         }
-        if (!['draft','scheduled'].includes(campaign.status)) {
-            return res.status(422).json({ success: false, message: 'Only draft or scheduled campaigns can be deleted.' });
+        if (campaign.status === 'sending' && !campaign.stale) {
+            return res.status(422).json({ success: false, message: 'This campaign is sending right now. Wait for it to finish (or pause it) before deleting.' });
         }
         await db.query('UPDATE outreach_campaigns SET deleted_at = NOW() WHERE id = ?', [req.params.id]);
-        logAction(req.user.id, 'delete_email_campaign', 'outreach_campaign', req.params.id, {}, null);
+        logAction(req.user.id, auditAction, 'outreach_campaign', req.params.id, { name: campaign.campaign_name, status: campaign.status }, null);
         res.json({ success: true, message: 'Campaign deleted.' });
     } catch (err) {
         console.error('[outreachCampaign.delete]', err);
         res.status(500).json({ success: false, message: 'Server error.' });
     }
 };
+exports.deleteEmailCampaign = makeDeleteCampaign('email', 'delete_email_campaign');
+exports.deleteWACampaign    = makeDeleteCampaign('whatsapp', 'delete_whatsapp_campaign');
 
 // ── GET /outreach/email-templates — read-only list for hr_staff/admin ─────────
 exports.listEmailTemplatesForOutreach = async (req, res) => {

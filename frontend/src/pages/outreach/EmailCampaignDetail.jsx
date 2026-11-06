@@ -171,6 +171,17 @@ export default function EmailCampaignDetail() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!confirm(`Delete campaign "${campaign.campaign_name}"? It will be removed from your list. Replies and leads already received are kept.`)) return;
+        try {
+            await emailCampaignAPI.remove(id);
+            toast.success('Campaign deleted');
+            navigate('/outreach/email');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Delete failed');
+        }
+    };
+
     const handlePause = async () => {
         try {
             await emailCampaignAPI.pause(id);
@@ -215,6 +226,10 @@ export default function EmailCampaignDetail() {
                 {campaign.status === 'sending' && (
                     <button onClick={handlePause}
                         className="bg-yellow-500 text-white text-sm px-4 py-1.5 rounded-xl hover:bg-yellow-600 transition">Pause</button>
+                )}
+                {campaign.status !== 'sending' && (
+                    <button onClick={handleDelete}
+                        className="border border-red-200 text-red-600 text-sm px-4 py-1.5 rounded-xl hover:bg-red-50 transition">Delete</button>
                 )}
             </div>
 

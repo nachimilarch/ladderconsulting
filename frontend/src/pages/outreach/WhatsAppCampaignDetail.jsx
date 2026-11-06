@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import { waCampaignAPI } from '../../api/outreach';
 import { fmtIst } from '../../utils/schedule';
@@ -12,6 +12,7 @@ const STATUS_COLORS = {
 
 export default function WhatsAppCampaignDetail() {
     const { id } = useParams();
+    const navigate = useNavigate();
     const [campaign, setCampaign]   = useState(null);
     const [failedLogs, setFailedLogs] = useState([]);
     const [tab, setTab]             = useState('overview');
@@ -45,6 +46,17 @@ export default function WhatsAppCampaignDetail() {
         }
     };
 
+    const handleDelete = async () => {
+        if (!confirm(`Delete campaign "${campaign.campaign_name}"? It will be removed from your list. Replies and leads already received are kept.`)) return;
+        try {
+            await waCampaignAPI.remove(id);
+            toast.success('Campaign deleted');
+            navigate('/outreach/whatsapp');
+        } catch (err) {
+            toast.error(err.response?.data?.message || 'Delete failed');
+        }
+    };
+
     const handleSend = async () => {
         if (!confirm('Send this WhatsApp campaign?')) return;
         try {
@@ -74,11 +86,18 @@ export default function WhatsAppCampaignDetail() {
                 </div>
             )}
 
-            {['draft', 'scheduled'].includes(campaign.status) && (
-                <button onClick={handleSend} className="mb-4 bg-green-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-green-700 transition">
-                    Send Now
-                </button>
-            )}
+            <div className="flex gap-2 mb-4 flex-wrap">
+                {['draft', 'scheduled'].includes(campaign.status) && (
+                    <button onClick={handleSend} className="bg-green-600 text-white text-sm px-4 py-2 rounded-xl hover:bg-green-700 transition">
+                        Send Now
+                    </button>
+                )}
+                {campaign.status !== 'sending' && (
+                    <button onClick={handleDelete} className="border border-red-200 text-red-600 text-sm px-4 py-2 rounded-xl hover:bg-red-50 transition">
+                        Delete
+                    </button>
+                )}
+            </div>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                 {[

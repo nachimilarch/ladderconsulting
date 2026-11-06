@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { recruitmentAPI } from '../../api/recruitment';
 import toast from 'react-hot-toast';
 import { matchTextCls, matchBoxCls } from '../../utils/matchScore';
+import FailedUploadsPanel from '../../components/hr/FailedUploadsPanel';
 import { CandidateOriginLine, OriginFilters } from '../../components/hr/CandidateOrigin';
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
@@ -650,6 +651,7 @@ export default function ResumeSourcing() {
                     { key: 'upload',    label: 'Upload Resumes' },
                     { key: 'freepool',  label: `Free Pool${fpTotal > 0 ? ` (${fpTotal})` : ''}` },
                     { key: 'pool',      label: 'Assign from Pool' },
+                    { key: 'failed',    label: 'Failed Uploads' },
                 ].map(t => (
                     <button key={t.key} onClick={() => setTab(t.key)}
                         className={`px-4 py-2.5 text-sm font-medium border-b-2 transition ${tab === t.key
@@ -659,6 +661,8 @@ export default function ResumeSourcing() {
                     </button>
                 ))}
             </div>
+
+            {tab === 'failed' && <FailedUploadsPanel onChanged={() => { loadBatches(); }} />}
 
             {/* ── UPLOAD TAB ── */}
             {tab === 'upload' && (

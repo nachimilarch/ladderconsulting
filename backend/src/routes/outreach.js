@@ -35,9 +35,16 @@ router.use(authorizeRole('hr_staff', 'admin'));
 // ── Contact Lists ────────────────────────────────────────────────────────────
 router.post('/contact-lists/upload',           uploadExcel.single('file'), contactCtrl.upload);
 router.get('/contact-lists',                   contactCtrl.getLists);
+router.post('/contact-lists',                  contactCtrl.createList);
 router.get('/contact-lists/:id',               contactCtrl.getList);
 router.get('/contact-lists/:id/contacts',      contactCtrl.getContacts);
+router.put('/contact-lists/:id',               contactCtrl.updateList);
 router.delete('/contact-lists/:id',            contactCtrl.deleteList);
+router.post('/contact-lists/:id/contacts',        contactCtrl.addContact);
+router.post('/contact-lists/:id/contacts/bulk',   contactCtrl.addContactsBulk);
+router.post('/contact-lists/:id/contacts/delete', contactCtrl.deleteContactsBulk);
+router.put('/contacts/:id',                    contactCtrl.updateContact);
+router.delete('/contacts/:id',                 contactCtrl.deleteContact);
 router.patch('/contacts/:id/unsubscribe',      contactCtrl.unsubscribeContact);
 router.get('/contacts/:id/call-history',       contactCtrl.getContactCallHistory);
 
@@ -90,6 +97,7 @@ router.get('/whatsapp-campaigns',              whatsappCtrl.listWACampaigns);
 router.get('/whatsapp-campaigns/:id',          whatsappCtrl.getWACampaign);
 router.get('/whatsapp-campaigns/:id/failed',   campaignCtrl.getWAFailedLogs);
 router.post('/whatsapp-campaigns/:id/send',    whatsappCtrl.sendWACampaign);
+router.delete('/whatsapp-campaigns/:id',       campaignCtrl.deleteWACampaign);
 router.patch('/whatsapp-campaigns/:id/schedule', whatsappCtrl.updateWASchedule);
 
 // ── Email Auto-Replies ───────────────────────────────────────────────────────

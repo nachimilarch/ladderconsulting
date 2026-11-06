@@ -21,6 +21,11 @@ export const recruitmentAPI = {
     getBatch: (id) => api.get(`/recruitment/batches/${id}`),
     deleteCandidate: (candidateId) => api.delete(`/recruitment/candidates/${candidateId}`),
 
+    listFailedUploads: () => api.get('/recruitment/failed-uploads'),
+    downloadUploadItem: (id) => api.get(`/recruitment/upload-items/${id}/download`, { responseType: 'blob' }),
+    deleteUploadItem: (id) => api.delete(`/recruitment/upload-items/${id}`),
+    deleteUploadItems: (ids) => api.post('/recruitment/upload-items/delete', ids ? { ids } : { all: true }),
+
     listTalentPool: (params) => api.get('/recruitment/talent', { params }),
     assignCandidateToJob: (jobId, candidateId) =>
         api.post(`/recruitment/jobs/${jobId}/assign-candidate`, { candidateId }),
