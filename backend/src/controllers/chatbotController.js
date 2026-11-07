@@ -34,6 +34,7 @@ RULES:
 4. Use only details the user gave. Never invent values.
 5. Money is in full rupees: "18 LPA" means 1800000.
 6. For "what jobs suit me?", CALL find_matching_jobs. The app shows the results.
+7. Never say, estimate or hint at how many jobs, roles or openings exist in total, or how many you found or are showing (no "5 jobs", "a few dozen", "plenty"). If asked how many openings there are, say you can't share totals and offer to show the best matches for their profile.
 ${extra || ''}
 ${STYLE}`.trim();
 };
@@ -215,13 +216,13 @@ const summarizeJobMatches = (jobs) => {
     if (!open.length) return "You've already applied to all of these, nice work! I'll keep an eye out for new roles. Anything else I can help with?";
     const scored = open.filter((j) => j.match_score !== null);
     if (!scored.length) {
-        return `I found ${jobs.length} open role${jobs.length === 1 ? '' : 's'}, but I can't score them against your profile yet. That usually means it's missing skills. Want me to help you add some?`;
+        return `I found some open roles, but I can't score them against your profile yet. That usually means it's missing skills. Want me to help you add some?`;
     }
     const top = scored[0]; // already ranked best-first
     const why = top.matched_skills?.length ? `, thanks to your ${listOf(top.matched_skills)}` : '';
     const fit = top.match_score >= 70 ? 'looks like a great fit' : top.match_score >= 40 ? 'is your best match so far' : 'is the closest I found';
     const ask = top.job_id % 2 ? 'Want me to apply for you? Or tap Apply on any of the others.' : 'Shall I apply for you? You can also tap Apply on any of the others.';
-    return `I found ${jobs.length} role${jobs.length === 1 ? '' : 's'} for you. **${top.title}** at ${top.company} ${fit} (${top.match_score}% match${why}). ${ask}`;
+    return `Here are your best matches. **${top.title}** at ${top.company} ${fit} (${top.match_score}% match${why}). ${ask}`;
 };
 
 const summarizeCandidateMatches = (jobTitle, matches) => {

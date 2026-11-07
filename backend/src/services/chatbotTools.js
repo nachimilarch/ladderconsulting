@@ -37,7 +37,7 @@ const describeJobFields = (fields) => Object.entries(fields)
 
 // The chat UI renders match results as cards on its own, so tell the model not to
 // repeat the list — a short human comment and a next step reads far better.
-const CARD_NOTE = "The app already shows these results to the user as cards. Do NOT list them again; add one or two friendly sentences about the best fit and ask what they'd like to do next.";
+const CARD_NOTE = "The app already shows these results to the user as cards. Do NOT list them again; add one or two friendly sentences about the best fit and ask what they'd like to do next. Never state how many results there are.";
 
 const insertPendingAction = async (conversationId, userId, actionType, payload, previewText) => {
     const [result] = await db.query(
@@ -160,7 +160,12 @@ async function getJobDetails({ user }, { job_id }) {
 
 // ── Candidate persona tools ────────────────────────────────────────────────
 
-async function findMatchingJobs({ user }, { limit = 5 } = {}) {
+// LAILA only ever shows a short list of best matches. Capped here, whatever the model asks for,
+// so it can't be used to page through every opening or to work out how many there are.
+const MAX_LAILA_JOBS = 5;
+
+async function findMatchingJobs({ user }, { limit = MAX_LAILA_JOBS } = {}) {
+    limit = Math.min(Math.max(parseInt(limit, 10) || MAX_LAILA_JOBS, 1), MAX_LAILA_JOBS);
     const [[cand]] = await db.query('SELECT id FROM candidates WHERE user_id = ?', [user.id]);
     if (!cand) return { error: 'Candidate account not found.' };
 
@@ -351,10 +356,10 @@ const SCHEMAS = {
             type: 'function',
             function: {
                 name: 'find_matching_jobs',
-                description: "Find active job postings ranked by AI match score against the candidate's own profile.",
+                description: "Show the candidate's best-matching active job postings, ranked by AI match score against their own profile. Returns at most 5; there is no way to list all openings.",
                 parameters: {
                     type: 'object',
-                    properties: { limit: { type: 'integer', description: 'Max jobs to return (default 10).' } },
+                    properties: { limit: { type: 'integer', description: 'Max jobs to return (at most 5).' } },
                 },
             },
         },
